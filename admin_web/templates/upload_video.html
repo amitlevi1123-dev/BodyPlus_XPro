@@ -1,0 +1,143 @@
+{% extends "base.html" %}
+{% block title %}העלאת וידאו — ניתוח מקובץ{% endblock %}
+{% block page_title %}📼 העלאת וידאו — ניתוח מקובץ{% endblock %}
+
+{% block content %}
+<div class="max-w-3xl mx-auto space-y-6" dir="rtl">
+  <section class="bg-white rounded-2xl shadow p-5">
+    <h3 class="font-semibold text-lg mb-3">בחרו קובץ מהמחשב</h3>
+    <p class="text-sm text-gray-600 mb-3">
+      מגבלת גודל: עד {{ max_mb }}MB. סיומות מותרות:
+      <code class="text-xs bg-gray-100 px-1 py-0.5 rounded">{{ allowed|join(', ') }}</code>
+    </p>
+
+    <div class="flex items-center gap-3">
+      <input id="filePick" type="file" accept="video/*"
+             class="block text-sm text-gray-900 file:mr-3 file:py-2 file:px-3 file:rounded-lg file:border-0
+                    file:text-sm file:font-semibold file:bg-sky-50 file:text-sky-700 hover:file:bg-sky-100" />
+      <button id="btnUpload"
+              class="px-4 py-2 rounded-lg bg-sky-600 text-white hover:bg-sky-700 disabled:opacity-50">
+        העלה
+      </button>
+      <span id="uploadMsg" class="text-sm text-gray-600"></span>
+    </div>
+
+    <hr class="my-4" />
+
+    <div class="flex items-center gap-3 flex-wrap">
+      <button id="btnUse"
+              class="px-4 py-2 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-50">
+        הפעל ניתוח על הקובץ האחרון
+      </button>
+      <a href="/video/stream_file.mjpg" target="_blank"
+         class="px-4 py-2 rounded-lg border text-sky-700 hover:bg-sky-50">
+        צפייה בזרם (מקובץ)
+      </a>
+      <button id="btnStop" class="px-4 py-2 rounded-lg bg-gray-200 hover:bg-gray-300">
+        עצור סטרים מקובץ
+      </button>
+      <a href="/api/debug/ffmpeg" target="_blank"
+         class="px-3 py-2 rounded-lg border text-gray-700 hover:bg-gray-50 text-sm">
+        דיבוג FFmpeg
+      </a>
+      <span id="useMsg" class="text-sm text-gray-600"></span>
+    </div>
+
+    <details class="mt-4">
+      <summary class="cursor-pointer text-sm text-gray-500">סטטוס אחרון</summary>
+      <pre id="stateBox" class="text-xs bg-gray-50 border rounded p-2 overflow-auto max-h-56">—</pre>
+    </details>
+  </section>
+
+  <section class="bg-white rounded-2xl shadow p-5">
+    <h4 class="font-semibold mb-2">טיפים</h4>
+    <ul class="list-disc pr-5 text-sm text-gray-700 space-y-1">
+      <li>הסטרים מהקובץ נגיש ב־<code>/video/stream_file.mjpg</code>.</li>
+      <li>מסלול המצלמה החיה נפרד: <code>/video/stream.mjpg</code> — אין התנגשות.</li>
+    </ul>
+  </section>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function () {
+  const pick     = document.getElementById('filePick');
+  const btnUp    = document.getElementById('btnUpload');
+  const btnUse   = document.getElementById('btnUse');
+  const btnStop  = document.getElementById('btnStop');
+  const upMsg    = document.getElementById('uploadMsg');
+  const useMsg   = document.getElementById('useMsg');
+  const stateBox = document.getElementById('stateBox');
+
+  // ---- fetchJson משופר: מציג הודעת שגיאה אמיתית מהשרת ----
+  async function fetchJson(url, opts) {
+    const r = await fetch(url, opts);
+    const text = await r.text();
+    let data = null;
+    try { data = JSON.parse(text); } catch(_) {}
+    if (!r.ok) {
+      const msg = (data && (data.error || data.err || data.message || data.detail))
+                  || text || ('HTTP ' + r.status);
+      throw new Error(msg);
+    }
+    return data ?? { ok: true, raw: text };
+  }
+
+  async function refreshStatus(){
+    try{
+      const j = await fetchJson('/api/upload_video/status', { cache:'no-store' });
+      stateBox.textContent = JSON.stringify(j, null, 2);
+    }catch(e){
+      stateBox.textContent = '⚠️ שגיאה בקריאת סטטוס: ' + (e.message || e);
+    }
+  }
+
+  btnUp.addEventListener('click', async () => {
+    const f = (pick.files && pick.files[0]);
+    if (!f) { upMsg.textContent = 'לא נבחר קובץ.'; return; }
+    upMsg.textContent = 'מעלה...';
+    btnUp.disabled = true;
+    try{
+      const fd = new FormData();
+      fd.append('file', f, f.name);
+      const j = await fetchJson('/api/upload_video', { method:'POST', body: fd });
+      upMsg.textContent = `✅ נשמר: ${j.file_name} (${j.size_mb}MB)`;
+    }catch(e){
+      upMsg.textContent = '❌ ' + (e.message || 'שגיאת רשת/שרת');
+    }finally{
+      btnUp.disabled = false;
+      refreshStatus();
+    }
+  });
+
+  btnUse.addEventListener('click', async () => {
+    useMsg.textContent = 'מתחיל סטרים...';
+    btnUse.disabled = true;
+    try{
+      const j = await fetchJson('/api/video/use_file', { method:'POST', headers:{'Content-Type':'application/json'}, body:'{}' });
+      useMsg.textContent = `🎬 ${j.message} — פתח/י: /video/stream_file.mjpg`;
+    }catch(e){
+      useMsg.textContent = '❌ ' + (e.message || 'שגיאת רשת/שרת');
+    }finally{
+      btnUse.disabled = false;
+      refreshStatus();
+    }
+  });
+
+  btnStop.addEventListener('click', async () => {
+    try{
+      await fetchJson('/api/video/stop_file', { method:'POST' });
+      useMsg.textContent = '⏹️ הופסק סטרים מהקובץ';
+    }catch(e){
+      useMsg.textContent = '❌ ' + (e.message || 'שגיאת רשת/שרת');
+    }finally{
+      refreshStatus();
+    }
+  });
+
+  // סטטוס ראשוני
+  refreshStatus();
+})();
+</script>
+{% endblock %}

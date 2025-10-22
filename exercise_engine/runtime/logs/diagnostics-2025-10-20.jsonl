@@ -1,0 +1,218 @@
+{"ts": "2025-10-20T12:22:53.178Z", "event": "camera_audit", "severity": "info", "message": "begin set audit", "context": {"exercise": null, "set_index": 101}}
+{"ts": "2025-10-20T12:22:53.185Z", "event": "classifier_no_candidate", "severity": "warn", "message": "top1 below accept threshold", "context": {"top1": "squat.bodyweight", "score": 0.0}}
+{"ts": "2025-10-20T12:22:53.185Z", "event": "classifier_fallback_bodyweight", "severity": "info", "message": "fallback to BW", "context": {"fallback_id": null}}
+{"ts": "2025-10-20T12:22:53.192Z", "event": "report_built", "severity": "info", "message": "report built", "context": {"exercise": "squat.base", "score": null, "quality": null, "unscored": true}}
+{"ts": "2025-10-20T12:22:53.193Z", "event": "classifier_no_candidate", "severity": "warn", "message": "top1 below accept threshold", "context": {"top1": "squat.bodyweight", "score": 0.0}}
+{"ts": "2025-10-20T12:22:53.194Z", "event": "classifier_fallback_bodyweight", "severity": "info", "message": "fallback to BW", "context": {"fallback_id": null}}
+{"ts": "2025-10-20T12:22:53.194Z", "event": "report_built", "severity": "info", "message": "report built", "context": {"exercise": "squat.base", "score": null, "quality": null, "unscored": true}}
+{"ts": "2025-10-20T12:22:53.195Z", "event": "classifier_no_candidate", "severity": "warn", "message": "top1 below accept threshold", "context": {"top1": "squat.bodyweight", "score": 0.0}}
+{"ts": "2025-10-20T12:22:53.195Z", "event": "classifier_fallback_bodyweight", "severity": "info", "message": "fallback to BW", "context": {"fallback_id": null}}
+{"ts": "2025-10-20T12:22:53.196Z", "event": "report_built", "severity": "info", "message": "report built", "context": {"exercise": "squat.base", "score": null, "quality": null, "unscored": true}}
+{"ts": "2025-10-20T12:22:53.196Z", "event": "classifier_no_candidate", "severity": "warn", "message": "top1 below accept threshold", "context": {"top1": "squat.bodyweight", "score": 0.0}}
+{"ts": "2025-10-20T12:22:53.197Z", "event": "classifier_fallback_bodyweight", "severity": "info", "message": "fallback to BW", "context": {"fallback_id": null}}
+{"ts": "2025-10-20T12:22:53.197Z", "event": "report_built", "severity": "info", "message": "report built", "context": {"exercise": "squat.base", "score": null, "quality": null, "unscored": true}}
+{"ts": "2025-10-20T12:22:53.198Z", "event": "classifier_no_candidate", "severity": "warn", "message": "top1 below accept threshold", "context": {"top1": "squat.bodyweight", "score": 0.0}}
+{"ts": "2025-10-20T12:22:53.198Z", "event": "classifier_fallback_bodyweight", "severity": "info", "message": "fallback to BW", "context": {"fallback_id": null}}
+{"ts": "2025-10-20T12:22:53.199Z", "event": "report_built", "severity": "info", "message": "report built", "context": {"exercise": "squat.base", "score": null, "quality": null, "unscored": true}}
+{"ts": "2025-10-20T12:22:53.199Z", "event": "classifier_no_candidate", "severity": "warn", "message": "top1 below accept threshold", "context": {"top1": "squat.bodyweight", "score": 0.0}}
+{"ts": "2025-10-20T12:22:53.200Z", "event": "classifier_fallback_bodyweight", "severity": "info", "message": "fallback to BW", "context": {"fallback_id": null}}
+{"ts": "2025-10-20T12:22:53.200Z", "event": "report_built", "severity": "info", "message": "report built", "context": {"exercise": "squat.base", "score": null, "quality": null, "unscored": true}}
+{"ts": "2025-10-20T12:22:53.201Z", "event": "classifier_no_candidate", "severity": "warn", "message": "top1 below accept threshold", "context": {"top1": "squat.bodyweight", "score": 0.0}}
+{"ts": "2025-10-20T12:22:53.201Z", "event": "classifier_fallback_bodyweight", "severity": "info", "message": "fallback to BW", "context": {"fallback_id": null}}
+{"ts": "2025-10-20T12:22:53.202Z", "event": "report_built", "severity": "info", "message": "report built", "context": {"exercise": "squat.base", "score": null, "quality": null, "unscored": true}}
+{"ts": "2025-10-20T12:22:53.202Z", "event": "classifier_no_candidate", "severity": "warn", "message": "top1 below accept threshold", "context": {"top1": "squat.bodyweight", "score": 0.0}}
+{"ts": "2025-10-20T12:22:53.203Z", "event": "classifier_fallback_bodyweight", "severity": "info", "message": "fallback to BW", "context": {"fallback_id": null}}
+{"ts": "2025-10-20T12:22:53.203Z", "event": "report_built", "severity": "info", "message": "report built", "context": {"exercise": "squat.base", "score": null, "quality": null, "unscored": true}}
+{"ts": "2025-10-20T12:22:53.204Z", "event": "classifier_no_candidate", "severity": "warn", "message": "top1 below accept threshold", "context": {"top1": "squat.bodyweight", "score": 0.0}}
+{"ts": "2025-10-20T12:22:53.204Z", "event": "classifier_fallback_bodyweight", "severity": "info", "message": "fallback to BW", "context": {"fallback_id": null}}
+{"ts": "2025-10-20T12:22:53.205Z", "event": "report_built", "severity": "info", "message": "report built", "context": {"exercise": "squat.base", "score": null, "quality": null, "unscored": true}}
+{"ts": "2025-10-20T12:22:53.205Z", "event": "classifier_no_candidate", "severity": "warn", "message": "top1 below accept threshold", "context": {"top1": "squat.bodyweight", "score": 0.0}}
+{"ts": "2025-10-20T12:22:53.205Z", "event": "classifier_fallback_bodyweight", "severity": "info", "message": "fallback to BW", "context": {"fallback_id": null}}
+{"ts": "2025-10-20T12:22:53.206Z", "event": "report_built", "severity": "info", "message": "report built", "context": {"exercise": "squat.base", "score": null, "quality": null, "unscored": true}}
+{"ts": "2025-10-20T12:22:53.206Z", "event": "classifier_no_candidate", "severity": "warn", "message": "top1 below accept threshold", "context": {"top1": "squat.bodyweight", "score": 0.0}}
+{"ts": "2025-10-20T12:22:53.207Z", "event": "classifier_fallback_bodyweight", "severity": "info", "message": "fallback to BW", "context": {"fallback_id": null}}
+{"ts": "2025-10-20T12:22:53.207Z", "event": "report_built", "severity": "info", "message": "report built", "context": {"exercise": "squat.base", "score": null, "quality": null, "unscored": true}}
+{"ts": "2025-10-20T12:22:53.208Z", "event": "classifier_no_candidate", "severity": "warn", "message": "top1 below accept threshold", "context": {"top1": "squat.bodyweight", "score": 0.0}}
+{"ts": "2025-10-20T12:22:53.208Z", "event": "classifier_fallback_bodyweight", "severity": "info", "message": "fallback to BW", "context": {"fallback_id": null}}
+{"ts": "2025-10-20T12:22:53.209Z", "event": "report_built", "severity": "info", "message": "report built", "context": {"exercise": "squat.base", "score": null, "quality": null, "unscored": true}}
+{"ts": "2025-10-20T12:22:53.209Z", "event": "classifier_no_candidate", "severity": "warn", "message": "top1 below accept threshold", "context": {"top1": "squat.bodyweight", "score": 0.0}}
+{"ts": "2025-10-20T12:22:53.209Z", "event": "classifier_fallback_bodyweight", "severity": "info", "message": "fallback to BW", "context": {"fallback_id": null}}
+{"ts": "2025-10-20T12:22:53.210Z", "event": "report_built", "severity": "info", "message": "report built", "context": {"exercise": "squat.base", "score": null, "quality": null, "unscored": true}}
+{"ts": "2025-10-20T12:22:53.210Z", "event": "classifier_no_candidate", "severity": "warn", "message": "top1 below accept threshold", "context": {"top1": "squat.bodyweight", "score": 0.0}}
+{"ts": "2025-10-20T12:22:53.211Z", "event": "classifier_fallback_bodyweight", "severity": "info", "message": "fallback to BW", "context": {"fallback_id": null}}
+{"ts": "2025-10-20T12:22:53.211Z", "event": "report_built", "severity": "info", "message": "report built", "context": {"exercise": "squat.base", "score": null, "quality": null, "unscored": true}}
+{"ts": "2025-10-20T12:22:53.212Z", "event": "classifier_no_candidate", "severity": "warn", "message": "top1 below accept threshold", "context": {"top1": "squat.bodyweight", "score": 0.0}}
+{"ts": "2025-10-20T12:22:53.212Z", "event": "classifier_fallback_bodyweight", "severity": "info", "message": "fallback to BW", "context": {"fallback_id": null}}
+{"ts": "2025-10-20T12:22:53.213Z", "event": "report_built", "severity": "info", "message": "report built", "context": {"exercise": "squat.base", "score": null, "quality": null, "unscored": true}}
+{"ts": "2025-10-20T12:22:53.213Z", "event": "classifier_no_candidate", "severity": "warn", "message": "top1 below accept threshold", "context": {"top1": "squat.bodyweight", "score": 0.0}}
+{"ts": "2025-10-20T12:22:53.213Z", "event": "classifier_fallback_bodyweight", "severity": "info", "message": "fallback to BW", "context": {"fallback_id": null}}
+{"ts": "2025-10-20T12:22:53.214Z", "event": "report_built", "severity": "info", "message": "report built", "context": {"exercise": "squat.base", "score": null, "quality": null, "unscored": true}}
+{"ts": "2025-10-20T12:22:53.214Z", "event": "classifier_no_candidate", "severity": "warn", "message": "top1 below accept threshold", "context": {"top1": "squat.bodyweight", "score": 0.0}}
+{"ts": "2025-10-20T12:22:53.215Z", "event": "classifier_fallback_bodyweight", "severity": "info", "message": "fallback to BW", "context": {"fallback_id": null}}
+{"ts": "2025-10-20T12:22:53.215Z", "event": "report_built", "severity": "info", "message": "report built", "context": {"exercise": "squat.base", "score": null, "quality": null, "unscored": true}}
+{"ts": "2025-10-20T12:22:53.216Z", "event": "classifier_no_candidate", "severity": "warn", "message": "top1 below accept threshold", "context": {"top1": "squat.bodyweight", "score": 0.0}}
+{"ts": "2025-10-20T12:22:53.216Z", "event": "classifier_fallback_bodyweight", "severity": "info", "message": "fallback to BW", "context": {"fallback_id": null}}
+{"ts": "2025-10-20T12:22:53.217Z", "event": "report_built", "severity": "info", "message": "report built", "context": {"exercise": "squat.base", "score": null, "quality": null, "unscored": true}}
+{"ts": "2025-10-20T12:22:53.218Z", "event": "classifier_no_candidate", "severity": "warn", "message": "top1 below accept threshold", "context": {"top1": "squat.bodyweight", "score": 0.0}}
+{"ts": "2025-10-20T12:22:53.218Z", "event": "classifier_fallback_bodyweight", "severity": "info", "message": "fallback to BW", "context": {"fallback_id": null}}
+{"ts": "2025-10-20T12:22:53.219Z", "event": "report_built", "severity": "info", "message": "report built", "context": {"exercise": "squat.base", "score": null, "quality": null, "unscored": true}}
+{"ts": "2025-10-20T12:22:53.219Z", "event": "classifier_no_candidate", "severity": "warn", "message": "top1 below accept threshold", "context": {"top1": "squat.bodyweight", "score": 0.0}}
+{"ts": "2025-10-20T12:22:53.220Z", "event": "classifier_fallback_bodyweight", "severity": "info", "message": "fallback to BW", "context": {"fallback_id": null}}
+{"ts": "2025-10-20T12:22:53.221Z", "event": "report_built", "severity": "info", "message": "report built", "context": {"exercise": "squat.base", "score": null, "quality": null, "unscored": true}}
+{"ts": "2025-10-20T12:22:53.221Z", "event": "classifier_no_candidate", "severity": "warn", "message": "top1 below accept threshold", "context": {"top1": "squat.bodyweight", "score": 0.0}}
+{"ts": "2025-10-20T12:22:53.222Z", "event": "classifier_fallback_bodyweight", "severity": "info", "message": "fallback to BW", "context": {"fallback_id": null}}
+{"ts": "2025-10-20T12:22:53.222Z", "event": "report_built", "severity": "info", "message": "report built", "context": {"exercise": "squat.base", "score": null, "quality": null, "unscored": true}}
+{"ts": "2025-10-20T12:22:53.223Z", "event": "classifier_no_candidate", "severity": "warn", "message": "top1 below accept threshold", "context": {"top1": "squat.bodyweight", "score": 0.0}}
+{"ts": "2025-10-20T12:22:53.223Z", "event": "classifier_fallback_bodyweight", "severity": "info", "message": "fallback to BW", "context": {"fallback_id": null}}
+{"ts": "2025-10-20T12:22:53.224Z", "event": "report_built", "severity": "info", "message": "report built", "context": {"exercise": "squat.base", "score": null, "quality": null, "unscored": true}}
+{"ts": "2025-10-20T12:22:53.225Z", "event": "classifier_no_candidate", "severity": "warn", "message": "top1 below accept threshold", "context": {"top1": "squat.bodyweight", "score": 0.0}}
+{"ts": "2025-10-20T12:22:53.225Z", "event": "classifier_fallback_bodyweight", "severity": "info", "message": "fallback to BW", "context": {"fallback_id": null}}
+{"ts": "2025-10-20T12:22:53.226Z", "event": "report_built", "severity": "info", "message": "report built", "context": {"exercise": "squat.base", "score": null, "quality": null, "unscored": true}}
+{"ts": "2025-10-20T12:22:53.227Z", "event": "classifier_no_candidate", "severity": "warn", "message": "top1 below accept threshold", "context": {"top1": "squat.bodyweight", "score": 0.0}}
+{"ts": "2025-10-20T12:22:53.227Z", "event": "classifier_fallback_bodyweight", "severity": "info", "message": "fallback to BW", "context": {"fallback_id": null}}
+{"ts": "2025-10-20T12:22:53.228Z", "event": "report_built", "severity": "info", "message": "report built", "context": {"exercise": "squat.base", "score": null, "quality": null, "unscored": true}}
+{"ts": "2025-10-20T12:22:53.228Z", "event": "classifier_no_candidate", "severity": "warn", "message": "top1 below accept threshold", "context": {"top1": "squat.bodyweight", "score": 0.0}}
+{"ts": "2025-10-20T12:22:53.229Z", "event": "classifier_fallback_bodyweight", "severity": "info", "message": "fallback to BW", "context": {"fallback_id": null}}
+{"ts": "2025-10-20T12:22:53.229Z", "event": "report_built", "severity": "info", "message": "report built", "context": {"exercise": "squat.base", "score": null, "quality": null, "unscored": true}}
+{"ts": "2025-10-20T12:22:53.230Z", "event": "classifier_no_candidate", "severity": "warn", "message": "top1 below accept threshold", "context": {"top1": "squat.bodyweight", "score": 0.0}}
+{"ts": "2025-10-20T12:22:53.230Z", "event": "classifier_fallback_bodyweight", "severity": "info", "message": "fallback to BW", "context": {"fallback_id": null}}
+{"ts": "2025-10-20T12:22:53.231Z", "event": "report_built", "severity": "info", "message": "report built", "context": {"exercise": "squat.base", "score": null, "quality": null, "unscored": true}}
+{"ts": "2025-10-20T12:22:53.232Z", "event": "classifier_no_candidate", "severity": "warn", "message": "top1 below accept threshold", "context": {"top1": "squat.bodyweight", "score": 0.0}}
+{"ts": "2025-10-20T12:22:53.232Z", "event": "classifier_fallback_bodyweight", "severity": "info", "message": "fallback to BW", "context": {"fallback_id": null}}
+{"ts": "2025-10-20T12:22:53.233Z", "event": "report_built", "severity": "info", "message": "report built", "context": {"exercise": "squat.base", "score": null, "quality": null, "unscored": true}}
+{"ts": "2025-10-20T12:22:53.233Z", "event": "classifier_no_candidate", "severity": "warn", "message": "top1 below accept threshold", "context": {"top1": "squat.bodyweight", "score": 0.0}}
+{"ts": "2025-10-20T12:22:53.234Z", "event": "classifier_fallback_bodyweight", "severity": "info", "message": "fallback to BW", "context": {"fallback_id": null}}
+{"ts": "2025-10-20T12:22:53.234Z", "event": "report_built", "severity": "info", "message": "report built", "context": {"exercise": "squat.base", "score": null, "quality": null, "unscored": true}}
+{"ts": "2025-10-20T12:22:53.235Z", "event": "classifier_no_candidate", "severity": "warn", "message": "top1 below accept threshold", "context": {"top1": "squat.bodyweight", "score": 0.0}}
+{"ts": "2025-10-20T12:22:53.235Z", "event": "classifier_fallback_bodyweight", "severity": "info", "message": "fallback to BW", "context": {"fallback_id": null}}
+{"ts": "2025-10-20T12:22:53.236Z", "event": "report_built", "severity": "info", "message": "report built", "context": {"exercise": "squat.base", "score": null, "quality": null, "unscored": true}}
+{"ts": "2025-10-20T12:22:53.237Z", "event": "classifier_no_candidate", "severity": "warn", "message": "top1 below accept threshold", "context": {"top1": "squat.bodyweight", "score": 0.0}}
+{"ts": "2025-10-20T12:22:53.237Z", "event": "classifier_fallback_bodyweight", "severity": "info", "message": "fallback to BW", "context": {"fallback_id": null}}
+{"ts": "2025-10-20T12:22:53.238Z", "event": "report_built", "severity": "info", "message": "report built", "context": {"exercise": "squat.base", "score": null, "quality": null, "unscored": true}}
+{"ts": "2025-10-20T12:22:53.238Z", "event": "classifier_no_candidate", "severity": "warn", "message": "top1 below accept threshold", "context": {"top1": "squat.bodyweight", "score": 0.0}}
+{"ts": "2025-10-20T12:22:53.239Z", "event": "classifier_fallback_bodyweight", "severity": "info", "message": "fallback to BW", "context": {"fallback_id": null}}
+{"ts": "2025-10-20T12:22:53.239Z", "event": "report_built", "severity": "info", "message": "report built", "context": {"exercise": "squat.base", "score": null, "quality": null, "unscored": true}}
+{"ts": "2025-10-20T12:22:53.240Z", "event": "classifier_no_candidate", "severity": "warn", "message": "top1 below accept threshold", "context": {"top1": "squat.bodyweight", "score": 0.0}}
+{"ts": "2025-10-20T12:22:53.240Z", "event": "classifier_fallback_bodyweight", "severity": "info", "message": "fallback to BW", "context": {"fallback_id": null}}
+{"ts": "2025-10-20T12:22:53.241Z", "event": "report_built", "severity": "info", "message": "report built", "context": {"exercise": "squat.base", "score": null, "quality": null, "unscored": true}}
+{"ts": "2025-10-20T12:22:53.242Z", "event": "classifier_no_candidate", "severity": "warn", "message": "top1 below accept threshold", "context": {"top1": "squat.bodyweight", "score": 0.0}}
+{"ts": "2025-10-20T12:22:53.242Z", "event": "classifier_fallback_bodyweight", "severity": "info", "message": "fallback to BW", "context": {"fallback_id": null}}
+{"ts": "2025-10-20T12:22:53.243Z", "event": "report_built", "severity": "info", "message": "report built", "context": {"exercise": "squat.base", "score": null, "quality": null, "unscored": true}}
+{"ts": "2025-10-20T12:22:53.243Z", "event": "classifier_no_candidate", "severity": "warn", "message": "top1 below accept threshold", "context": {"top1": "squat.bodyweight", "score": 0.0}}
+{"ts": "2025-10-20T12:22:53.244Z", "event": "classifier_fallback_bodyweight", "severity": "info", "message": "fallback to BW", "context": {"fallback_id": null}}
+{"ts": "2025-10-20T12:22:53.244Z", "event": "report_built", "severity": "info", "message": "report built", "context": {"exercise": "squat.base", "score": null, "quality": null, "unscored": true}}
+{"ts": "2025-10-20T12:22:53.245Z", "event": "classifier_no_candidate", "severity": "warn", "message": "top1 below accept threshold", "context": {"top1": "squat.bodyweight", "score": 0.0}}
+{"ts": "2025-10-20T12:22:53.245Z", "event": "classifier_fallback_bodyweight", "severity": "info", "message": "fallback to BW", "context": {"fallback_id": null}}
+{"ts": "2025-10-20T12:22:53.246Z", "event": "report_built", "severity": "info", "message": "report built", "context": {"exercise": "squat.base", "score": null, "quality": null, "unscored": true}}
+{"ts": "2025-10-20T12:22:53.246Z", "event": "classifier_no_candidate", "severity": "warn", "message": "top1 below accept threshold", "context": {"top1": "squat.bodyweight", "score": 0.0}}
+{"ts": "2025-10-20T12:22:53.247Z", "event": "classifier_fallback_bodyweight", "severity": "info", "message": "fallback to BW", "context": {"fallback_id": null}}
+{"ts": "2025-10-20T12:22:53.248Z", "event": "report_built", "severity": "info", "message": "report built", "context": {"exercise": "squat.base", "score": null, "quality": null, "unscored": true}}
+{"ts": "2025-10-20T12:22:53.248Z", "event": "classifier_no_candidate", "severity": "warn", "message": "top1 below accept threshold", "context": {"top1": "squat.bodyweight", "score": 0.0}}
+{"ts": "2025-10-20T12:22:53.249Z", "event": "classifier_fallback_bodyweight", "severity": "info", "message": "fallback to BW", "context": {"fallback_id": null}}
+{"ts": "2025-10-20T12:22:53.249Z", "event": "report_built", "severity": "info", "message": "report built", "context": {"exercise": "squat.base", "score": null, "quality": null, "unscored": true}}
+{"ts": "2025-10-20T12:22:53.250Z", "event": "classifier_no_candidate", "severity": "warn", "message": "top1 below accept threshold", "context": {"top1": "squat.bodyweight", "score": 0.0}}
+{"ts": "2025-10-20T12:22:53.250Z", "event": "classifier_fallback_bodyweight", "severity": "info", "message": "fallback to BW", "context": {"fallback_id": null}}
+{"ts": "2025-10-20T12:22:53.251Z", "event": "report_built", "severity": "info", "message": "report built", "context": {"exercise": "squat.base", "score": null, "quality": null, "unscored": true}}
+{"ts": "2025-10-20T12:22:53.252Z", "event": "classifier_no_candidate", "severity": "warn", "message": "top1 below accept threshold", "context": {"top1": "squat.bodyweight", "score": 0.0}}
+{"ts": "2025-10-20T12:22:53.252Z", "event": "classifier_fallback_bodyweight", "severity": "info", "message": "fallback to BW", "context": {"fallback_id": null}}
+{"ts": "2025-10-20T12:22:53.253Z", "event": "report_built", "severity": "info", "message": "report built", "context": {"exercise": "squat.base", "score": null, "quality": null, "unscored": true}}
+{"ts": "2025-10-20T12:22:53.255Z", "event": "classifier_no_candidate", "severity": "warn", "message": "top1 below accept threshold", "context": {"top1": "squat.bodyweight", "score": 0.0}}
+{"ts": "2025-10-20T12:22:53.255Z", "event": "classifier_fallback_bodyweight", "severity": "info", "message": "fallback to BW", "context": {"fallback_id": null}}
+{"ts": "2025-10-20T12:22:53.256Z", "event": "report_built", "severity": "info", "message": "report built", "context": {"exercise": "squat.base", "score": null, "quality": null, "unscored": true}}
+{"ts": "2025-10-20T12:22:53.257Z", "event": "classifier_no_candidate", "severity": "warn", "message": "top1 below accept threshold", "context": {"top1": "squat.bodyweight", "score": 0.0}}
+{"ts": "2025-10-20T12:22:53.257Z", "event": "classifier_fallback_bodyweight", "severity": "info", "message": "fallback to BW", "context": {"fallback_id": null}}
+{"ts": "2025-10-20T12:22:53.257Z", "event": "report_built", "severity": "info", "message": "report built", "context": {"exercise": "squat.base", "score": null, "quality": null, "unscored": true}}
+{"ts": "2025-10-20T12:22:53.258Z", "event": "classifier_no_candidate", "severity": "warn", "message": "top1 below accept threshold", "context": {"top1": "squat.bodyweight", "score": 0.0}}
+{"ts": "2025-10-20T12:22:53.258Z", "event": "classifier_fallback_bodyweight", "severity": "info", "message": "fallback to BW", "context": {"fallback_id": null}}
+{"ts": "2025-10-20T12:22:53.259Z", "event": "report_built", "severity": "info", "message": "report built", "context": {"exercise": "squat.base", "score": null, "quality": null, "unscored": true}}
+{"ts": "2025-10-20T12:22:53.259Z", "event": "classifier_no_candidate", "severity": "warn", "message": "top1 below accept threshold", "context": {"top1": "squat.bodyweight", "score": 0.0}}
+{"ts": "2025-10-20T12:22:53.260Z", "event": "classifier_fallback_bodyweight", "severity": "info", "message": "fallback to BW", "context": {"fallback_id": null}}
+{"ts": "2025-10-20T12:22:53.260Z", "event": "report_built", "severity": "info", "message": "report built", "context": {"exercise": "squat.base", "score": null, "quality": null, "unscored": true}}
+{"ts": "2025-10-20T12:22:53.261Z", "event": "classifier_no_candidate", "severity": "warn", "message": "top1 below accept threshold", "context": {"top1": "squat.bodyweight", "score": 0.0}}
+{"ts": "2025-10-20T12:22:53.261Z", "event": "classifier_fallback_bodyweight", "severity": "info", "message": "fallback to BW", "context": {"fallback_id": null}}
+{"ts": "2025-10-20T12:22:53.262Z", "event": "report_built", "severity": "info", "message": "report built", "context": {"exercise": "squat.base", "score": null, "quality": null, "unscored": true}}
+{"ts": "2025-10-20T12:22:53.262Z", "event": "classifier_no_candidate", "severity": "warn", "message": "top1 below accept threshold", "context": {"top1": "squat.bodyweight", "score": 0.0}}
+{"ts": "2025-10-20T12:22:53.263Z", "event": "classifier_fallback_bodyweight", "severity": "info", "message": "fallback to BW", "context": {"fallback_id": null}}
+{"ts": "2025-10-20T12:22:53.263Z", "event": "report_built", "severity": "info", "message": "report built", "context": {"exercise": "squat.base", "score": null, "quality": null, "unscored": true}}
+{"ts": "2025-10-20T12:22:53.264Z", "event": "classifier_no_candidate", "severity": "warn", "message": "top1 below accept threshold", "context": {"top1": "squat.bodyweight", "score": 0.0}}
+{"ts": "2025-10-20T12:22:53.264Z", "event": "classifier_fallback_bodyweight", "severity": "info", "message": "fallback to BW", "context": {"fallback_id": null}}
+{"ts": "2025-10-20T12:22:53.265Z", "event": "report_built", "severity": "info", "message": "report built", "context": {"exercise": "squat.base", "score": null, "quality": null, "unscored": true}}
+{"ts": "2025-10-20T12:22:53.265Z", "event": "classifier_no_candidate", "severity": "warn", "message": "top1 below accept threshold", "context": {"top1": "squat.bodyweight", "score": 0.0}}
+{"ts": "2025-10-20T12:22:53.266Z", "event": "classifier_fallback_bodyweight", "severity": "info", "message": "fallback to BW", "context": {"fallback_id": null}}
+{"ts": "2025-10-20T12:22:53.266Z", "event": "report_built", "severity": "info", "message": "report built", "context": {"exercise": "squat.base", "score": null, "quality": null, "unscored": true}}
+{"ts": "2025-10-20T12:22:53.266Z", "event": "classifier_no_candidate", "severity": "warn", "message": "top1 below accept threshold", "context": {"top1": "squat.bodyweight", "score": 0.0}}
+{"ts": "2025-10-20T12:22:53.267Z", "event": "classifier_fallback_bodyweight", "severity": "info", "message": "fallback to BW", "context": {"fallback_id": null}}
+{"ts": "2025-10-20T12:22:53.267Z", "event": "report_built", "severity": "info", "message": "report built", "context": {"exercise": "squat.base", "score": null, "quality": null, "unscored": true}}
+{"ts": "2025-10-20T12:22:53.268Z", "event": "classifier_no_candidate", "severity": "warn", "message": "top1 below accept threshold", "context": {"top1": "squat.bodyweight", "score": 0.0}}
+{"ts": "2025-10-20T12:22:53.268Z", "event": "classifier_fallback_bodyweight", "severity": "info", "message": "fallback to BW", "context": {"fallback_id": null}}
+{"ts": "2025-10-20T12:22:53.269Z", "event": "report_built", "severity": "info", "message": "report built", "context": {"exercise": "squat.base", "score": null, "quality": null, "unscored": true}}
+{"ts": "2025-10-20T12:22:53.269Z", "event": "classifier_no_candidate", "severity": "warn", "message": "top1 below accept threshold", "context": {"top1": "squat.bodyweight", "score": 0.0}}
+{"ts": "2025-10-20T12:22:53.269Z", "event": "classifier_fallback_bodyweight", "severity": "info", "message": "fallback to BW", "context": {"fallback_id": null}}
+{"ts": "2025-10-20T12:22:53.270Z", "event": "report_built", "severity": "info", "message": "report built", "context": {"exercise": "squat.base", "score": null, "quality": null, "unscored": true}}
+{"ts": "2025-10-20T12:22:53.270Z", "event": "classifier_no_candidate", "severity": "warn", "message": "top1 below accept threshold", "context": {"top1": "squat.bodyweight", "score": 0.0}}
+{"ts": "2025-10-20T12:22:53.271Z", "event": "classifier_fallback_bodyweight", "severity": "info", "message": "fallback to BW", "context": {"fallback_id": null}}
+{"ts": "2025-10-20T12:22:53.271Z", "event": "report_built", "severity": "info", "message": "report built", "context": {"exercise": "squat.base", "score": null, "quality": null, "unscored": true}}
+{"ts": "2025-10-20T12:22:53.272Z", "event": "classifier_no_candidate", "severity": "warn", "message": "top1 below accept threshold", "context": {"top1": "squat.bodyweight", "score": 0.0}}
+{"ts": "2025-10-20T12:22:53.272Z", "event": "classifier_fallback_bodyweight", "severity": "info", "message": "fallback to BW", "context": {"fallback_id": null}}
+{"ts": "2025-10-20T12:22:53.272Z", "event": "report_built", "severity": "info", "message": "report built", "context": {"exercise": "squat.base", "score": null, "quality": null, "unscored": true}}
+{"ts": "2025-10-20T12:22:53.273Z", "event": "classifier_no_candidate", "severity": "warn", "message": "top1 below accept threshold", "context": {"top1": "squat.bodyweight", "score": 0.0}}
+{"ts": "2025-10-20T12:22:53.273Z", "event": "classifier_fallback_bodyweight", "severity": "info", "message": "fallback to BW", "context": {"fallback_id": null}}
+{"ts": "2025-10-20T12:22:53.274Z", "event": "report_built", "severity": "info", "message": "report built", "context": {"exercise": "squat.base", "score": null, "quality": null, "unscored": true}}
+{"ts": "2025-10-20T12:22:53.274Z", "event": "classifier_no_candidate", "severity": "warn", "message": "top1 below accept threshold", "context": {"top1": "squat.bodyweight", "score": 0.0}}
+{"ts": "2025-10-20T12:22:53.274Z", "event": "classifier_fallback_bodyweight", "severity": "info", "message": "fallback to BW", "context": {"fallback_id": null}}
+{"ts": "2025-10-20T12:22:53.275Z", "event": "report_built", "severity": "info", "message": "report built", "context": {"exercise": "squat.base", "score": null, "quality": null, "unscored": true}}
+{"ts": "2025-10-20T12:22:53.275Z", "event": "classifier_no_candidate", "severity": "warn", "message": "top1 below accept threshold", "context": {"top1": "squat.bodyweight", "score": 0.0}}
+{"ts": "2025-10-20T12:22:53.276Z", "event": "classifier_fallback_bodyweight", "severity": "info", "message": "fallback to BW", "context": {"fallback_id": null}}
+{"ts": "2025-10-20T12:22:53.276Z", "event": "report_built", "severity": "info", "message": "report built", "context": {"exercise": "squat.base", "score": null, "quality": null, "unscored": true}}
+{"ts": "2025-10-20T12:22:53.277Z", "event": "classifier_no_candidate", "severity": "warn", "message": "top1 below accept threshold", "context": {"top1": "squat.bodyweight", "score": 0.0}}
+{"ts": "2025-10-20T12:22:53.277Z", "event": "classifier_fallback_bodyweight", "severity": "info", "message": "fallback to BW", "context": {"fallback_id": null}}
+{"ts": "2025-10-20T12:22:53.277Z", "event": "report_built", "severity": "info", "message": "report built", "context": {"exercise": "squat.base", "score": null, "quality": null, "unscored": true}}
+{"ts": "2025-10-20T12:22:53.278Z", "event": "classifier_no_candidate", "severity": "warn", "message": "top1 below accept threshold", "context": {"top1": "squat.bodyweight", "score": 0.0}}
+{"ts": "2025-10-20T12:22:53.278Z", "event": "classifier_fallback_bodyweight", "severity": "info", "message": "fallback to BW", "context": {"fallback_id": null}}
+{"ts": "2025-10-20T12:22:53.279Z", "event": "report_built", "severity": "info", "message": "report built", "context": {"exercise": "squat.base", "score": null, "quality": null, "unscored": true}}
+{"ts": "2025-10-20T12:22:53.279Z", "event": "classifier_no_candidate", "severity": "warn", "message": "top1 below accept threshold", "context": {"top1": "squat.bodyweight", "score": 0.0}}
+{"ts": "2025-10-20T12:22:53.280Z", "event": "classifier_fallback_bodyweight", "severity": "info", "message": "fallback to BW", "context": {"fallback_id": null}}
+{"ts": "2025-10-20T12:22:53.280Z", "event": "report_built", "severity": "info", "message": "report built", "context": {"exercise": "squat.base", "score": null, "quality": null, "unscored": true}}
+{"ts": "2025-10-20T12:22:53.281Z", "event": "classifier_no_candidate", "severity": "warn", "message": "top1 below accept threshold", "context": {"top1": "squat.bodyweight", "score": 0.0}}
+{"ts": "2025-10-20T12:22:53.281Z", "event": "classifier_fallback_bodyweight", "severity": "info", "message": "fallback to BW", "context": {"fallback_id": null}}
+{"ts": "2025-10-20T12:22:53.282Z", "event": "report_built", "severity": "info", "message": "report built", "context": {"exercise": "squat.base", "score": null, "quality": null, "unscored": true}}
+{"ts": "2025-10-20T12:22:53.283Z", "event": "classifier_no_candidate", "severity": "warn", "message": "top1 below accept threshold", "context": {"top1": "squat.bodyweight", "score": 0.0}}
+{"ts": "2025-10-20T12:22:53.283Z", "event": "classifier_fallback_bodyweight", "severity": "info", "message": "fallback to BW", "context": {"fallback_id": null}}
+{"ts": "2025-10-20T12:22:53.284Z", "event": "report_built", "severity": "info", "message": "report built", "context": {"exercise": "squat.base", "score": null, "quality": null, "unscored": true}}
+{"ts": "2025-10-20T12:22:53.284Z", "event": "classifier_no_candidate", "severity": "warn", "message": "top1 below accept threshold", "context": {"top1": "squat.bodyweight", "score": 0.0}}
+{"ts": "2025-10-20T12:22:53.284Z", "event": "classifier_fallback_bodyweight", "severity": "info", "message": "fallback to BW", "context": {"fallback_id": null}}
+{"ts": "2025-10-20T12:22:53.285Z", "event": "report_built", "severity": "info", "message": "report built", "context": {"exercise": "squat.base", "score": null, "quality": null, "unscored": true}}
+{"ts": "2025-10-20T12:22:53.285Z", "event": "classifier_no_candidate", "severity": "warn", "message": "top1 below accept threshold", "context": {"top1": "squat.bodyweight", "score": 0.0}}
+{"ts": "2025-10-20T12:22:53.286Z", "event": "classifier_fallback_bodyweight", "severity": "info", "message": "fallback to BW", "context": {"fallback_id": null}}
+{"ts": "2025-10-20T12:22:53.288Z", "event": "report_built", "severity": "info", "message": "report built", "context": {"exercise": "squat.base", "score": null, "quality": null, "unscored": true}}
+{"ts": "2025-10-20T12:27:56.938Z", "event": "camera_audit", "severity": "info", "message": "begin set audit", "context": {"exercise": null, "set_index": 1}}
+{"ts": "2025-10-20T12:27:56.943Z", "event": "classifier_no_candidate", "severity": "warn", "message": "top1 below accept threshold", "context": {"top1": "squat.bodyweight", "score": 0.0}}
+{"ts": "2025-10-20T12:27:56.944Z", "event": "classifier_fallback_bodyweight", "severity": "info", "message": "fallback to BW", "context": {"fallback_id": null}}
+{"ts": "2025-10-20T12:27:56.964Z", "event": "report_built", "severity": "info", "message": "report built", "context": {"exercise": "squat.base", "score": null, "quality": null, "unscored": true}}
+{"ts": "2025-10-20T12:27:56.965Z", "event": "classifier_no_candidate", "severity": "warn", "message": "top1 below accept threshold", "context": {"top1": "squat.bodyweight", "score": 0.0}}
+{"ts": "2025-10-20T12:27:56.966Z", "event": "classifier_fallback_bodyweight", "severity": "info", "message": "fallback to BW", "context": {"fallback_id": null}}
+{"ts": "2025-10-20T12:27:56.967Z", "event": "report_built", "severity": "info", "message": "report built", "context": {"exercise": "squat.base", "score": null, "quality": null, "unscored": true}}
+{"ts": "2025-10-20T12:27:56.967Z", "event": "classifier_no_candidate", "severity": "warn", "message": "top1 below accept threshold", "context": {"top1": "squat.bodyweight", "score": 0.0}}
+{"ts": "2025-10-20T12:27:56.968Z", "event": "classifier_fallback_bodyweight", "severity": "info", "message": "fallback to BW", "context": {"fallback_id": null}}
+{"ts": "2025-10-20T12:27:56.969Z", "event": "report_built", "severity": "info", "message": "report built", "context": {"exercise": "squat.base", "score": null, "quality": null, "unscored": true}}
+{"ts": "2025-10-20T12:27:56.970Z", "event": "classifier_no_candidate", "severity": "warn", "message": "top1 below accept threshold", "context": {"top1": "squat.bodyweight", "score": 0.0}}
+{"ts": "2025-10-20T12:27:56.970Z", "event": "classifier_fallback_bodyweight", "severity": "info", "message": "fallback to BW", "context": {"fallback_id": null}}
+{"ts": "2025-10-20T12:27:56.971Z", "event": "report_built", "severity": "info", "message": "report built", "context": {"exercise": "squat.base", "score": null, "quality": null, "unscored": true}}
+{"ts": "2025-10-20T12:27:56.972Z", "event": "classifier_no_candidate", "severity": "warn", "message": "top1 below accept threshold", "context": {"top1": "squat.bodyweight", "score": 0.0}}
+{"ts": "2025-10-20T12:27:56.973Z", "event": "classifier_fallback_bodyweight", "severity": "info", "message": "fallback to BW", "context": {"fallback_id": null}}
+{"ts": "2025-10-20T12:27:56.973Z", "event": "report_built", "severity": "info", "message": "report built", "context": {"exercise": "squat.base", "score": null, "quality": null, "unscored": true}}
+{"ts": "2025-10-20T12:27:56.974Z", "event": "classifier_no_candidate", "severity": "warn", "message": "top1 below accept threshold", "context": {"top1": "squat.bodyweight", "score": 0.0}}
+{"ts": "2025-10-20T12:27:56.975Z", "event": "classifier_fallback_bodyweight", "severity": "info", "message": "fallback to BW", "context": {"fallback_id": null}}
+{"ts": "2025-10-20T12:27:56.975Z", "event": "report_built", "severity": "info", "message": "report built", "context": {"exercise": "squat.base", "score": null, "quality": null, "unscored": true}}
+{"ts": "2025-10-20T12:27:56.977Z", "event": "classifier_no_candidate", "severity": "warn", "message": "top1 below accept threshold", "context": {"top1": "squat.bodyweight", "score": 0.0}}
+{"ts": "2025-10-20T12:27:56.978Z", "event": "classifier_fallback_bodyweight", "severity": "info", "message": "fallback to BW", "context": {"fallback_id": null}}
+{"ts": "2025-10-20T12:27:56.979Z", "event": "report_built", "severity": "info", "message": "report built", "context": {"exercise": "squat.base", "score": null, "quality": null, "unscored": true}}
+{"ts": "2025-10-20T12:43:05.643Z", "event": "alias_rewrite", "severity": "info", "message": "3 alias rewrites applied", "context": {"count": 3}}
+{"ts": "2025-10-20T12:43:05.645Z", "event": "rep_segmenter_error", "severity": "warn", "message": "rep segmenter error: 'ExerciseDef' object has no attribute 'doc'", "context": {}}
+{"ts": "2025-10-20T12:43:05.654Z", "event": "report_built", "severity": "info", "message": "report built", "context": {"exercise": "squat.bodyweight", "score": null, "quality": null, "unscored": true}}
+{"ts": "2025-10-20T12:49:38.892Z", "event": "alias_rewrite", "severity": "info", "message": "3 alias rewrites applied", "context": {"count": 3}}
+{"ts": "2025-10-20T12:49:38.894Z", "event": "rep_segmenter_error", "severity": "warn", "message": "rep segmenter error: 'ExerciseDef' object has no attribute 'doc'", "context": {}}
+{"ts": "2025-10-20T12:49:38.904Z", "event": "report_built", "severity": "info", "message": "report built", "context": {"exercise": "squat.bodyweight", "score": null, "quality": null, "unscored": true}}
+{"ts": "2025-10-20T12:58:10.173Z", "event": "alias_rewrite", "severity": "info", "message": "7 alias rewrites applied", "context": {"count": 7}}
+{"ts": "2025-10-20T12:58:10.175Z", "event": "rep_segmenter_error", "severity": "warn", "message": "rep segmenter error: 'ExerciseDef' object has no attribute 'doc'", "context": {}}
+{"ts": "2025-10-20T12:58:10.184Z", "event": "report_built", "severity": "info", "message": "report built", "context": {"exercise": "squat.bodyweight", "score": 0.8466666666666667, "quality": "full", "unscored": false}}

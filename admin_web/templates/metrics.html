@@ -1,0 +1,162 @@
+{% extends "base.html" %}
+{% block title %}מדדים (Metrics) — BodyPlus{% endblock %}
+{% block page_title %}מדדים (Metrics){% endblock %}
+
+{% block head_extra %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/metrics.css') }}?v={{ app_version|default('dev', true) }}">
+<!-- וידג'ט השלד (אופציונלי) -->
+<script defer src="{{ url_for('static', filename='js/skeleton_widget.js') }}" onerror="/* optional */"></script>
+{% endblock %}
+
+{% block content %}
+<div class="bp-container">
+
+  <!-- SYSTEM KPIs -->
+  <section class="bp-section">
+    <div class="sec-head">
+      <h3 class="sec-title tooltip" data-tip="מדדי מערכת מסכמים: FPS, לטנטיות, רזולוציה, מצלמה ועוד.">נתוני מערכת</h3>
+      <div class="actions">
+        <button id="btnCheckNow" class="btn small" title="בדיקת בריאות מידית">בדוק עכשיו</button>
+        <button id="btnToggleConf" class="btn ghost small" title="הצגת אמון למדידה">הצג אמון מדידה</button>
+        <button id="btnToggleSkeleton" class="btn ghost small" title="פתיחת/סגירת וידג'ט שלד">שלד חי</button>
+        <span id="lastUpdate" class="muted small">—</span>
+      </div>
+    </div>
+
+    <div class="kpis kpis-tight">
+      <div class="kpi"><div class="label">FPS</div><div id="kpi_fps" class="value ltr-num nowrap">—</div></div>
+      <div class="kpi"><div class="label">Latency (ms)</div><div id="kpi_latency" class="value ltr-num nowrap">—</div></div>
+      <div class="kpi"><div class="label">Pose conf</div><div id="kpi_pose_conf" class="value ltr-num nowrap">—</div></div>
+      <div class="kpi"><div class="label">Hands conf</div><div id="kpi_hands_conf" class="value ltr-num nowrap">—</div></div>
+      <div class="kpi"><div class="label">Resolution</div><div id="kpi_resolution" class="value nowrap">—</div></div>
+      <div class="kpi"><div class="label">Camera</div><div id="kpi_camera" class="value clamp-text nowrap">—</div></div>
+      <div class="kpi"><div class="label">Uptime (s)</div><div id="kpi_uptime" class="value ltr-num nowrap">—</div></div>
+      <div class="kpi"><div class="label">Model</div><div id="kpi_model" class="value clamp-text nowrap">—</div></div>
+      <div class="kpi"><div class="label">View</div><div id="kpi_view" class="value clamp-text nowrap">—</div></div>
+    </div>
+
+    <!-- Skeleton widget (works with skeleton_widget.js) -->
+    <div id="skeleton_wrap" class="bp-skeleton hidden" data-endpoint="/payload" data-autostart="true">
+      <div class="skel-top">
+        <div class="switch">
+          <input type="checkbox" class="bp-skel-toggle" id="skel_on">
+          <label for="skel_on">הפעל שלד</label>
+        </div>
+        <div class="skel-controls">
+          <label class="inline gap-6 small"><input type="checkbox" class="bp-show-angles" checked> זוויות (מודל)</label>
+          <label class="inline gap-6 small"><input type="checkbox" class="bp-show-pose" checked> Pose</label>
+          <label class="inline gap-6 small"><input type="checkbox" class="bp-show-hands" checked> ידיים</label>
+          <label class="inline gap-6 small"><input type="checkbox" class="bp-toggle-angles-overlay"> זוויות על השלד</label>
+        </div>
+        <div class="bp-skel-status small muted">—</div>
+      </div>
+
+      <canvas class="bp-skel-canvas"></canvas>
+
+      <!-- דלתות (אופציונלי, מציג Δ בין מודל ל-Pose) -->
+      <div class="tiny muted mt-2">
+        Δ כתף שמאל: <span class="bp-delta" data-k="shoulder_left">—</span> ·
+        Δ כתף ימין: <span class="bp-delta" data-k="shoulder_right">—</span> ·
+        Δ מרפק שמאל: <span class="bp-delta" data-k="elbow_left">—</span> ·
+        Δ מרפק ימין: <span class="bp-delta" data-k="elbow_right">—</span> ·
+        Δ ברך שמאל: <span class="bp-delta" data-k="knee_left">—</span> ·
+        Δ ברך ימין: <span class="bp-delta" data-k="knee_right">—</span>
+      </div>
+
+      <div class="bp-measurements"></div>
+    </div>
+  </section>
+
+  <!-- ISSUE PANEL (toggleable “what’s wrong”) -->
+  <section class="bp-section">
+    <div class="issue-panel" id="issue_panel">
+      <div class="bar">
+        <span class="badge warn">אזהרות</span>
+        <span class="ttl">אינדיקציות / התראות</span>
+        <span class="count muted small" id="issue_count">0</span>
+        <button id="issues_hide_all" class="btn ghost small">הסתר הכל</button>
+      </div>
+      <div class="content" id="issues_content">
+        <!-- ימולא ב־metrics.js: .issue-row עם .hide-toggle לכל פריט -->
+      </div>
+    </div>
+  </section>
+
+  <!-- ALERTS (simple chips grid, if תרצה לשמור) -->
+  <section class="bp-section">
+    <div class="sec-head">
+      <h3 class="sec-title tooltip" data-tip="אינדיקציות קצרות וניתנות להסתרה.">אינדיקציות מהירות</h3>
+      <span class="muted small">נבדק אוטומטית בכל רענון</span>
+    </div>
+    <div id="alerts" class="alerts-grid"></div>
+  </section>
+
+  <!-- DOMAINS -->
+  <section class="bp-section">
+    <h3 class="sec-title tooltip" data-tip="מדדים של יציבה גלובלית: פלג גוף עליון, אגן, עמוד שדרה ו-COM.">יציבה (Posture)</h3>
+    <div id="sec-posture" class="rows"></div>
+  </section>
+
+  <section class="bp-section">
+    <h3 class="sec-title tooltip" data-tip="כתפיים/מרפקים/ידיים — כולל אוריינטציית יד ומדדי שורש כף יד.">כתפיים · מרפקים · ידיים</h3>
+    <div id="sec-upper" class="rows"></div>
+  </section>
+
+  <section class="bp-section">
+    <h3 class="sec-title tooltip" data-tip="אגן/ירכיים/ברכיים/קרסול — כולל ולגוס/דורזיפלקשן/זווית כף הרגל.">אגן · ירכיים · ברכיים · קרסול</h3>
+    <div id="sec-lower" class="rows"></div>
+  </section>
+
+  <section class="bp-section">
+    <h3 class="sec-title tooltip" data-tip="ראש (Yaw/Pitch/Roll), מגע רגליים עם הקרקע, רוחבים ויחסים.">ראש · מגע רגל · רוחבים/יחסים</h3>
+    <div id="sec-head-contacts" class="rows"></div>
+  </section>
+
+  <section class="bp-section">
+    <h3 class="sec-title tooltip" data-tip="דלתות טכניות (Δ), מדדי איכות ומידע מערכתי נוסף.">דלתות טכניות (Δ) · מדדים נוספים</h3>
+    <div id="sec-tech" class="rows"></div>
+  </section>
+
+  <!-- MISC / UNASSIGNED as tiles -->
+  <section class="bp-section">
+    <div class="sec-head">
+      <h3 class="sec-title">שאר המדדים (אריחים)</h3>
+      <label class="inline gap-8 small">
+        <input id="toggle_show_raw" type="checkbox"> הצג פריטים גולמיים/טכניים
+      </label>
+    </div>
+    <div id="misc-grid" class="misc-grid"></div>
+  </section>
+
+  <!-- TABLE + RAW -->
+  <section class="bp-section">
+    <div class="sec-head">
+      <h3 class="sec-title">טבלה מלאה</h3>
+      <div class="topbar">
+        <div class="search"><input id="q" type="search" placeholder="סינון לפי שם…"></div>
+        <button id="toggleRawData" class="btn small">RAW</button>
+      </div>
+    </div>
+    <div id="rawDataBox" class="hidden mt-2">
+      <pre id="rawDataJSON"></pre>
+    </div>
+    <div class="overflow-x-auto mt-2">
+      <table>
+        <thead>
+          <tr>
+            <th>מדד</th>
+            <th class="ltr-num">ערך</th>
+          </tr>
+        </thead>
+        <tbody id="metrics-table"></tbody>
+      </table>
+      <div class="muted small mt-2">סה״כ מוצגים: <span id="filtered-count">0</span></div>
+    </div>
+  </section>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script defer src="{{ url_for('static', filename='js/metrics.js') }}?v={{ app_version|default('dev', true) }}"></script>
+{% endblock %}

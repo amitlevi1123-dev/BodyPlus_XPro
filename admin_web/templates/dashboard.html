@@ -1,0 +1,128 @@
+{% extends "base.html" %}
+{% block title %}לוח ניהול — וידאו + שלד{% endblock %}
+{% block page_title %}לוח ניהול — וידאו + שלד{% endblock %}
+
+{% block content %}
+
+<style>
+  /* לדף הזה בלבד: קנבס של השלד לא חוסם קליקים */
+  .bp-skel-canvas { pointer-events:none; }
+  .card { background:#fff; border-radius:1rem; box-shadow:0 2px 8px rgba(0,0,0,.06); }
+</style>
+
+<div class="grid grid-cols-12 gap-4" dir="rtl">
+
+  <!-- כרטיס ראשי: וידאו + שלד -->
+  <div class="col-span-12 card p-3">
+    <div class="flex items-center justify-between mb-3">
+      <h3 class="font-semibold">תצוגה חיה</h3>
+      <div class="flex items-center gap-3">
+        <button id="btn-start" class="px-3 py-1.5 rounded bg-green-600 text-white hover:bg-green-700">הפעל מצלמה + וידאו</button>
+        <button id="btn-stop"  class="px-3 py-1.5 rounded bg-red-600 text-white hover:bg-red-700">כבה מצלמה + סגור וידאו</button>
+      </div>
+    </div>
+
+    <div class="grid gap-3 md:grid-cols-2 items-stretch">
+      <!-- וידאו -->
+      <div>
+        <div class="flex items-center flex-wrap gap-x-4 gap-y-1 text-sm mb-2">
+          <div>מצב מצלמה:
+            <span class="inline-flex items-center gap-1">
+              <span id="cam-dot" class="inline-block w-2.5 h-2.5 rounded-full bg-gray-400"></span>
+              <span id="cam-text">לא פעילה</span>
+            </span>
+          </div>
+          <div>חלון וידאו:
+            <span class="inline-flex items-center gap-1">
+              <span id="view-dot" class="inline-block w-2.5 h-2.5 rounded-full bg-gray-400"></span>
+              <span id="view-text">לא מוצג</span>
+            </span>
+          </div>
+          <div>FPS: <span id="fps-val">—</span></div>
+          <div>גודל: <span id="size-val">—</span></div>
+        </div>
+
+        <div id="reason" class="text-sm text-red-600 mb-2"></div>
+
+        <div id="video-wrap" class="block">
+          <div class="text-xs text-gray-600 mb-1">זרם מ־<code>/video/stream.mjpg</code></div>
+          <div id="video-holder" class="bg-white border rounded p-2 flex items-center justify-center">
+            <div id="video-slot" class="w-full text-center">
+              <div id="video-placeholder" class="text-gray-400 py-24">אין זרם</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- שלד -->
+      <div class="flex flex-col">
+        <div class="bp-skeleton flex-1 grid grid-rows-[auto_1fr_auto] gap-2"
+             data-endpoint="/payload" data-autostart="true">
+
+          <div class="flex flex-wrap items-center gap-3 text-sm">
+            <label class="inline-flex items-center gap-2"><input type="checkbox" class="bp-skel-toggle" /> הפעל שלד</label>
+            <label class="inline-flex items-center gap-2"><input type="checkbox" class="bp-show-angles" checked /> זוויות (מודל)</label>
+            <label class="inline-flex items-center gap-2"><input type="checkbox" class="bp-show-pose" checked /> Pose</label>
+            <label class="inline-flex items-center gap-2"><input type="checkbox" class="bp-show-hands" /> ידיים</label>
+            <label class="inline-flex items-center gap-2"><input type="checkbox" class="bp-toggle-angles-overlay" /> זוויות על השלד</label>
+            <span class="text-xs text-gray-500 bp-skel-status"></span>
+          </div>
+
+          <div id="skel-box" class="border rounded grid place-items-center">
+            <canvas class="bp-skel-canvas w-full h-full"></canvas>
+          </div>
+
+          <div class="bp-measurements"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- אינדיקציות -->
+  <div class="col-span-12 grid grid-cols-1 lg:grid-cols-3 gap-3">
+    <div class="card p-3">
+      <div class="font-semibold mb-2">סטטוס מערכת</div>
+      <div class="grid grid-cols-2 gap-2 text-sm">
+        <div class="flex items-center justify-between rounded-lg bg-gray-50 px-3 py-2">
+          <span>וידאו (MJPEG)</span>
+          <span class="inline-flex items-center gap-2"><span id="ind-cam-dot" class="w-2.5 h-2.5 rounded-full bg-gray-300"></span><span id="ind-cam-text" class="text-gray-700">בודק…</span></span>
+        </div>
+        <div class="flex items-center justify-between rounded-lg bg-gray-50 px-3 py-2">
+          <span>Payload (שלד)</span>
+          <span class="inline-flex items-center gap-2"><span id="ind-payload-dot" class="w-2.5 h-2.5 rounded-full bg-gray-300"></span><span id="ind-payload-text" class="text-gray-700">בודק…</span></span>
+        </div>
+        <div class="flex items-center justify-between rounded-lg bg-gray-50 px-3 py-2 col-span-2">
+          <span>זיהוי אובייקטים</span>
+          <span class="inline-flex items-center gap-2"><span id="ind-od-dot" class="w-2.5 h-2.5 rounded-full bg-gray-300"></span><span id="ind-od-text" class="text-gray-700">בודק…</span></span>
+        </div>
+      </div>
+    </div>
+
+    <div class="card p-3">
+      <div class="font-semibold mb-2">נתוני מערכת</div>
+      <div class="grid grid-cols-2 gap-2 text-sm">
+        <div class="rounded-lg bg-gray-50 px-3 py-2"><div class="text-xs text-gray-500">FPS (וידאו)</div><div id="ind-fps" class="text-lg font-semibold">—</div></div>
+        <div class="rounded-lg bg-gray-50 px-3 py-2"><div class="text-xs text-gray-500">רזולוציה</div><div id="ind-size" class="text-lg font-semibold">—</div></div>
+        <div class="rounded-lg bg-gray-50 px-3 py-2"><div class="text-xs text-gray-500">Uptime</div><div id="ind-uptime" class="text-lg font-semibold">—</div></div>
+        <div class="rounded-lg bg-gray-50 px-3 py-2"><div class="text-xs text-gray-500">OD FPS</div><div id="ind-od-fps" class="text-lg font-semibold">—</div></div>
+        <div class="rounded-lg bg-gray-50 px-3 py-2"><div class="text-xs text-gray-500">OD Latency</div><div id="ind-od-lat" class="text-lg font-semibold">—</div></div>
+        <div class="rounded-lg bg-gray-50 px-3 py-2"><div class="text-xs text-gray-500">OD Objects</div><div id="ind-od-obj" class="text-lg font-semibold">—</div></div>
+      </div>
+    </div>
+
+    <div class="card p-3">
+      <div class="font-semibold mb-2">מדידות ליבה</div>
+      <div class="grid grid-cols-2 gap-2 text-sm">
+        <div class="rounded-lg bg-gray-50 px-3 py-2 flex items-center justify-between"><span>Shoulder L/R</span><span id="ind-shoulder" class="font-semibold tabular-nums">—</span></div>
+        <div class="rounded-lg bg-gray-50 px-3 py-2 flex items-center justify-between"><span>Elbow L/R</span><span id="ind-elbow" class="font-semibold tabular-nums">—</span></div>
+        <div class="rounded-lg bg-gray-50 px-3 py-2 flex items-center justify-between"><span>Knee L/R</span><span id="ind-knee" class="font-semibold tabular-nums">—</span></div>
+        <div class="rounded-lg bg-gray-50 px-3 py-2 flex items-center justify-between"><span>Torso Tilt</span><span id="ind-torso" class="font-semibold tabular-nums">—</span></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+<script src="{{ url_for('static', filename='js/skeleton_widget.js') }}" defer></script>
+<script src="{{ url_for('static', filename='js/dashboard_controls.js') }}" defer></script>
+{% endblock %}

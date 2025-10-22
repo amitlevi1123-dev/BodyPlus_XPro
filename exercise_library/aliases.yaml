@@ -1,0 +1,450 @@
+# =============================================================================
+# 📘 aliases.yaml — מיפוי שמות raw → canonical לכל המערכת
+# =============================================================================
+# שימוש:
+# 1) כל מנועי הניתוח/ציון משתמשים רק בשמות הקנוניים כאן.
+# 2) אם ה-raw משתנה, הוסיפו alias תחת המפתח הקנוני (אל תשנו את הקנוני).
+# 3) ה-Normalizer יזהה קונפליקטים בין aliases של אותו מפתח לפי "tolerances".
+#
+# הערות:
+# • Pass-Through: יש פרפיקסים שה-Normalizer מעביר גם בלי רישום (rep./bar./pose./view./features./objdet.).
+#   עדיין מומלץ לרשום כאן לטובת עקיבות.
+# • יחידות (unit) משמשות לחישוב טולרנסים בקונפליקטים.
+# • אל תכפלו מפתחות קנוניים — הרחיבו רשימות aliases בלבד.
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# (אופציונלי) הגדרות מנרמל/קונפליקטים — לא שוברות תאימות.
+# הערך כאן הוא תיעודי עד שתפעיל תמיכה בקוד:
+#   settings.normalizer.conflict_strategy.numeric: mean | first
+#   settings.normalizer.conflict_strategy.text:    first
+# -----------------------------------------------------------------------------
+settings:
+  normalizer:
+    conflict_strategy:
+      numeric: mean     # ברירת מחדל נוכחית בקוד: ממוצע; אפשר לעבור ל-'first'
+      text: first       # מחרוזות: קח את הראשון
+      bool: first       # דגלים: קח את הראשון
+    pass_through_prefixes: [rep., bar., pose., view., features., objdet.]
+
+canonical_keys:
+
+  # ────────────────────────────────────────────────────────────────────────────
+  # מטא/תזמון פריים/איכות חישוב
+  # ────────────────────────────────────────────────────────────────────────────
+  dt_ms:
+    unit: ms
+    aliases: [dt_ms, dt]
+
+  average_visibility:
+    unit: ratio
+    aliases: [average_visibility]
+
+  quality_score:
+    unit: ratio
+    aliases: [quality_score, view_score]
+
+  weight_shift:
+    unit: ratio
+    aliases: [weight_shift]
+
+  measurements.ok:
+    unit: bool
+    aliases: [measurements.ok]
+
+  # ────────────────────────────────────────────────────────────────────────────
+  # תצוגה / מצב מצלמה / זווית צפייה
+  # ────────────────────────────────────────────────────────────────────────────
+  view.mode:
+    unit: text
+    aliases: [view.mode, view_mode, view.primary]
+
+  pose.available:
+    unit: bool
+    aliases: [pose.available, pose.ok, pose]
+
+  pose.confidence:
+    unit: ratio
+    aliases: [pose.confidence, pose.average_confidence, confidence]
+
+  # ────────────────────────────────────────────────────────────────────────────
+  # בר/אובייקטים (לפי סרגל/מוט)
+  # ────────────────────────────────────────────────────────────────────────────
+  bar.y_px:
+    unit: px
+    aliases: [bar.y_px, bar_y_px, bar.y]
+
+  objdet.bar_present:
+    unit: bool
+    aliases: [objdet.bar_present, bar.present]
+
+  # ────────────────────────────────────────────────────────────────────────────
+  # נקודות עוגן ביד/שורש כף היד (ל־reps auto-pick)
+  # ────────────────────────────────────────────────────────────────────────────
+  wrist_left_y_px:
+    unit: px
+    aliases: [wrist_left_y_px, wrist_y_left, hand_y_left]
+
+  wrist_right_y_px:
+    unit: px
+    aliases: [wrist_right_y_px, wrist_y_right, hand_y_right]
+
+  # ────────────────────────────────────────────────────────────────────────────
+  # יציבה / גו (Torso & Spine)
+  # ────────────────────────────────────────────────────────────────────────────
+  torso_forward_deg:
+    unit: deg
+    aliases: [torso_forward_deg, torso_vs_vertical_deg, torso_lean_deg]
+
+  torso_vs_horizontal_deg:
+    unit: deg
+    aliases: [torso_vs_horizontal_deg, torso_forward_side_deg]
+
+  spine_flexion_deg:
+    unit: deg
+    aliases: [spine_flexion_deg, spine_curvature_side_deg]
+
+  torso_forward_vel_deg_s:
+    unit: deg_s
+    aliases: [torso_forward_vel_deg_s]
+
+  torso_forward_acc_deg_s2:
+    unit: deg_s2
+    aliases: [torso_forward_acc_deg_s2]
+
+  spine_curvature_side_vel_deg_s:
+    unit: deg_s
+    aliases: [spine_curvature_side_vel_deg_s]
+
+  spine_curvature_side_acc_deg_s2:
+    unit: deg_s2
+    aliases: [spine_curvature_side_acc_deg_s2]
+
+  spine_curvature_side_jitter_std:
+    unit: deg
+    aliases: [spine_curvature_side_jitter_std]
+
+  # ────────────────────────────────────────────────────────────────────────────
+  # אגן (Pelvis)
+  # ────────────────────────────────────────────────────────────────────────────
+  pelvis_tilt_deg:
+    unit: deg
+    aliases: [pelvis_tilt_deg]
+
+  pelvis_rotation_deg:
+    unit: deg
+    aliases: [pelvis_rotation_deg]
+
+  # ────────────────────────────────────────────────────────────────────────────
+  # כתפיים / מרפקים / ירכיים / ברכיים (Joints)
+  # ────────────────────────────────────────────────────────────────────────────
+  shoulder_left_deg:
+    unit: deg
+    aliases: [shoulder_left_deg, shoulder_angle_left]
+
+  shoulder_right_deg:
+    unit: deg
+    aliases: [shoulder_right_deg, shoulder_angle_right]
+
+  elbow_left_deg:
+    unit: deg
+    aliases: [elbow_left_deg, elbow_angle_left, measurements.elbow_left_deg]
+
+  elbow_right_deg:
+    unit: deg
+    aliases: [elbow_right_deg, elbow_angle_right]
+
+  hip_left_deg:
+    unit: deg
+    aliases: [hip_left_deg]
+
+  hip_right_deg:
+    unit: deg
+    aliases: [hip_right_deg]
+
+  knee_left_deg:
+    unit: deg
+    aliases: [knee_left_deg, measurements.knee_left_deg, knee_angle_left]
+
+  knee_right_deg:
+    unit: deg
+    aliases: [knee_right_deg, measurements.knee_right_deg, knee_angle_right]
+
+  hip_delta_deg:
+    unit: deg
+    aliases: [hip_delta_deg]
+
+  knee_delta_deg:
+    unit: deg
+    aliases: [knee_delta_deg]
+
+  # ────────────────────────────────────────────────────────────────────────────
+  # קרסול / שורש כף-יד (Ankle / Wrist)
+  # ────────────────────────────────────────────────────────────────────────────
+  ankle_dorsi_left_deg:
+    unit: deg
+    aliases: [ankle_dorsi_left_deg]
+
+  ankle_dorsi_right_deg:
+    unit: deg
+    aliases: [ankle_dorsi_right_deg]
+
+  wrist_flex_ext_left_deg:
+    unit: deg
+    aliases: [wrist_flex_ext_left_deg]
+
+  wrist_flex_ext_right_deg:
+    unit: deg
+    aliases: [wrist_flex_ext_right_deg]
+
+  wrist_radial_ulnar_left_deg:
+    unit: deg
+    aliases: [wrist_radial_ulnar_left_deg]
+
+  wrist_radial_ulnar_right_deg:
+    unit: deg
+    aliases: [wrist_radial_ulnar_right_deg]
+
+  # ────────────────────────────────────────────────────────────────────────────
+  # עמידה / כפות רגליים (Feet & Stance)
+  # ────────────────────────────────────────────────────────────────────────────
+  features.stance_width_ratio:
+    unit: ratio
+    aliases: [features.stance_width_ratio, feet_w_over_shoulders_w, stance_width_ratio]
+
+  toe_angle_left_deg:
+    unit: deg
+    aliases: [toe_angle_left_deg, fpa_left_deg]
+
+  toe_angle_right_deg:
+    unit: deg
+    aliases: [toe_angle_right_deg, fpa_right_deg]
+
+  knee_foot_alignment_left_deg:
+    unit: deg
+    aliases: [knee_foot_alignment_left_deg, knee_toe_alignment_left_deg, knee_valgus_left_deg, kfa_left_deg, knee_toe_left_deg]
+
+  knee_foot_alignment_right_deg:
+    unit: deg
+    aliases: [knee_foot_alignment_right_deg, knee_toe_alignment_right_deg, knee_valgus_right_deg, kfa_right_deg, knee_toe_right_deg]
+
+  heel_lift_left:
+    unit: bool
+    aliases: [heel_lift_left]
+
+  heel_lift_right:
+    unit: bool
+    aliases: [heel_lift_right]
+
+  foot_contact_left:
+    unit: bool
+    aliases: [foot_contact_left]
+
+  foot_contact_right:
+    unit: bool
+    aliases: [foot_contact_right]
+
+  feet_width_px:
+    unit: px
+    aliases: [feet_width_px]
+
+  shoulders_width_px:
+    unit: px
+    aliases: [shoulders_width_px]
+
+  shoulders_delta_px:
+    unit: px
+    aliases: [shoulders_delta_px]
+
+  hips_delta_px:
+    unit: px
+    aliases: [hips_delta_px]
+
+  # ────────────────────────────────────────────────────────────────────────────
+  # ראש (Head)
+  # ────────────────────────────────────────────────────────────────────────────
+  head_yaw_deg:
+    unit: deg
+    aliases: [head_yaw_deg, head.yaw_deg, head_yaw]
+
+  head_pitch_deg:
+    unit: deg
+    aliases: [head_pitch_deg, head.pitch_deg, head_pitch]
+
+  head_roll_deg:
+    unit: deg
+    aliases: [head_roll_deg, head.roll_deg, head_roll]
+
+  head_confidence:
+    unit: ratio
+    aliases: [head_confidence, head.confidence]
+
+  head_ok:
+    unit: bool
+    aliases: [head_ok, head.ok]
+
+  # ────────────────────────────────────────────────────────────────────────────
+  # חזרות: מצב/טיימינג/ROM/דגלי איכות (Rep Metrics)
+  # ────────────────────────────────────────────────────────────────────────────
+  rep.state:
+    unit: text
+    aliases: [rep.state]  # start / towards / turn / away
+
+  rep.phase:
+    unit: text
+    aliases: [rep.phase]  # אופציונלי; ממופה ע"י phase_map בתרגיל
+
+  rep.dir:
+    unit: text
+    aliases: [rep.dir]    # inc / dec
+
+  rep.active:
+    unit: bool
+    aliases: [rep.active]
+
+  rep.in_rep_window:
+    unit: bool
+    aliases: [rep.in_rep_window]
+
+  rep.freeze_active:
+    unit: bool
+    aliases: [rep.freeze_active]
+
+  rep.rep_id:
+    unit: count
+    aliases: [rep.rep_id]
+
+  rep.units:
+    unit: text
+    aliases: [rep.units]
+
+  # טיימינג ו-Tempo
+  rep.timing_s:
+    unit: s
+    aliases: [rep.timing_s, rep_time_s, rep_duration_s]
+
+  rep.ecc_s:
+    unit: s
+    aliases: [rep.ecc_s]
+
+  rep.con_s:
+    unit: s
+    aliases: [rep.con_s]
+
+  rep.rest_s:
+    unit: s
+    aliases: [rep.rest_s]
+
+  # טווח תנועה/התקדמות
+  rep.rom:
+    unit: deg
+    aliases: [rep.rom]
+
+  rep.progress:
+    unit: ratio
+    aliases: [rep.progress]  # 0..1
+
+  rep.eccentric:
+    unit: bool
+    aliases: [rep.eccentric]
+
+  rep.concentric:
+    unit: bool
+    aliases: [rep.concentric]
+
+  # איכות/אזהרות/שגיאות
+  rep.quality:
+    unit: text
+    aliases: [rep.quality]  # good/fast/slow/short/incomplete
+
+  rep.errors.fast_rep:
+    unit: bool
+    aliases: [rep.errors.fast_rep]
+
+  rep.errors.slow_rep:
+    unit: bool
+    aliases: [rep.errors.slow_rep]
+
+  rep.errors.small_rom:
+    unit: bool
+    aliases: [rep.errors.small_rom]
+
+  rep.errors.missing_signal:
+    unit: bool
+    aliases: [rep.errors.missing_signal]
+
+  rep.warnings.auto_signal_used:
+    unit: bool
+    aliases: [rep.warnings.auto_signal_used]
+
+  rep.warnings.auto_target_used:
+    unit: bool
+    aliases: [rep.warnings.auto_target_used]
+
+  # ────────────────────────────────────────────────────────────────────────────
+  # סטים: טריגרים/מצב/סיכומי סט (נכתב ע"י SetCounter)
+  # ────────────────────────────────────────────────────────────────────────────
+  set.begin:
+    unit: bool
+    aliases: [set.begin]
+
+  set.end:
+    unit: bool
+    aliases: [set.end]
+
+  set.index:
+    unit: count
+    aliases: [set.index]
+
+  rep.set_active:
+    unit: bool
+    aliases: [rep.set_active]
+
+  rep.set_index:
+    unit: count
+    aliases: [rep.set_index]
+
+  rep.set_reps:
+    unit: count
+    aliases: [rep.set_reps]
+
+  rep.set_total:
+    unit: count
+    aliases: [rep.set_total]
+
+  rep.set_last_ok:
+    unit: bool
+    aliases: [rep.set_last_ok]
+
+  rep.set_last_reps:
+    unit: count
+    aliases: [rep.set_last_reps]
+
+  rep.set_last_duration_s:
+    unit: s
+    aliases: [rep.set_last_duration_s]
+
+# =============================================================================
+# טולרנסים בין aliases של אותו מפתח קנוני
+# אם שני aliases של אותו מפתח מחזירים ערכים שונים מעבר לטולרנס — יופיע alias_conflict.
+# =============================================================================
+tolerances:
+  deg:     0.5      # מעלות
+  deg_s:   1.0      # מעלות/שנייה
+  deg_s2:  10.0     # מעלות/שנייה^2
+  ratio:   0.02     # יחס חסר יחידות
+  s:       0.05     # שניות
+  px:      2.0      # פיקסלים
+  ms:      30.0     # מילישניות (dt_ms וכו')
+  count:   0        # מזהים/מונה — לא ממוצעים
+  text:    0        # לא רלוונטי (תיעוד/אינבנטורי)
+  bool:    0        # לא רלוונטי (דגלים)
+
+# =============================================================================
+# 🛠️ רעיונות עתידיים (תיעוד בלבד)
+# =============================================================================
+# 1) ROM מפורק למפרקים: knee_rom_deg / hip_rom_deg / elbow_rom_deg (deg)
+# 2) שליטה בטמפו מורחב: rep.pause_bottom_s / rep.pause_top_s (s)
+# 3) מדדי סימטריה: symmetry.knee_diff_deg / symmetry.hip_diff_deg / symmetry.shoulder_diff_deg
+# 4) Hinge Ratio: torso_forward_deg / avg(knee_left/right_deg) (ratio)
+# 5) balance_score מתנועה צדית מנורמלת (shoulders_delta_px / hips_delta_px)

@@ -1,0 +1,21 @@
+# -------------------------------------------------------------------
+# squat.bodyweight.yaml — סקוואט משקל גוף (יורש את ה-base)
+# -------------------------------------------------------------------
+
+id: squat.bodyweight
+extends: squat.base
+family: squat
+
+meta:
+  selectable: true
+  display_name: "Squat (Bodyweight)"
+
+# (אופציונלי) דריסות נקודתיות:
+# weights/thresholds בתוך scoring.criteria או policy/safety_caps/aggregate.
+# דוגמה לשינוי יעד עומק קל:
+scoring:
+  criteria:
+    depth:
+      rule:
+        target_max: 95     # היה 90 ב-base
+        cutoff_max: 150    # לא שינינו

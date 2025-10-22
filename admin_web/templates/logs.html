@@ -1,0 +1,193 @@
+{% extends "base.html" %}
+
+{% block title %}יומני מערכת - BodyPlus XPro Admin{% endblock %}
+{% block page_title %}יומני מערכת{% endblock %}
+
+{% block content %}
+<div id="logs-page" class="space-y-6">
+
+  <!-- 🔧 Controls -->
+  <div class="bg-white shadow rounded-lg">
+    <div class="px-4 py-5 sm:p-6">
+      <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+
+        <!-- סינון -->
+        <div class="flex items-center gap-3 flex-wrap">
+          <label for="log-level" class="text-sm text-gray-600">רמה:</label>
+          <select id="log-level"
+                  class="block w-40 px-3 py-2 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary sm:text-sm">
+            <option value="ALL">כל הרמות</option>
+            <option value="ERROR">שגיאה</option>
+            <option value="WARNING">אזהרה</option>  <!-- FIX: WARN -> WARNING -->
+            <option value="INFO" selected>מידע</option>
+            <option value="DEBUG">דיבוג</option>
+          </select>
+
+          <input id="log-query" type="text" placeholder="חיפוש בטקסט..."
+                 class="w-56 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary focus:border-primary sm:text-sm">
+        </div>
+
+        <!-- כפתורים -->
+        <div class="flex items-center gap-2 flex-wrap">
+
+          <!-- עדכון אוטומטי -->
+          <label class="inline-flex items-center ml-2">
+            <input id="auto-refresh" type="checkbox" class="form-checkbox h-4 w-4 text-primary" checked>
+            <span class="mr-2 text-sm text-gray-700">עדכון אוטומטי</span>
+          </label>
+
+          <!-- עקוב אחרי הסוף -->
+          <label class="inline-flex items-center ml-2">
+            <input id="follow-tail" type="checkbox" class="form-checkbox h-4 w-4 text-primary" checked>
+            <span class="mr-2 text-sm text-gray-700">עקוב אחרי הסוף</span>
+          </label>
+
+          <!-- הסתר payload_push -->
+          <label class="inline-flex items-center ml-2">
+            <input id="hide-payload-push" type="checkbox" class="form-checkbox h-4 w-4 text-primary" checked>
+            <span class="mr-2 text-sm text-gray-700">הסתר פרטי payload</span>
+          </label>
+
+          <!-- הורדה -->
+          <button id="btn-download"
+                  class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-primary hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary">
+            <svg class="h-4 w-4 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1M12 12v8m0 0l4-4m-4 4l-4-4M12 4v8"/>
+            </svg>
+            הורד יומנים
+          </button>
+
+          <!-- ניקוי -->
+          <button id="btn-clear"
+                  class="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary">
+            <svg class="h-4 w-4 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M6 18L18 6M6 6l12 12"/>
+            </svg>
+            נקה
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 🟢 Live Logs -->
+  <div class="bg-white shadow rounded-lg">
+    <div class="px-4 py-5 sm:p-6">
+      <div class="flex items-center justify-between mb-3">
+        <h3 class="text-lg leading-6 font-medium text-gray-900">יומנים בזמן אמת</h3>
+
+        <!-- אינדיקציה -->
+        <div id="system-health" class="flex items-center gap-2">
+          <div id="led-heartbeat" class="w-3 h-3 rounded-full bg-gray-400 animate-pulse"></div>
+          <span id="health-text" class="text-sm text-gray-600">ממתין לנתונים...</span>
+          <span id="last-update" class="text-xs text-gray-400">(לא התקבלו נתונים עדיין)</span>
+        </div>
+      </div>
+
+      <div id="log-container"
+           class="bg-black rounded-lg p-4 h-96 overflow-y-auto font-mono text-sm text-gray-100 border border-gray-800"
+           data-init="50" data-burst="20" data-ping="15000">
+        <div id="empty-state" class="text-gray-400 select-none">אין רשומות להצגה עדיין…</div>
+        <!-- שורות יוזרקו כאן -->
+      </div>
+    </div>
+  </div>
+
+  <!-- 🔢 Stats -->
+  <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+    <div class="bg-white overflow-hidden shadow rounded-lg p-5 flex items-center">
+      <svg class="h-6 w-6 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M12 9v6m0 4h.01M5.07 19h13.86"/>
+      </svg>
+      <div class="mr-4">
+        <dt class="text-sm font-medium text-gray-500">שגיאות</dt>
+        <dd id="stat-error" class="text-lg font-medium text-gray-900">0</dd>
+      </div>
+    </div>
+
+    <div class="bg-white overflow-hidden shadow rounded-lg p-5 flex items-center">
+      <svg class="h-6 w-6 text-yellow-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M12 9v6m0 4h.01M5.07 19h13.86"/>
+      </svg>
+      <div class="mr-4">
+        <dt class="text-sm font-medium text-gray-500">אזהרות</dt>
+        <dd id="stat-warn" class="text-lg font-medium text-gray-900">0</dd>
+      </div>
+    </div>
+
+    <div class="bg-white overflow-hidden shadow rounded-lg p-5 flex items-center">
+      <svg class="h-6 w-6 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+      </svg>
+      <div class="mr-4">
+        <dt class="text-sm font-medium text-gray-500">מידע</dt>
+        <dd id="stat-info" class="text-lg font-medium text-gray-900">0</dd>
+      </div>
+    </div>
+
+    <div class="bg-white overflow-hidden shadow rounded-lg p-5 flex items-center">
+      <svg class="h-6 w-6 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M9 12h6m-6 4h6M6 5h8l4 4v10a2 2 0 01-2 2H6a2 2 0 01-2-2V7a2 2 0 012-2z"/>
+      </svg>
+      <div class="mr-4">
+        <dt class="text-sm font-medium text-gray-500">סה״כ רשומות</dt>
+        <dd id="stat-total" class="text-lg font-medium text-gray-900">0</dd>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- תבנית שורה לוג — לרינדור יעיל בבאצ'ים -->
+<template id="log-row-template">
+  <div class="log-line whitespace-pre leading-5">
+    <span class="log-ts text-gray-400"></span>
+    <span class="log-level font-semibold ml-2"></span>
+    <span class="log-msg"></span>
+    <span class="log-repeat text-gray-400 ml-2"></span>
+  </div>
+</template>
+{% endblock %}
+
+{% block scripts %}
+  <script src="{{ url_for('static', filename='js/logs.js') }}?v={{ app_version|default('dev') }}" defer></script>
+  <script>
+    // אינדיקציה חיה למצב המערכת
+    const led = document.getElementById('led-heartbeat');
+    const text = document.getElementById('health-text');
+    const last = document.getElementById('last-update');
+    let lastPing = Date.now();
+
+    function setHealthy(ok) {
+      const now = Date.now();
+      const delta = ((now - lastPing) / 1000).toFixed(1);
+      if (ok) {
+        led.classList.remove('bg-gray-400', 'bg-red-500');
+        led.classList.add('bg-green-500');
+        text.textContent = 'כל המערכות פעילות';
+        last.textContent = `(עודכן לפני ${delta} שניות)`;
+      } else {
+        led.classList.remove('bg-green-500');
+        led.classList.add('bg-red-500');
+        text.textContent = 'אין נתונים חיים';
+        last.textContent = '(לא התקבלו נתונים לאחרונה)';
+      }
+    }
+
+    // בדיקה כל שנייה (בריאות סטרים)
+    setInterval(() => {
+      setHealthy(Date.now() - lastPing <= 5000);
+    }, 1000);
+
+    // משמש את logs.js להודיע שהתקבלו נתונים
+    window.__logPing = function () {
+      lastPing = Date.now();
+      setHealthy(true);
+    };
+  </script>
+{% endblock %}

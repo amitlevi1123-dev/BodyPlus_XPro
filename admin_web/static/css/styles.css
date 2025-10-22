@@ -1,0 +1,272 @@
+/*-----------------------------------------------------------
+styles.css — Global styles for BodyPlus XPro Admin
+מה שודרג:
+• משתני מותג + צבעים לרמות לוג (ERROR/WARNING/INFO/DEBUG).
+• טיפוגרפיית מונוספייס ללוגים עם כיוון LTR בתוך אתר RTL.
+• גלילה חלקה, scrollbar דק, ומניעת ג’אנק ברינדור רציף.
+• התאמות RTL למספרים/טיימסטמפים, ו-utilities כלליים.
+• עדכוני A11y: כיבוי אנימציות במצב reduced-motion.
+-----------------------------------------------------------*/
+
+/* Brand & tokens */
+:root{
+  --brand-blue: #38b6ff;
+  --brand-blue-700: #0377b5;
+  --brand-indigo-500: #667eea;
+  --brand-purple-600: #764ba2;
+  --brand-slate-900: #2c3e50;
+  --brand-slate-800: #34495e;
+  --brand-green-600: #27ae60;
+  --brand-green-700: #219a52;
+  --brand-red-500: #e74c3c;
+  --brand-red-700: #c0392b;
+
+  --surface: #ffffff;
+  --surface-soft: #f8f9fa;
+  --ink: #333;
+  --divider: #e9ecef;
+
+  /* Log level colors */
+  --log-err: #f87171;      /* red-400 */
+  --log-warn: #facc15;     /* yellow-400 */
+  --log-info: #60a5fa;     /* blue-400 */
+  --log-debug: #9ca3af;    /* gray-400 */
+
+  /* Misc */
+  --scrollbar: rgba(0,0,0,.25);
+  --scrollbar-bg: rgba(255,255,255,.05);
+}
+
+/* Reset (light) */
+*{ margin:0; padding:0; box-sizing:border-box; }
+
+/* Base */
+body{
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  background: var(--surface);   /* רקע לבן של האתר – במקום הגרדיאנט הסגול */
+  color: var(--ink);
+  min-height: 100vh;
+}
+
+/* App container */
+.app{
+  max-width: 1400px;
+  margin: 0 auto;
+  background: var(--surface);
+  min-height: 100vh;
+  box-shadow: 0 0 30px rgba(0,0,0,.1);
+}
+
+/* Header */
+.header{
+  background: linear-gradient(135deg, var(--brand-slate-900) 0%, var(--brand-slate-800) 100%);
+  color: #fff;
+  padding: 1rem 2rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.header h1{ font-size:1.8rem; font-weight:300; }
+
+/* Status bar (small top info) */
+.status-bar{
+  display:flex; gap:2rem; align-items:center;
+}
+.connection-status,.fps-counter,.confidence-meter{
+  display:flex; align-items:center; gap:.5rem; font-size:.9rem;
+}
+
+.status-dot{
+  width:8px; height:8px; border-radius:50%;
+  background: var(--brand-red-500);
+  animation: pulse 2s infinite;
+}
+.status-dot.connected{ background: var(--brand-green-600); }
+@keyframes pulse{ 0%,100%{opacity:1} 50%{opacity:.5} }
+/* כיבוי אנימציות למעדיפים תנועה מופחתת */
+@media (prefers-reduced-motion: reduce){
+  .status-dot{ animation:none }
+}
+
+/* Tabs */
+.tabs-nav{
+  background: var(--surface-soft);
+  border-bottom:2px solid var(--divider);
+  padding: 0 2rem;
+  display:flex; gap:0;
+  overflow-x:auto;
+}
+.tab-button{
+  background:none; border:none; padding:1rem 1.5rem; cursor:pointer;
+  font-size:1rem; color:#666; border-bottom:3px solid transparent;
+  transition: background-color .2s ease, color .2s ease, border-color .2s ease;
+}
+.tab-button:hover{ background:#e9ecef; color:#333; }
+.tab-button.active{ color:var(--brand-slate-900); border-bottom-color: var(--brand-blue); background:#fff; }
+
+/* Main */
+.main-content{ padding:2rem; min-height:calc(100vh - 200px); }
+.tab-content{ animation: fadeIn .25s ease; }
+@keyframes fadeIn{ from{opacity:0; transform:translateY(10px)} to{opacity:1; transform:none} }
+@media (prefers-reduced-motion: reduce){
+  .tab-content{ animation:none }
+}
+
+/* Top metrics band */
+.top-metrics{
+  background: linear-gradient(135deg, #3498db 0%, #2980b9 100%);
+  color:#fff; padding:1.5rem; border-radius:10px; margin-bottom:2rem;
+}
+.top-metrics h2{ font-size:1.3rem; margin-bottom:1rem; font-weight:400; }
+.top-metrics-grid{
+  display:grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap:1rem;
+}
+.metric-item{ background:rgba(255,255,255,.1); padding:1rem; border-radius:8px; text-align:center; }
+.metric-item.stale{ opacity:.6; background: rgba(231,76,60,.2); }
+.metric-name{ font-size:.9rem; margin-bottom:.5rem; opacity:.9; }
+.metric-value{ font-size:1.4rem; font-weight:600; margin-bottom:.2rem; }
+.metric-unit{ font-size:.8rem; opacity:.8; }
+
+/* Categories & metric rows */
+.categories{ display:flex; flex-direction:column; gap:2rem; }
+.category{ background: var(--surface-soft); border-radius:10px; padding:1.5rem; }
+.category h3{ color:var(--brand-slate-900); margin-bottom:1rem; font-size:1.2rem; font-weight:500; }
+
+.sides-container{
+  display:grid; grid-template-columns:1fr 1fr 300px; gap:2rem;
+}
+.side-column,.general-column{
+  background:#fff; border-radius:8px; padding:1rem;
+}
+.side-column h4,.general-column h4{
+  color:#666; margin-bottom:.8rem; font-size:1rem; text-align:center;
+  padding-bottom:.5rem; border-bottom:1px solid var(--divider);
+}
+
+.metric-row{
+  display:flex; justify-content:space-between; align-items:center;
+  padding:.7rem 0; border-bottom:1px solid #f1f3f4;
+}
+.metric-row:last-child{ border-bottom:none; }
+.metric-row.stale{ opacity:.6; color: var(--brand-red-500); }
+
+.metric-key{ font-size:.9rem; color:#555; flex:1; }
+/* בטבלאות RTL אנחנו משאירים מספרים מיושרים לשמאל כדי לשמור על קריאות */
+.metric-current{ font-weight:600; color:var(--brand-slate-900); text-align:left; min-width:80px; }
+
+/* Hand orientation */
+.hand-orientation{ display:flex; gap:1rem; margin:1rem 0; justify-content:center; }
+.hand-chip{ display:flex; flex-direction:column; align-items:center; gap:.5rem; }
+.hand-label{ font-size:.9rem; color:#666; font-weight:500; }
+.orientation-states{ display:flex; gap:.3rem; }
+.orientation-state{
+  padding:.3rem .8rem; border-radius:20px; font-size:.8rem;
+  background:#e9ecef; color:#666; border:2px solid transparent;
+}
+.orientation-state.active{ background:#3498db; color:#fff; border-color:#2980b9; }
+
+/* Video area */
+.video-container{ position:relative; display:flex; gap:1rem; margin-bottom:2rem; }
+.video-wrapper,.skeleton-wrapper{ position:relative; flex:1; background:#000; border-radius:10px; overflow:hidden; }
+.video-feed,.skeleton-canvas{ width:100%; height:auto; display:block; }
+.skeleton-controls{
+  position:absolute; top:10px; inset-inline-end:10px; /* מתאים ל-RTL/LTR */
+  display:flex; gap:.5rem; flex-direction:column;
+}
+.skeleton-mode-btn,.opacity-control{
+  background:rgba(0,0,0,.7); color:#fff; border:none; padding:.5rem;
+  border-radius:5px; font-size:.8rem; cursor:pointer;
+}
+.opacity-control{ inline-size:100px; }
+
+/* Freeze controls + indicators */
+.freeze-controls{
+  position:fixed; inset-block-end:2rem; inset-inline-end:2rem;
+  display:flex; gap:1rem; z-index:1000;
+}
+.freeze-btn{
+  background:#3498db; color:#fff; border:none; padding:.8rem 1.2rem; border-radius:8px;
+  cursor:pointer; display:flex; align-items:center; gap:.5rem; font-size:.9rem;
+  transition:transform .15s ease, background-color .15s ease, box-shadow .15s ease;
+  box-shadow:0 4px 12px rgba(52,152,219,.3);
+}
+.freeze-btn:hover{ background:#2980b9; transform:translateY(-2px); box-shadow:0 6px 16px rgba(52,152,219,.4); }
+.freeze-btn.active{ background: var(--brand-red-500); }
+.freeze-btn.active:hover{ background: var(--brand-red-700); }
+
+.freeze-indicators{
+  position:fixed; inset-block-start:50%; inset-inline-start:50%;
+  transform: translate(-50%, -50%); z-index:1001; pointer-events:none;
+}
+.freeze-indicator{
+  background:rgba(0,0,0,.9); color:#fff; padding:1rem 2rem; border-radius:10px;
+  font-size:1.1rem; text-align:center; margin-bottom:1rem; pointer-events:auto;
+  display:flex; align-items:center; gap:1rem; justify-content:center;
+}
+.freeze-indicator.hidden{ display:none; }
+
+.save-btn{
+  background: var(--brand-green-600); color:#fff; border:none;
+  padding:.5rem 1rem; border-radius:5px; cursor:pointer; font-size:.9rem;
+}
+.save-btn:hover{ background: var(--brand-green-700); }
+
+/* ---------- Logs panel (Anti-jank) ---------- */
+.log-line{
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  direction: ltr;           /* טיימסטמפים/סוגריים נקראים טוב יותר ב-LTR */
+  unicode-bidi: plaintext;  /* ללא היפוך סימנים במסרים מעורבים */
+  white-space: pre;         /* לא לעטוף */
+  will-change: contents;    /* עזרה קלה ל-DOM מרובה */
+}
+.log-line .log-ts{ color:#9ca3af }            /* טיימסטמפ */
+.log-line .log-level{ margin-inline-start:.5rem }
+.log-line .log-msg{ color:#e5e7eb }           /* טקסט הודעה */
+.log-line .log-repeat{ color:#9ca3af }         /* ×N */
+
+.log-level[data-level="ERROR"], .text-error, .log-error{ color: var(--log-err) !important; }
+.log-level[data-level="WARNING"], .text-warn, .log-warn{ color: var(--log-warn) !important; }
+.log-level[data-level="INFO"], .text-info, .log-info{ color: var(--log-info) !important; }
+.log-level[data-level="DEBUG"], .text-debug, .log-debug{ color: var(--log-debug) !important; }
+
+#log-container{
+  contain: content;         /* מבודד רינדור פנימי */
+  scrollbar-gutter: stable; /* פחות קפיצות בעת שינוי הגובה */
+  overscroll-behavior: contain;
+}
+#log-container::-webkit-scrollbar{ width:10px; }
+#log-container::-webkit-scrollbar-thumb{ background: var(--scrollbar); border-radius:8px; }
+#log-container::-webkit-scrollbar-track{ background: var(--scrollbar-bg); }
+
+/* Utilities */
+.hidden{ display:none; }
+.loading{ text-align:center; padding:2rem; color:#666; }
+.error{
+  background:#fee; color:#c33; padding:1rem; border-radius:5px; margin:1rem 0;
+  border-inline-start:4px solid var(--brand-red-500); /* RTL/LTR-friendly */
+}
+
+/* Responsive */
+@media (max-width: 1024px){
+  .sides-container{ grid-template-columns:1fr; gap:1rem; }
+  .video-container{ flex-direction:column; }
+  .freeze-controls{
+    position:relative; inset:unset; justify-content:center; margin:1rem 0;
+  }
+}
+@media (max-width: 768px){
+  .header{ flex-direction:column; gap:1rem; }
+  .status-bar{ flex-wrap:wrap; gap:1rem; }
+  .tabs-nav{ padding:0 1rem; }
+  .main-content{ padding:1rem; }
+  .top-metrics-grid{ grid-template-columns:repeat(auto-fit, minmax(150px, 1fr)); gap:.8rem; }
+}
+
+/* ===== אופציונלי: מחלקות להפעלת גרדיאנט נקודתית (לא חובה) ===== */
+.bg-gradient-brand{
+  background: linear-gradient(135deg, var(--brand-indigo-500) 0%, var(--brand-purple-600) 100%);
+}
+/* לשימוש: <body class="has-gradient"> אם תרצה בעמוד ספציפי */
+.has-gradient{
+  background: linear-gradient(135deg, var(--brand-indigo-500) 0%, var(--brand-purple-600) 100%) !important;
+}

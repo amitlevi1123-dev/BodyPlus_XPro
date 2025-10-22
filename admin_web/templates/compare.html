@@ -1,0 +1,163 @@
+{#
+  🆚 Compare Page – BodyPlus Admin
+  קובץ זה מצלם שני “מצבים” חיים מ־/payload, משווה ביניהם,
+  מציג טבלת הפרשים וסטטיסטיקות, ומאפשר ייצוא JSON/CSV.
+  ה־JS שמפעיל הכול נמצא ב־/static/js/compare.js.
+#}
+
+{% extends "base.html" %}
+{% block title %}השוואת מדדים – BodyPlus Admin{% endblock %}
+{% block page_title %}השוואת מדדים{% endblock %}
+
+{% block content %}
+<div class="compare-tab">
+  <!-- Controls -->
+  <div class="compare-controls">
+    <div class="control-section">
+      <h3>השוואת מדדים</h3>
+      <div class="snapshot-controls">
+        <button id="captureSnapshot1" class="capture-btn">📸 צלם מצב נוכחי לראשון</button>
+        <button id="captureSnapshot2" class="capture-btn">📸 צלם מצב נוכחי לשני</button>
+        <button id="clearSnapshots"   class="clear-btn">🗑️ נקה הכל</button>
+      </div>
+    </div>
+
+    <!-- Snapshot Status -->
+    <div class="snapshots-status">
+      <div class="snapshot-status" id="snapshot1Status">
+        <div class="status-header">מצב ראשון</div>
+        <div class="status-content">לא נשמר</div>
+      </div>
+      <div class="snapshot-status" id="snapshot2Status">
+        <div class="status-header">מצב שני</div>
+        <div class="status-content">לא נשמר</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Comparison Results -->
+  <div class="comparison-section">
+    <div id="comparisonContent" class="comparison-content">
+      <div class="no-comparison">
+        <div class="no-comparison-message">
+          <h4>לא זמינה השוואה</h4>
+          <p>צלם שני מצבים כדי לראות השוואה בין המדדים</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Statistics Summary -->
+  <div class="comparison-stats hidden" id="comparisonStats">
+    <div class="stats-grid">
+      <div class="stat-item">
+        <div class="stat-label">מדדים משותפים</div>
+        <div class="stat-value" id="commonMetricsCount">--</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-label">שיפורים</div>
+        <div class="stat-value improved" id="improvedCount">--</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-label">הידרדרויות</div>
+        <div class="stat-value worsened" id="worsenedCount">--</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-label">ללא שינוי</div>
+        <div class="stat-value unchanged" id="unchangedCount">--</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Export Options -->
+  <div class="export-section hidden" id="exportSection">
+    <h4>ייצוא השוואה</h4>
+    <div class="export-buttons">
+      <button id="exportComparisonJSON" class="export-btn">ייצא JSON</button>
+      <button id="exportComparisonCSV"  class="export-btn">ייצא CSV</button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+  <script src="{{ url_for('static', filename='js/compare.js') }}"></script>
+{% endblock %}
+
+{% block head_extra %}
+<style>
+  /* === CSS פנימי ייעודי לטאב ההשוואה (אפשר להעביר אח"כ ל-styles.css) === */
+  .compare-tab { display: flex; flex-direction: column; gap: 2rem; }
+  .compare-controls {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: #fff; padding: 2rem; border-radius: 10px;
+  }
+  .compare-controls h3 { margin-bottom: 1rem; font-size: 1.3rem; font-weight: 400; }
+  .snapshot-controls { display: flex; gap: 1rem; margin-bottom: 1.5rem; flex-wrap: wrap; }
+
+  .capture-btn, .clear-btn {
+    background: rgba(255,255,255,0.2); color: #fff; border: none;
+    padding: .8rem 1.5rem; border-radius: 8px; cursor: pointer; font-size: .9rem;
+    transition: background .3s ease; border: 2px solid transparent;
+  }
+  .capture-btn:hover, .clear-btn:hover { background: rgba(255,255,255,0.3); border-color: rgba(255,255,255,0.4); }
+  .clear-btn { background: rgba(231,76,60,0.3); }
+  .clear-btn:hover { background: rgba(231,76,60,0.5); }
+
+  .snapshots-status {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(200px,1fr)); gap: 1rem;
+  }
+  .snapshot-status { background: rgba(255,255,255,0.15); padding: 1rem; border-radius: 8px; text-align: center; }
+  .status-header { font-weight: 600; margin-bottom: .5rem; font-size: 1rem; }
+  .status-content { font-size: .9rem; opacity: .9; }
+  .snapshot-status.has-data { background: rgba(46,204,113,0.3); border: 2px solid rgba(46,204,113,0.5); }
+
+  .comparison-section { background: #fff; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,.1); overflow: hidden; }
+  .comparison-content { min-height: 400px; }
+  .no-comparison { display: flex; align-items: center; justify-content: center; height: 400px; text-align: center; color: #666; }
+  .no-comparison-message h4 { margin-bottom: .5rem; color: #333; }
+  .comparison-view { padding: 1.5rem; }
+
+  .comparison-header, .comparison-row {
+    display: grid; grid-template-columns: 2fr 1fr 1fr 1fr; gap: 1rem; padding: 1rem 1.5rem; align-items: center;
+  }
+  .comparison-header { background: #f8f9fa; font-weight: 600; color: #495057; border-bottom: 2px solid #dee2e6; }
+  .comparison-row { border-bottom: 1px solid #f1f3f4; }
+  .comparison-row:last-child { border-bottom: none; }
+  .comparison-row:nth-child(even) { background: #f8f9fa; }
+
+  .comparison-metric { font-weight: 500; color: #333; }
+  .comparison-value { text-align: center; font-family: monospace; }
+  .comparison-diff { text-align: center; font-weight: 600; font-family: monospace; }
+  .comparison-diff.positive { color: #28a745; }
+  .comparison-diff.negative { color: #dc3545; }
+  .comparison-diff.neutral  { color: #6c757d; }
+
+  .comparison-stats { background: #f8f9fa; padding: 1.5rem; border-radius: 8px; }
+  .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px,1fr)); gap: 1rem; }
+  .stat-item { background: #fff; padding: 1rem; border-radius: 8px; text-align: center; box-shadow: 0 2px 4px rgba(0,0,0,.05); }
+  .stat-label { font-size: .9rem; color: #666; margin-bottom: .5rem; }
+  .stat-value { font-size: 1.4rem; font-weight: 600; color: #333; }
+  .stat-value.improved { color: #28a745; }
+  .stat-value.worsened { color: #dc3545; }
+  .stat-value.unchanged { color: #6c757d; }
+
+  .export-section { background: #f8f9fa; padding: 1rem; border-radius: 8px; text-align: center; }
+  .export-section h4 { margin-bottom: 1rem; color: #495057; }
+  .export-buttons { display: flex; gap: 1rem; justify-content: center; }
+  .export-btn {
+    background: #007bff; color: #fff; border: none; padding: .5rem 1rem; border-radius: 5px; cursor: pointer; font-size: .9rem;
+    transition: background .3s ease;
+  }
+  .export-btn:hover { background: #0056b3; }
+
+  .hidden { display: none; }
+
+  @media (max-width: 768px) {
+    .snapshot-controls { flex-direction: column; }
+    .comparison-header, .comparison-row { grid-template-columns: 1fr; gap: .5rem; }
+    .comparison-row { text-align: center; }
+    .stats-grid { grid-template-columns: repeat(2, 1fr); }
+  }
+</style>
+{% endblock %}

@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>{% block title %}BodyPlus XPro Admin{% endblock %}</title>
+
+  <!-- Tailwind CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: { primary: '#38b6ff', secondary: '#f8fafc' },
+          fontFamily: {
+            sans: ['Inter','ui-sans-serif','system-ui','Segoe UI','Roboto','Helvetica Neue','Arial','Noto Sans']
+          },
+        },
+      },
+    };
+  </script>
+
+  <!-- Fonts + App CSS -->
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}?v={{ app_version|default('dev', true) }}" />
+
+  <style>
+    body{ background:#f7fafc; font-family: Inter, system-ui, sans-serif; }
+    .status-dot{ width:10px; height:10px; border-radius:9999px; display:inline-block; background:#ef4444; transition: background-color .2s; }
+    .status-dot.connected{ background:#16a34a; }
+    .badge{ display:none; align-items:center; gap:.35rem; font-size:.75rem; line-height:1rem; padding:.15rem .5rem; border-radius:.5rem; }
+    .badge.show{ display:inline-flex; }
+    .badge-err{ background:#fee2e2; color:#991b1b; }
+    .badge-warn{ background:#fef3c7; color:#92400e; }
+  </style>
+
+  {% block head %}{% endblock %}
+  {% block head_extra %}{% endblock %}
+</head>
+
+<body class="font-sans text-gray-900">
+  <!-- Sidebar -->
+  {% include '_sidebar.html' ignore missing %}
+
+  <!-- Content area -->
+  <div class="min-h-screen pr-64">
+    <header class="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-10">
+      <div class="max-w-7xl mx-auto py-4 px-4 sm:px-6 lg:px-8">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center">
+            <img src="{{ url_for('static', filename='images/logo.png') }}"
+                 alt="BodyPlus XPro" class="h-10 w-auto ml-4"
+                 onerror="this.style.display='none'">
+            <h1 class="text-2xl font-bold">{% block page_title %}Admin Panel{% endblock %}</h1>
+          </div>
+          <div class="flex items-center gap-3">
+            <span class="status-dot" id="statusDot" title="מצב חיבור"></span>
+
+            <span id="badgeWarn" class="badge badge-warn" title="אזהרות בדקה האחרונה">
+              <svg class="h-4 w-4" viewBox="0 0 24 24" fill="currentColor"><path d="M12 9v4m0 4h.01M10.29 3.86l-8.48 14.7A2 2 0 003.52 22h16.96a2 2 0 001.71-3.44l-8.48-14.7a2 2 0 00-3.42 0z"/></svg>
+              <span id="badgeWarnNum">0</span>
+            </span>
+            <span id="badgeErr" class="badge badge-err" title="שגיאות בדקה האחרונה">
+              <svg class="h-4 w-4" viewBox="0 0 24 24" fill="currentColor"><path d="M12 9v6m0 4h.01M5.07 19h13.86"/></svg>
+              <span id="badgeErrNum">0</span>
+            </span>
+
+            <span class="text-sm text-gray-500">גרסה: {{ app_version|default('dev', true) }}</span>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <main class="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
+      {% block content %}
+      <div class="text-gray-500 text-center py-12">
+        אין תוכן להצגה בדף זה.
+      </div>
+      {% endblock %}
+    </main>
+  </div>
+
+  <!-- הסרנו את video.js הישן -->
+  {#  <script src="{{ url_for('static', filename='js/video.js') }}"></script>  #}
+
+  {% block scripts %}{% endblock %}
+
+  <!-- ping/health dot -->
+  <script>
+    (function(){
+      const dot = document.getElementById('statusDot');
+      if(!dot) return;
+      async function ping(){
+        try{
+          const s = await fetch('/api/session/status', {cache:'no-store'}).then(r=>r.ok?r.json():null).catch(()=>null);
+          if (s && (s.opened || s.running)) { dot.classList.add('connected'); return; }
+          const h = await fetch('/healthz', {cache:'no-store'}).then(r=>r.ok?r.json():null).catch(()=>null);
+          if(h && (h.ok === true || h.ok === 'true')) dot.classList.add('connected');
+          else dot.classList.remove('connected');
+        }catch(_){ dot.classList.remove('connected'); }
+      }
+      ping(); setInterval(ping, 2000);
+    })();
+  </script>
+
+  <!-- global lightweight logs badges (skip on /logs) -->
+  <script>
+    (function(){
+      try {
+        const onLogsPage = location.pathname.replace(/\/+$/,'') === '/logs';
+        if (onLogsPage) return;
+        if (window.__GLOBAL_LOGS_SSE__) return;
+        window.__GLOBAL_LOGS_SSE__ = true;
+
+        const badgeErr  = document.getElementById('badgeErr');
+        const badgeWarn = document.getElementById('badgeWarn');
+        const numErr    = document.getElementById('badgeErrNum');
+        const numWarn   = document.getElementById('badgeWarnNum');
+        if (!badgeErr || !badgeWarn || !numErr || !numWarn) return;
+
+        const WINDOW_MS = 60*1000;
+        const qErr = [], qWarn = [];
+        function prune(now){ while(qErr.length&&now-qErr[0]>WINDOW_MS)qErr.shift(); while(qWarn.length&&now-qWarn[0]>WINDOW_MS)qWarn.shift(); }
+        function update(){ const now=Date.now(); prune(now); const e=qErr.length,w=qWarn.length; numErr.textContent=e; numWarn.textContent=w; badgeErr.classList.toggle('show',e>0); badgeWarn.classList.toggle('show',w>0); }
+        let pending=false; function schedule(){ if(pending)return; pending=true; setTimeout(()=>{pending=false; update();},1000); }
+
+        const url = `/api/logs/stream?burst=5&ping_ms=15000`; let es;
+        function connect(){
+          try{ es=new EventSource(url);}catch{return;}
+          es.onmessage=(ev)=>{ try{ const obj=JSON.parse(ev.data); const arr=Array.isArray(obj)?obj:[obj]; const now=Date.now(); for(const r of arr){ const lvl=String(r.level||'').toUpperCase(); if(lvl==='ERROR') qErr.push(now); else if(lvl==='WARNING') qWarn.push(now);} schedule(); }catch{} };
+          es.onerror=()=>{ try{es.close();}catch{}; setTimeout(connect,4000); };
+        }
+        connect();
+      } catch(_) {}
+    })();
+  </script>
+</body>
+</html>

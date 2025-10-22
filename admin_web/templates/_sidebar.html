@@ -1,0 +1,83 @@
+<!-- admin_web/templates/_sidebar.html -->
+<aside class="fixed right-0 top-0 h-full w-64 bg-white border-l border-gray-200 shadow-sm">
+  <div class="p-4 border-b">
+    <a href="{{ url_for('dashboard') }}">
+      <img src="{{ url_for('static', filename='images/logo.png') }}"
+           alt="BodyPlus XPro"
+           class="h-10 w-auto mx-auto"
+           onerror="this.style.display='none'">
+    </a>
+  </div>
+
+  {% set ep = request.endpoint.split('.')[-1] if request.endpoint else '' %}
+
+  <nav class="p-3 space-y-1 text-sm">
+
+    <a href="{{ url_for('dashboard') }}"
+       class="flex items-center justify-between px-3 py-2 rounded-lg
+              {{ 'bg-sky-100 text-sky-600 font-semibold' if ep=='dashboard' else 'text-gray-700 hover:bg-gray-50' }}">
+      <span>לוח בקרה</span>
+      <span class="text-xs text-gray-400">{{ app_version|default('dev') }}</span>
+    </a>
+
+    <a href="{{ url_for('metrics_page') }}"
+       class="block px-3 py-2 rounded-lg
+              {{ 'bg-sky-100 text-sky-600 font-semibold' if ep=='metrics_page' else 'text-gray-700 hover:bg-gray-50' }}">
+      מדדים
+    </a>
+
+    <a href="{{ url_for('logs_page') }}"
+       class="block px-3 py-2 rounded-lg
+              {{ 'bg-sky-100 text-sky-600 font-semibold' if ep=='logs_page' else 'text-gray-700 hover:bg-gray-50' }}">
+      לוגים
+    </a>
+
+    <a href="{{ url_for('compare_page') }}"
+       class="block px-3 py-2 rounded-lg
+              {{ 'bg-sky-100 text-sky-600 font-semibold' if ep=='compare_page' else 'text-gray-700 hover:bg-gray-50' }}">
+      השוואה
+    </a>
+
+    <a href="{{ url_for('video_page') }}"
+       class="block px-3 py-2 rounded-lg
+              {{ 'bg-sky-100 text-sky-600 font-semibold' if ep=='video_page' else 'text-gray-700 hover:bg-gray-50' }}">
+      וידאו (מצלמה)
+    </a>
+
+    {% if has_endpoint('upload_video.upload_video_page') %}
+      <a href="{{ url_for('upload_video.upload_video_page') }}"
+         class="block px-3 py-2 rounded-lg
+                {{ 'bg-sky-100 text-sky-600 font-semibold' if ep=='upload_video_page' else 'text-gray-700 hover:bg-gray-50' }}">
+        העלאת וידאו 🎬
+      </a>
+    {% endif %}
+
+    {% if has_endpoint('exercise_page') %}
+      <a href="{{ url_for_safe('exercise_page') }}"
+         class="block px-3 py-2 rounded-lg
+                {{ 'bg-sky-100 text-sky-600 font-semibold' if ep=='exercise_page' else 'text-gray-700 hover:bg-gray-50' }}">
+        זיהוי תרגיל
+      </a>
+    {% endif %}
+
+    {% if has_endpoint('system_page') %}
+      <a href="{{ url_for_safe('system_page') }}"
+         class="block px-3 py-2 rounded-lg
+                {{ 'bg-sky-100 text-sky-600 font-semibold' if ep=='system_page' else 'text-gray-700 hover:bg-gray-50' }}">
+        מצב מערכת
+      </a>
+    {% else %}
+      <span class="block px-3 py-2 rounded-lg text-gray-300 cursor-not-allowed select-none"
+            title="העמוד מצב מערכת טרם הופעל בשרת">
+        מצב מערכת
+      </span>
+    {% endif %}
+
+    <a href="{{ url_for('settings_page') }}"
+       class="block px-3 py-2 rounded-lg
+              {{ 'bg-sky-100 text-sky-600 font-semibold' if ep=='settings_page' else 'text-gray-700 hover:bg-gray-50' }}">
+      הגדרות
+    </a>
+
+  </nav>
+</aside>

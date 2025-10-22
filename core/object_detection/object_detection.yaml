@@ -1,0 +1,75 @@
+﻿# =========================================================
+# BodyPlus_XPro — Object Detection (Ultralytics YOLO + ONNX + SIM)
+# =========================================================
+
+active_profile: yolov8_cpu_640
+env_override: DETECTOR_PROFILE
+
+tracking_enabled: false
+tracker:
+  type: none
+  max_age: 30
+  iou_threshold: 0.30
+  conf_threshold: 0.25
+
+classes:
+  - barbell
+  - dumbbell
+
+ui_label_map:
+  "0": barbell
+  "1": dumbbell
+
+profiles:
+  yolov8_cpu_640:
+    enabled: true
+    tracking_enabled: false
+    detector:
+      provider: yolov8
+      # ⚠️ שים לב: weights (לא weights_path)
+      weights: "C:/Users/Owner/Desktop/BodyPlus/BodyPlus_XPro/core/object_detection/models/best.pt"
+      device: cpu
+      imgsz: 640
+      threshold: 0.15
+      overlap: 0.50
+      max_objects: 50
+      period_ms: 120
+      clip_to_frame: true
+      extra:
+        half: false
+        agnostic_nms: true
+        allow_any_label: true
+        allowed_labels: [barbell, dumbbell]
+        classes_allowlist: [0, 1]
+
+  onnx_cpu_640:
+    # כדי למנוע בחירה בטעות ב-ONNX (שעלול להיות COCO), מכובה כרגע.
+    enabled: false
+    tracking_enabled: false
+    detector:
+      provider: onnx
+      onnx_path: "C:/Users/Owner/Desktop/BodyPlus/BodyPlus_XPro/core/object_detection/models/best.onnx"
+      device: cpu
+      imgsz: 640
+      threshold: 0.30
+      overlap: 0.50
+      max_objects: 50
+      period_ms: 120
+      clip_to_frame: true
+      extra:
+        allow_any_label: true
+        allowed_labels: [barbell, dumbbell]
+        debug_dump: 0
+
+  sim:
+    enabled: false
+    tracking_enabled: false
+    detector:
+      provider: sim
+      imgsz: 640
+      threshold: 0.30
+      overlap: 0.50
+      max_objects: 25
+      period_ms: 150
+      device: cpu
+      extra: {}

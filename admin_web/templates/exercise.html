@@ -1,0 +1,191 @@
+{% extends "base.html" %}
+{% block title %}זיהוי תרגיל · BodyPlus XPro{% endblock %}
+{% block page_title %}זיהוי תרגיל{% endblock %}
+
+{% block head %}
+<style>
+  .mono{font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono","Courier New",monospace}
+  .card{background:#fff;border:1px solid #e5e7eb;border-radius:1rem}
+  .card-h{padding:.9rem 1.1rem;border-bottom:1px solid #eef2f7}
+  .card-b{padding:1rem 1.1rem}
+
+  /* 🔵 Gauges */
+  .gauge{width:128px;height:128px}
+  .gauge .bg{stroke:#e5e7eb}
+  .gauge .fg{stroke-linecap:round;transition:stroke-dashoffset .6s ease, stroke .25s ease}
+  .gauge .label{font-size:14px;fill:#6b7280}
+  .gauge .value{font-size:22px;font-weight:700;fill:#111827}
+
+  /* Modal (פירוט חזרה/סט) */
+  .modal-backdrop{ position:fixed; inset:0; background:rgba(0,0,0,.45); display:none; align-items:flex-start; justify-content:center; padding:4vh 1rem; z-index:60; }
+  .modal-backdrop.show{ display:flex; }
+  .modal-card{ width:min(980px, 96vw); max-height:92vh; overflow:auto; background:#fff; border:1px solid #e5e7eb; border-radius:1rem; box-shadow:0 10px 25px rgba(0,0,0,.12); }
+  .crit-list h5{ font-weight:600; margin:.5rem 0 .35rem; }
+  .crit-item{ display:grid; grid-template-columns: 1fr auto auto; gap:.6rem; padding:.45rem .6rem; border-radius:.6rem; }
+  .crit-bad   { background:#fff1f2; }
+  .crit-warn  { background:#fff7ed; }
+  .crit-minor { background:#f8fafc; }
+  .crit-good  { background:#f0fdf4; }
+  .pill{ display:inline-flex; align-items:center; gap:.3rem; padding:.2rem .5rem; border-radius:9999px; font-size:.75rem; }
+  .pill-k{ background:#eef2ff; color:#3730a3; }
+  .pill-r{ background:#fee2e2; color:#991b1b; }
+
+  /* תוספות חסרות */
+  .status-dot{width:10px;height:10px;border-radius:9999px;background:#ef4444;display:inline-block}
+  .status-dot.connected{background:#22c55e}
+  .chip{display:inline-flex;align-items:center;background:#f1f5f9;border:1px solid #e5e7eb;border-radius:9999px;padding:.2rem .55rem;font-size:.75rem;color:#334155}
+</style>
+{% endblock %}
+
+{% block content %}
+
+<!-- שורת עליונה: וידאו חי + סטטוס -->
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+  <!-- וידאו חי -->
+  <div class="lg:col-span-2 card overflow-hidden">
+    <div class="card-h flex items-center justify-between">
+      <div class="font-semibold">וידאו חי</div>
+      <div class="text-sm text-gray-500">
+        מקור: <span id="vidSource">—</span> · FPS: <span id="vidFps">—</span> · גודל: <span id="vidSize">—</span>
+      </div>
+    </div>
+    <div class="card-b">
+      <img id="videoFeed" src="/video/stream.mjpg" alt="Video stream"
+           class="w-full h-[380px] object-contain bg-gray-50 rounded-lg border border-gray-200" />
+      <div class="text-xs text-gray-500 mt-2">אם לא רואים וידאו: ודא שהסטרימר פעיל. (בדף <span class="mono">/video</span> או דרך המצלמה הראשית)</div>
+    </div>
+  </div>
+
+  <!-- סטטוס חיבור + מדדי ציון -->
+  <div class="card">
+    <div class="card-h font-semibold">סטטוס · ציונים חיים</div>
+    <div class="card-b">
+      <div class="space-y-3">
+        <div class="flex items-center gap-3">
+          <span class="status-dot" id="exerciseStatusDot"></span>
+          <div class="text-sm text-gray-600">חיבור API / מצב סטרים</div>
+        </div>
+        <div class="grid grid-cols-2 gap-4">
+          <div class="flex flex-col items-center gap-1">
+            <div id="gaugeRep" class="gauge"></div>
+            <div class="text-sm text-gray-600">חזרה אחרונה</div>
+          </div>
+          <div class="flex flex-col items-center gap-1">
+            <div id="gaugeSet" class="gauge"></div>
+            <div class="text-sm text-gray-600">סט אחרון</div>
+          </div>
+        </div>
+        <div class="text-xs text-gray-500">
+          מדרג צבעים: <span class="font-medium text-red-600">אדום</span> (גרוע) ·
+          <span class="font-medium text-orange-500">כתום</span> ·
+          <span class="font-medium text-yellow-500">צהוב</span> ·
+          <span class="font-medium text-green-600">ירוק</span> (טוב)
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- פאנל סימולטור -->
+<div class="card mt-6">
+  <div class="card-h flex items-center justify-between">
+    <div class="font-semibold">סימולטור חזרות/סטים (לבדיקת הציונים)</div>
+    <div class="text-sm text-gray-500">מייצר דוחות מדומים הדומים לפלט המנוע – לצורכי UI בלבד</div>
+  </div>
+  <div class="card-b space-y-4">
+    <div class="grid grid-cols-1 lg:grid-cols-6 gap-3">
+      <label class="flex items-center gap-2">
+        <span class="w-24 text-sm text-gray-600">סטים</span>
+        <input id="simSets" type="number" min="1" max="10" value="2" class="form-input w-28 rounded-lg border-gray-300"/>
+      </label>
+      <label class="flex items-center gap-2">
+        <span class="w-24 text-sm text-gray-600">חזרות/סט</span>
+        <input id="simReps" type="number" min="1" max="30" value="5" class="form-input w-28 rounded-lg border-gray-300"/>
+      </label>
+      <label class="flex items-center gap-2">
+        <span class="w-24 text-sm text-gray-600">מצב</span>
+        <select id="simMode" class="form-select w-40 rounded-lg border-gray-300">
+          <option value="good">Good (דוגמה טובה)</option>
+          <option value="shallow">Shallow (עומק חלש)</option>
+          <option value="missing">Missing Critical (חסר מדד)</option>
+          <option value="mixed" selected>Mixed (משולב)</option>
+        </select>
+      </label>
+      <label class="flex items-center gap-2">
+        <span class="w-24 text-sm text-gray-600">% רעש</span>
+        <input id="simNoise" type="number" step="0.01" min="0" max="0.5" value="0.25" class="form-input w-28 rounded-lg border-gray-300"/>
+      </label>
+      <div class="flex items-center gap-2 lg:col-span-2">
+        <button id="btnSimRun" class="px-4 py-2 rounded-lg text-white bg-primary hover:opacity-90">התחל סימולציה</button>
+        <button id="btnSimClear" class="px-4 py-2 rounded-lg border border-gray-300 hover:bg-gray-50">נקה טבלה</button>
+        <button id="btnServerScore" class="px-4 py-2 rounded-lg text-white bg-indigo-600 hover:opacity-90">דוח ניקוד (שרת)</button>
+      </div>
+    </div>
+
+    <div class="overflow-auto border rounded-xl">
+      <table class="min-w-full text-sm">
+        <thead class="bg-gray-50">
+          <tr class="text-gray-600">
+            <th class="py-2 px-3 text-right">סט</th>
+            <th class="py-2 px-3 text-right">חזרה</th>
+            <th class="py-2 px-3 text-right">תרגיל</th>
+            <th class="py-2 px-3 text-right">% ציון</th>
+            <th class="py-2 px-3 text-right">דרוג</th>
+            <th class="py-2 px-3 text-right">איכות</th>
+            <th class="py-2 px-3 text-right">Unscored</th>
+            <th class="py-2 px-3 text-right">הערה</th>
+            <th class="py-2 px-3 text-right">פירוט</th>
+          </tr>
+        </thead>
+        <tbody id="simTbody">
+          <tr><td colspan="9" class="py-6 text-center text-gray-400">אין נתונים — הרץ סימולציה</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- דיאגנוסטיקה קלה -->
+<div class="card mt-6">
+  <div class="card-h font-semibold">דיאגנוסטיקות חיות (SSE)</div>
+  <div class="card-b">
+    <div class="flex items-center gap-2">
+      <button id="btnDiagStart" class="px-3 py-1.5 rounded-lg border border-gray-300 hover:bg-gray-50">SSE הפעל</button>
+      <button id="btnDiagStop" class="px-3 py-1.5 rounded-lg border border-gray-300 hover:bg-gray-50">עצור</button>
+      <button id="btnDiagSnap" class="px-3 py-1.5 rounded-lg border border-gray-300 hover:bg-gray-50">Snapshot</button>
+      <span class="text-sm text-gray-500">נתיב: <span class="mono">/api/exercise/diag/stream</span></span>
+    </div>
+    <pre id="diagBox" class="mono text-xs text-gray-700 mt-3 border rounded-xl p-3 max-h-64 overflow-auto bg-gray-50">—</pre>
+  </div>
+</div>
+
+<!-- Modal: פירוט חזרה/סט -->
+<div id="details-modal" class="modal-backdrop" role="dialog" aria-modal="true">
+  <div class="modal-card">
+    <div class="p-4 border-b flex items-center justify-between">
+      <div>
+        <div class="text-lg font-semibold">פירוט ביצוע</div>
+        <div id="details-sub" class="text-sm text-gray-500">—</div>
+      </div>
+      <button id="details-close" class="px-3 py-2 rounded-lg bg-gray-100 hover:bg-gray-200">סגור</button>
+    </div>
+    <div class="p-4 grid grid-cols-1 lg:grid-cols-3 gap-4">
+      <div class="space-y-1">
+        <div id="details-chips" class="flex flex-wrap items-center gap-2"></div>
+        <details class="mt-2">
+          <summary class="cursor-pointer text-sm text-gray-500">Raw</summary>
+          <pre id="details-raw" class="mono text-xs text-gray-600 max-h-64 overflow-auto border rounded-xl p-3 mt-2">—</pre>
+        </details>
+      </div>
+      <div class="lg:col-span-2">
+        <div id="details-lists" class="crit-list space-y-3"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/exercise.js') }}?v={{ app_version|default('dev', true) }}"></script>
+{% endblock %}

@@ -1,0 +1,172 @@
+{% extends "base.html" %}
+{% block title %}זיהוי אובייקטים — BodyPlus XPro{% endblock %}
+{% block page_title %}זיהוי אובייקטים{% endblock %}
+
+{% block content %}
+<div class="grid grid-cols-12 gap-4" dir="rtl">
+  <!-- וידאו + שכבות + שליטה -->
+  <div class="col-span-12 xl:col-span-8 bg-white rounded-2xl shadow p-3">
+    <div class="flex items-center justify-between mb-2">
+      <h3 class="font-semibold">תצוגת זיהוי</h3>
+
+      <div class="flex items-center gap-4">
+        <!-- מתג הפעלה/כיבוי -->
+        <div class="flex items-center gap-2">
+          <span class="text-sm text-gray-600">זיהוי:</span>
+          <label class="relative inline-flex items-center cursor-pointer" aria-label="הפעל/כבה זיהוי אובייקטים">
+            <input type="checkbox" id="toggle-od" class="sr-only peer">
+            <div class="w-11 h-6 bg-gray-200 rounded-full peer-checked:bg-green-500 transition"></div>
+            <div class="absolute left-1 top-1 w-4 h-4 bg-white rounded-full transition peer-checked:translate-x-5"></div>
+          </label>
+          <span id="toggle-od-label" class="text-sm text-gray-600">טוען…</span>
+        </div>
+
+        <!-- שבב סטטוס -->
+        <div class="flex items-center gap-2">
+          <span class="text-sm text-gray-500">מצב:</span>
+          <span id="od-status" class="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded bg-gray-100">
+            <span id="od-dot" class="w-2 h-2 rounded-full bg-gray-300"></span> ממתין…
+          </span>
+        </div>
+
+        <!-- כפתור דיבאג -->
+        <button id="dbg-toggle" type="button" class="text-sm px-3 py-1 rounded-xl bg-gray-100 hover:bg-gray-200">
+          דיבאג
+        </button>
+      </div>
+    </div>
+
+    <div class="relative">
+      <!-- זרם MJPEG מהשרת -->
+      <img
+        id="mjpeg"
+        src="/video/stream.mjpg"
+        alt="Object Detection Stream"
+        class="w-full h-auto block rounded-lg select-none"
+        onerror="this.nextElementSibling?.classList.remove('hidden')"
+      />
+      <div class="hidden mt-2 text-xs text-red-500">
+        הסטרים לא זמין. ודא שהנתיב <code>/video/stream.mjpg</code> פעיל.
+      </div>
+
+      <canvas id="path" class="absolute inset-0 block pointer-events-none"></canvas>
+      <canvas id="obj"  class="absolute inset-0 block pointer-events-none"></canvas>
+    </div>
+
+    <!-- אינדיקציות עיקריות -->
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mt-3">
+      <div class="rounded-xl bg-gray-50 p-3">
+        <div class="text-xs text-gray-500">כמות אובייקטים</div>
+        <div id="od-count" class="text-xl font-semibold">0</div>
+      </div>
+      <div class="rounded-xl bg-gray-50 p-3">
+        <div class="text-xs text-gray-500">FPS (הערכה)</div>
+        <div id="od-fps" class="text-xl font-semibold">—</div>
+      </div>
+      <div class="rounded-xl bg-gray-50 p-3">
+        <div class="text-xs text-gray-500">Latency משוער (ms)</div>
+        <div id="od-lat" class="text-xl font-semibold">—</div>
+      </div>
+      <div class="rounded-xl bg-gray-50 p-3">
+        <div class="text-xs text-gray-500">זווית תנועה אחרונה</div>
+        <div id="od-angle" class="text-xl font-semibold">—</div>
+      </div>
+    </div>
+
+    <!-- הגדרות זיהוי -->
+    <div id="od-settings-card" class="mt-4 rounded-2xl border border-gray-200 p-3 transition-opacity">
+      <div class="flex items-center justify-between mb-3">
+        <div class="flex items-center gap-2">
+          <h4 class="font-semibold">הגדרות זיהוי</h4>
+          <span class="text-xs text-gray-400">פרופיל: <span class="font-medium">onnx_cpu_640</span></span>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-2 md:grid-cols-5 gap-3">
+        <label class="block">
+          <span class="text-xs text-gray-500">threshold</span>
+          <input id="od-threshold" type="number" step="0.01" min="0" max="1"
+                 class="mt-1 w-full rounded-lg border-gray-300 focus:ring-0" placeholder="0.35">
+          <div id="help-threshold" class="mt-1 text-[11px] text-gray-500"></div>
+        </label>
+
+        <label class="block">
+          <span class="text-xs text-gray-500">overlap (NMS)</span>
+          <input id="od-overlap" type="number" step="0.01" min="0" max="1"
+                 class="mt-1 w-full rounded-lg border-gray-300 focus:ring-0" placeholder="0.60">
+          <div id="help-overlap" class="mt-1 text-[11px] text-gray-500"></div>
+        </label>
+
+        <label class="block">
+          <span class="text-xs text-gray-500">max_objects</span>
+          <input id="od-max-objects" type="number" step="1" min="1" max="200"
+                 class="mt-1 w-full rounded-lg border-gray-300 focus:ring-0" placeholder="20">
+          <div id="help-max" class="mt-1 text-[11px] text-gray-500"></div>
+        </label>
+
+        <label class="block">
+          <span class="text-xs text-gray-500">period_ms</span>
+          <input id="od-period" type="number" step="10" min="30" max="2000"
+                 class="mt-1 w-full rounded-lg border-gray-300 focus:ring-0" placeholder="150">
+          <div id="help-period" class="mt-1 text-[11px] text-gray-500"></div>
+        </label>
+
+        <label class="block">
+          <span class="text-xs text-gray-500">imgsz</span>
+          <input id="od-imgsz" type="number" step="16" min="128" max="1280"
+                 class="mt-1 w-full rounded-lg border-gray-300 focus:ring-0" placeholder="640">
+          <div id="help-imgsz" class="mt-1 text-[11px] text-gray-500"></div>
+        </label>
+      </div>
+
+      <div class="flex items-center justify-end gap-2 mt-3">
+        <button id="od-reset" type="button" class="px-3 py-1 rounded-lg bg-gray-100 hover:bg-gray-200">אתחל לברירת-מחדל</button>
+        <button id="od-save"  type="button" class="px-3 py-1 rounded-lg bg-sky-600 text-white hover:bg-sky-700">שמור</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- פנל ניתוח (צד ימין) -->
+  <div class="col-span-12 xl:col-span-4 bg-white rounded-2xl shadow p-4">
+    <div class="flex items-center justify-between mb-3">
+      <h3 class="font-semibold">ניתוח מהיר</h3>
+      <button id="od-clear" type="button" class="text-sm px-3 py-1 rounded-xl bg-gray-100 hover:bg-gray-200">נקה שביל</button>
+    </div>
+
+    <div class="space-y-3">
+      <div class="rounded-xl bg-gray-50 p-3">
+        <div class="text-xs text-gray-500 mb-2">אובייקטים (Top 10)</div>
+        <div id="od-list" class="space-y-2 text-sm text-gray-700">
+          <div class="text-gray-400">אין נתונים עדיין…</div>
+        </div>
+      </div>
+
+      <!-- לוח דיבאג -->
+      <div id="dbg-panel" class="hidden rounded-xl border border-gray-200 p-3">
+        <div class="text-xs text-gray-500 mb-2">🔍 Debug / Diagnostics</div>
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <div class="text-xs text-gray-500 mb-1">Health</div>
+            <pre id="dbg-health" class="text-[11px] bg-gray-50 rounded p-2 overflow-auto h-28"></pre>
+          </div>
+          <div>
+            <div class="text-xs text-gray-500 mb-1">Status (wiring)</div>
+            <pre id="dbg-status" class="text-[11px] bg-gray-50 rounded p-2 overflow-auto h-28"></pre>
+          </div>
+          <div class="col-span-2">
+            <div class="flex items-center justify-between">
+              <div class="text-xs text-gray-500 mb-1">Last objdet payload (raw)</div>
+              <button id="dbg-copy" type="button" class="text-xs px-2 py-1 rounded bg-gray-100 hover:bg-gray-200"
+                      onclick="navigator.clipboard.writeText(document.getElementById('dbg-payload').textContent||'')">העתק</button>
+            </div>
+            <pre id="dbg-payload" class="text-[11px] bg-gray-50 rounded p-2 overflow-auto h-48"></pre>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- JS -->
+<script src="{{ url_for('static', filename='js/object_detection.js') }}" defer></script>
+{% endblock %}

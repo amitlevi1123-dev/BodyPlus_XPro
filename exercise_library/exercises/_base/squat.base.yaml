@@ -1,0 +1,92 @@
+# -------------------------------------------------------------------
+# squat.base.yaml — בסיס למשפחת סקוואט (עם הגדרות scoring מלאות)
+# -------------------------------------------------------------------
+
+id: squat.base
+family: squat
+
+meta:
+  selectable: false
+  display_name: "Squat (Base)"
+
+# קריטריונים בסיסיים (מגדירים זמינות נתונים ל־scoring בלבד)
+criteria:
+  posture:       { requires: [torso_forward_deg] }
+  depth:         { requires: [knee_left_deg, knee_right_deg] }
+  tempo:         { requires: [rep.timing_s] }
+  stance_width:  { requires: [features.stance_width_ratio] }
+  knee_valgus:   { requires: [knee_foot_alignment_left_deg, knee_foot_alignment_right_deg] }
+
+# אם קריטי חסר → Unscored
+critical: [posture, depth]
+
+# ---------- בלוק scoring (ה"לב" — המנוע מציית למה שמוגדר כאן) ----------
+scoring:
+
+  # מדיניות (איך להתנהג כשחסר משהו, ואיך קובעים quality)
+  policy:
+    missing: skip                    # כשקריטריון לא זמין והוא לא קריטי → מדלגים עליו בשקלול
+    min_criteria_for_full_quality: 3 # <3 קריטריונים בשקלול → quality="partial"
+
+  # שופטים (כל קריטריון: משקל + כלל פשוט)
+  criteria:
+
+    posture:
+      weight: 1.0
+      rule:
+        kind: linear_band            # ≤ good_max → 1.0; ≥ bad_max → 0.0; ביניהם ירידה ליניארית, עם מדרגה ל-ok
+        input: torso_forward_deg
+        good_max: 15
+        ok_max:   25
+        bad_max:  45
+
+    depth:
+      weight: 1.5
+      rule:
+        kind: threshold_window       # lower_is_better: ברך קטנה=עמוק=טוב
+        input: min(knee_left_deg, knee_right_deg)
+        target_max:  90              # ≤90°  → 1.0
+        cutoff_max: 150              # ≥150° → 0.0
+        direction: lower_is_better
+
+    tempo:
+      weight: 0.5
+      rule:
+        kind: tempo_window           # בטווח [min,max]=1.0; מחוץ לטווח דועך ליניארי עד cutoff
+        input: rep.timing_s
+        min: 0.7
+        max: 2.5
+        cutoff_min: 0.4
+        cutoff_max: 4.0
+
+    stance_width:
+      weight: 0.5
+      rule:
+        kind: band_center            # להיות בטווח "בסדר"; חורג→דועך עד cutoffs
+        input: features.stance_width_ratio
+        min_ok: 0.90
+        max_ok: 1.20
+        cutoff_min: 0.70
+        cutoff_max: 1.50
+
+    knee_valgus:
+      weight: 1.0
+      rule:
+        kind: symmetric_threshold    # משתמש במקס' |L|,|R|; קטן=טוב
+        input: max(abs(knee_foot_alignment_left_deg), abs(knee_foot_alignment_right_deg))
+        ok:   5
+        warn: 10
+        bad:  20
+
+  # שקלול לציון כללי
+  aggregate:
+    method: weighted_mean            # ממוצע משוקלל של הקריטריונים ש"זמינים"
+    weights_source: inline           # משתמש ב־weight שמוגדר לכל קריטריון כאן
+
+  # תקרות בטיחות (אופציונלי): אם תנאי מתקיים → cap לציון הכללי
+  safety_caps:
+    - when: "knee_valgus <= 0.6"
+      cap: 0.90
+
+  # מיפוי ציונים לאות
+  grade_bands: { A: 0.85, B: 0.75, C: 0.60 }

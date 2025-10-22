@@ -1,0 +1,133 @@
+{"time": 1760861953286, "type": "alias_rewrite", "severity": "info", "message": "5 alias rewrites applied", "context": {"count": 5}}
+{"time": 1760861953291, "type": "report_built", "severity": "info", "message": "report built", "context": {"exercise": "squat.bodyweight", "score": 0.6666666666666666, "quality": "full", "unscored": false}}
+{"time": 1760861953292, "type": "alias_rewrite", "severity": "info", "message": "3 alias rewrites applied", "context": {"count": 3}}
+{"time": 1760861953294, "type": "report_built", "severity": "info", "message": "report built", "context": {"exercise": "squat.bodyweight", "score": null, "quality": null, "unscored": true}}
+{"time": 1760861953294, "type": "alias_rewrite", "severity": "info", "message": "5 alias rewrites applied", "context": {"count": 5}}
+{"time": 1760861953295, "type": "report_built", "severity": "info", "message": "report built", "context": {"exercise": "squat.bodyweight", "score": 0.6190476190476192, "quality": "full", "unscored": false}}
+{"time": 1760861953296, "type": "alias_rewrite", "severity": "info", "message": "5 alias rewrites applied", "context": {"count": 5}}
+{"time": 1760861953296, "type": "report_built", "severity": "info", "message": "report built", "context": {"exercise": "squat.bodyweight", "score": 0.6666666666666666, "quality": "full", "unscored": false}}
+{"time": 1760861953297, "type": "alias_rewrite", "severity": "info", "message": "5 alias rewrites applied", "context": {"count": 5}}
+{"time": 1760861953297, "type": "report_built", "severity": "info", "message": "report built", "context": {"exercise": "squat.bodyweight", "score": 0.7083333333333333, "quality": "full", "unscored": false}}
+{"time": 1760861953298, "type": "alias_rewrite", "severity": "info", "message": "5 alias rewrites applied", "context": {"count": 5}}
+{"time": 1760861953298, "type": "report_built", "severity": "info", "message": "report built", "context": {"exercise": "squat.bodyweight", "score": 0.6208333333333332, "quality": "full", "unscored": false}}
+{"time": 1760861953299, "type": "alias_rewrite", "severity": "info", "message": "5 alias rewrites applied", "context": {"count": 5}}
+{"time": 1760861953300, "type": "report_built", "severity": "info", "message": "report built", "context": {"exercise": "squat.bodyweight", "score": 0.6666666666666666, "quality": "full", "unscored": false}}
+{"time": 1760861953300, "type": "alias_rewrite", "severity": "info", "message": "5 alias rewrites applied", "context": {"count": 5}}
+{"time": 1760861953301, "type": "report_built", "severity": "info", "message": "report built", "context": {"exercise": "squat.bodyweight", "score": 0.6666666666666666, "quality": "full", "unscored": false}}
+{"time": 1760861953301, "type": "alias_rewrite", "severity": "info", "message": "5 alias rewrites applied", "context": {"count": 5}}
+{"time": 1760861953302, "type": "report_built", "severity": "info", "message": "report built", "context": {"exercise": "squat.bodyweight", "score": 0.6666666666666666, "quality": "full", "unscored": false}}
+{"time": 1760861953302, "type": "alias_rewrite", "severity": "info", "message": "5 alias rewrites applied", "context": {"count": 5}}
+{"time": 1760861953303, "type": "report_built", "severity": "info", "message": "report built", "context": {"exercise": "squat.bodyweight", "score": 0.6666666666666666, "quality": "full", "unscored": false}}
+{"time": 1760861953303, "type": "alias_rewrite", "severity": "info", "message": "5 alias rewrites applied", "context": {"count": 5}}
+{"time": 1760861953304, "type": "report_built", "severity": "info", "message": "report built", "context": {"exercise": "squat.bodyweight", "score": 0.6666666666666666, "quality": "full", "unscored": false}}
+{"time": 1760861953304, "type": "alias_rewrite", "severity": "info", "message": "5 alias rewrites applied", "context": {"count": 5}}
+{"time": 1760861953305, "type": "report_built", "severity": "info", "message": "report built", "context": {"exercise": "squat.bodyweight", "score": 0.6666666666666666, "quality": "full", "unscored": false}}
+{"time": 1760861953305, "type": "alias_rewrite", "severity": "info", "message": "5 alias rewrites applied", "context": {"count": 5}}
+{"time": 1760861953306, "type": "report_built", "severity": "info", "message": "report built", "context": {"exercise": "squat.bodyweight", "score": 0.6666666666666666, "quality": "full", "unscored": false}}
+{"time": 1760861953307, "type": "alias_rewrite", "severity": "info", "message": "5 alias rewrites applied", "context": {"count": 5}}
+{"time": 1760861953307, "type": "report_built", "severity": "info", "message": "report built", "context": {"exercise": "squat.bodyweight", "score": 0.6666666666666666, "quality": "full", "unscored": false}}
+{"time": 1760862694967, "type": "alias_rewrite", "severity": "info", "message": "5 alias rewrites applied", "context": {"count": 5}}
+{"ts": "2025-10-19T08:36:20.039Z", "event": "alias_rewrite", "severity": "info", "message": "5 alias rewrites applied", "context": {"count": 5}}
+{"ts": "2025-10-19T08:36:20.039Z", "event": "report_built", "severity": "info", "message": "report built", "context": {"exercise": "squat.bodyweight", "score": 0.6666666666666666, "quality": "full", "unscored": false}}
+{"ts": "2025-10-19T08:36:20.039Z", "event": "alias_rewrite", "severity": "info", "message": "3 alias rewrites applied", "context": {"count": 3}}
+{"ts": "2025-10-19T08:36:20.039Z", "event": "report_built", "severity": "info", "message": "report built", "context": {"exercise": "squat.bodyweight", "score": null, "quality": null, "unscored": true}}
+{"ts": "2025-10-19T08:36:20.039Z", "event": "alias_rewrite", "severity": "info", "message": "5 alias rewrites applied", "context": {"count": 5}}
+{"ts": "2025-10-19T08:36:20.039Z", "event": "report_built", "severity": "info", "message": "report built", "context": {"exercise": "squat.bodyweight", "score": 0.6190476190476192, "quality": "full", "unscored": false}}
+{"ts": "2025-10-19T08:36:20.039Z", "event": "alias_rewrite", "severity": "info", "message": "3 alias rewrites applied", "context": {"count": 3}}
+{"ts": "2025-10-19T08:36:20.039Z", "event": "report_built", "severity": "info", "message": "report built", "context": {"exercise": "squat.bodyweight", "score": null, "quality": null, "unscored": true}}
+{"ts": "2025-10-19T08:36:20.039Z", "event": "alias_rewrite", "severity": "info", "message": "5 alias rewrites applied", "context": {"count": 5}}
+{"ts": "2025-10-19T08:36:20.039Z", "event": "report_built", "severity": "info", "message": "report built", "context": {"exercise": "squat.bodyweight", "score": 0.7083333333333333, "quality": "full", "unscored": false}}
+{"ts": "2025-10-19T08:36:20.054Z", "event": "alias_rewrite", "severity": "info", "message": "5 alias rewrites applied", "context": {"count": 5}}
+{"ts": "2025-10-19T08:36:20.055Z", "event": "report_built", "severity": "info", "message": "report built", "context": {"exercise": "squat.bodyweight", "score": 0.6208333333333332, "quality": "full", "unscored": false}}
+{"ts": "2025-10-19T08:36:20.056Z", "event": "alias_rewrite", "severity": "info", "message": "5 alias rewrites applied", "context": {"count": 5}}
+{"ts": "2025-10-19T08:36:20.056Z", "event": "report_built", "severity": "info", "message": "report built", "context": {"exercise": "squat.bodyweight", "score": 0.6666666666666666, "quality": "full", "unscored": false}}
+{"ts": "2025-10-19T08:36:20.057Z", "event": "alias_rewrite", "severity": "info", "message": "5 alias rewrites applied", "context": {"count": 5}}
+{"ts": "2025-10-19T08:36:20.057Z", "event": "report_built", "severity": "info", "message": "report built", "context": {"exercise": "squat.bodyweight", "score": 0.6666666666666666, "quality": "full", "unscored": false}}
+{"ts": "2025-10-19T08:36:20.058Z", "event": "alias_rewrite", "severity": "info", "message": "5 alias rewrites applied", "context": {"count": 5}}
+{"ts": "2025-10-19T08:36:20.059Z", "event": "report_built", "severity": "info", "message": "report built", "context": {"exercise": "squat.bodyweight", "score": 0.6666666666666666, "quality": "full", "unscored": false}}
+{"ts": "2025-10-19T08:36:20.059Z", "event": "alias_rewrite", "severity": "info", "message": "5 alias rewrites applied", "context": {"count": 5}}
+{"ts": "2025-10-19T08:36:20.060Z", "event": "report_built", "severity": "info", "message": "report built", "context": {"exercise": "squat.bodyweight", "score": 0.6666666666666666, "quality": "full", "unscored": false}}
+{"ts": "2025-10-19T08:51:07.235Z", "event": "alias_rewrite", "severity": "info", "message": "5 alias rewrites applied", "context": {"count": 5}}
+{"ts": "2025-10-19T08:51:07.246Z", "event": "report_built", "severity": "info", "message": "report built", "context": {"exercise": "squat.bodyweight", "score": 0.6666666666666666, "quality": "full", "unscored": false}}
+{"ts": "2025-10-19T08:51:07.247Z", "event": "alias_rewrite", "severity": "info", "message": "3 alias rewrites applied", "context": {"count": 3}}
+{"ts": "2025-10-19T08:51:07.249Z", "event": "report_built", "severity": "info", "message": "report built", "context": {"exercise": "squat.bodyweight", "score": null, "quality": null, "unscored": true}}
+{"ts": "2025-10-19T08:51:07.250Z", "event": "alias_rewrite", "severity": "info", "message": "5 alias rewrites applied", "context": {"count": 5}}
+{"ts": "2025-10-19T08:51:07.250Z", "event": "report_built", "severity": "info", "message": "report built", "context": {"exercise": "squat.bodyweight", "score": 0.6190476190476192, "quality": "full", "unscored": false}}
+{"ts": "2025-10-19T08:51:07.251Z", "event": "alias_rewrite", "severity": "info", "message": "3 alias rewrites applied", "context": {"count": 3}}
+{"ts": "2025-10-19T08:51:07.251Z", "event": "report_built", "severity": "info", "message": "report built", "context": {"exercise": "squat.bodyweight", "score": null, "quality": null, "unscored": true}}
+{"ts": "2025-10-19T08:51:07.252Z", "event": "alias_rewrite", "severity": "info", "message": "5 alias rewrites applied", "context": {"count": 5}}
+{"ts": "2025-10-19T08:51:07.252Z", "event": "report_built", "severity": "info", "message": "report built", "context": {"exercise": "squat.bodyweight", "score": 0.7083333333333333, "quality": "full", "unscored": false}}
+{"ts": "2025-10-19T08:51:07.253Z", "event": "alias_rewrite", "severity": "info", "message": "5 alias rewrites applied", "context": {"count": 5}}
+{"ts": "2025-10-19T08:51:07.253Z", "event": "report_built", "severity": "info", "message": "report built", "context": {"exercise": "squat.bodyweight", "score": 0.6208333333333332, "quality": "full", "unscored": false}}
+{"ts": "2025-10-19T08:51:07.254Z", "event": "alias_rewrite", "severity": "info", "message": "5 alias rewrites applied", "context": {"count": 5}}
+{"ts": "2025-10-19T08:51:07.255Z", "event": "report_built", "severity": "info", "message": "report built", "context": {"exercise": "squat.bodyweight", "score": 0.6666666666666666, "quality": "full", "unscored": false}}
+{"ts": "2025-10-19T08:51:07.255Z", "event": "alias_rewrite", "severity": "info", "message": "5 alias rewrites applied", "context": {"count": 5}}
+{"ts": "2025-10-19T08:51:07.255Z", "event": "report_built", "severity": "info", "message": "report built", "context": {"exercise": "squat.bodyweight", "score": 0.6666666666666666, "quality": "full", "unscored": false}}
+{"ts": "2025-10-19T08:51:07.256Z", "event": "alias_rewrite", "severity": "info", "message": "5 alias rewrites applied", "context": {"count": 5}}
+{"ts": "2025-10-19T08:51:07.257Z", "event": "report_built", "severity": "info", "message": "report built", "context": {"exercise": "squat.bodyweight", "score": 0.6666666666666666, "quality": "full", "unscored": false}}
+{"ts": "2025-10-19T08:51:07.257Z", "event": "alias_rewrite", "severity": "info", "message": "5 alias rewrites applied", "context": {"count": 5}}
+{"ts": "2025-10-19T08:51:07.258Z", "event": "report_built", "severity": "info", "message": "report built", "context": {"exercise": "squat.bodyweight", "score": 0.6666666666666666, "quality": "full", "unscored": false}}
+{"ts": "2025-10-19T08:57:56.536Z", "event": "alias_rewrite", "severity": "info", "message": "5 alias rewrites applied", "context": {"count": 5}}
+{"ts": "2025-10-19T08:57:56.547Z", "event": "report_built", "severity": "info", "message": "report built", "context": {"exercise": "squat.bodyweight", "score": 0.6666666666666666, "quality": "full", "unscored": false}}
+{"ts": "2025-10-19T08:57:56.548Z", "event": "alias_rewrite", "severity": "info", "message": "3 alias rewrites applied", "context": {"count": 3}}
+{"ts": "2025-10-19T08:57:56.550Z", "event": "report_built", "severity": "info", "message": "report built", "context": {"exercise": "squat.bodyweight", "score": null, "quality": null, "unscored": true}}
+{"ts": "2025-10-19T08:57:56.551Z", "event": "alias_rewrite", "severity": "info", "message": "5 alias rewrites applied", "context": {"count": 5}}
+{"ts": "2025-10-19T08:57:56.551Z", "event": "report_built", "severity": "info", "message": "report built", "context": {"exercise": "squat.bodyweight", "score": 0.6190476190476192, "quality": "full", "unscored": false}}
+{"ts": "2025-10-19T08:57:56.552Z", "event": "alias_rewrite", "severity": "info", "message": "3 alias rewrites applied", "context": {"count": 3}}
+{"ts": "2025-10-19T08:57:56.553Z", "event": "report_built", "severity": "info", "message": "report built", "context": {"exercise": "squat.bodyweight", "score": null, "quality": null, "unscored": true}}
+{"ts": "2025-10-19T08:57:56.554Z", "event": "alias_rewrite", "severity": "info", "message": "5 alias rewrites applied", "context": {"count": 5}}
+{"ts": "2025-10-19T08:57:56.554Z", "event": "report_built", "severity": "info", "message": "report built", "context": {"exercise": "squat.bodyweight", "score": 0.7083333333333333, "quality": "full", "unscored": false}}
+{"ts": "2025-10-19T08:57:56.555Z", "event": "alias_rewrite", "severity": "info", "message": "5 alias rewrites applied", "context": {"count": 5}}
+{"ts": "2025-10-19T08:57:56.556Z", "event": "report_built", "severity": "info", "message": "report built", "context": {"exercise": "squat.bodyweight", "score": 0.6208333333333332, "quality": "full", "unscored": false}}
+{"ts": "2025-10-19T08:57:56.556Z", "event": "alias_rewrite", "severity": "info", "message": "5 alias rewrites applied", "context": {"count": 5}}
+{"ts": "2025-10-19T08:57:56.557Z", "event": "report_built", "severity": "info", "message": "report built", "context": {"exercise": "squat.bodyweight", "score": 0.6666666666666666, "quality": "full", "unscored": false}}
+{"ts": "2025-10-19T08:57:56.558Z", "event": "alias_rewrite", "severity": "info", "message": "5 alias rewrites applied", "context": {"count": 5}}
+{"ts": "2025-10-19T08:57:56.558Z", "event": "report_built", "severity": "info", "message": "report built", "context": {"exercise": "squat.bodyweight", "score": 0.6666666666666666, "quality": "full", "unscored": false}}
+{"ts": "2025-10-19T08:57:56.559Z", "event": "alias_rewrite", "severity": "info", "message": "5 alias rewrites applied", "context": {"count": 5}}
+{"ts": "2025-10-19T08:57:56.560Z", "event": "report_built", "severity": "info", "message": "report built", "context": {"exercise": "squat.bodyweight", "score": 0.6666666666666666, "quality": "full", "unscored": false}}
+{"ts": "2025-10-19T08:57:56.560Z", "event": "alias_rewrite", "severity": "info", "message": "5 alias rewrites applied", "context": {"count": 5}}
+{"ts": "2025-10-19T08:57:56.561Z", "event": "report_built", "severity": "info", "message": "report built", "context": {"exercise": "squat.bodyweight", "score": 0.6666666666666666, "quality": "full", "unscored": false}}
+{"ts": "2025-10-19T08:57:58.275Z", "event": "alias_rewrite", "severity": "info", "message": "5 alias rewrites applied", "context": {"count": 5}}
+{"ts": "2025-10-19T08:57:58.284Z", "event": "report_built", "severity": "info", "message": "report built", "context": {"exercise": "squat.bodyweight", "score": 0.6666666666666666, "quality": "full", "unscored": false}}
+{"ts": "2025-10-19T08:57:58.285Z", "event": "alias_rewrite", "severity": "info", "message": "3 alias rewrites applied", "context": {"count": 3}}
+{"ts": "2025-10-19T08:57:58.286Z", "event": "report_built", "severity": "info", "message": "report built", "context": {"exercise": "squat.bodyweight", "score": null, "quality": null, "unscored": true}}
+{"ts": "2025-10-19T08:57:58.287Z", "event": "alias_rewrite", "severity": "info", "message": "5 alias rewrites applied", "context": {"count": 5}}
+{"ts": "2025-10-19T08:57:58.288Z", "event": "report_built", "severity": "info", "message": "report built", "context": {"exercise": "squat.bodyweight", "score": 0.6190476190476192, "quality": "full", "unscored": false}}
+{"ts": "2025-10-19T08:57:58.289Z", "event": "alias_rewrite", "severity": "info", "message": "3 alias rewrites applied", "context": {"count": 3}}
+{"ts": "2025-10-19T08:57:58.290Z", "event": "report_built", "severity": "info", "message": "report built", "context": {"exercise": "squat.bodyweight", "score": null, "quality": null, "unscored": true}}
+{"ts": "2025-10-19T08:57:58.291Z", "event": "alias_rewrite", "severity": "info", "message": "5 alias rewrites applied", "context": {"count": 5}}
+{"ts": "2025-10-19T08:57:58.291Z", "event": "report_built", "severity": "info", "message": "report built", "context": {"exercise": "squat.bodyweight", "score": 0.7083333333333333, "quality": "full", "unscored": false}}
+{"ts": "2025-10-19T08:57:58.292Z", "event": "alias_rewrite", "severity": "info", "message": "5 alias rewrites applied", "context": {"count": 5}}
+{"ts": "2025-10-19T08:57:58.293Z", "event": "report_built", "severity": "info", "message": "report built", "context": {"exercise": "squat.bodyweight", "score": 0.6208333333333332, "quality": "full", "unscored": false}}
+{"ts": "2025-10-19T08:57:58.293Z", "event": "alias_rewrite", "severity": "info", "message": "5 alias rewrites applied", "context": {"count": 5}}
+{"ts": "2025-10-19T08:57:58.294Z", "event": "report_built", "severity": "info", "message": "report built", "context": {"exercise": "squat.bodyweight", "score": 0.6666666666666666, "quality": "full", "unscored": false}}
+{"ts": "2025-10-19T08:57:58.294Z", "event": "alias_rewrite", "severity": "info", "message": "5 alias rewrites applied", "context": {"count": 5}}
+{"ts": "2025-10-19T08:57:58.295Z", "event": "report_built", "severity": "info", "message": "report built", "context": {"exercise": "squat.bodyweight", "score": 0.6666666666666666, "quality": "full", "unscored": false}}
+{"ts": "2025-10-19T08:57:58.296Z", "event": "alias_rewrite", "severity": "info", "message": "5 alias rewrites applied", "context": {"count": 5}}
+{"ts": "2025-10-19T08:57:58.296Z", "event": "report_built", "severity": "info", "message": "report built", "context": {"exercise": "squat.bodyweight", "score": 0.6666666666666666, "quality": "full", "unscored": false}}
+{"ts": "2025-10-19T08:57:58.297Z", "event": "alias_rewrite", "severity": "info", "message": "5 alias rewrites applied", "context": {"count": 5}}
+{"ts": "2025-10-19T08:57:58.297Z", "event": "report_built", "severity": "info", "message": "report built", "context": {"exercise": "squat.bodyweight", "score": 0.6666666666666666, "quality": "full", "unscored": false}}
+{"ts": "2025-10-19T09:05:53.428Z", "event": "alias_rewrite", "severity": "info", "message": "5 alias rewrites applied", "context": {"count": 5}}
+{"ts": "2025-10-19T09:05:53.432Z", "event": "report_built", "severity": "info", "message": "report built", "context": {"exercise": "squat.bodyweight", "score": 0.6666666666666666, "quality": "full", "unscored": false}}
+{"ts": "2025-10-19T09:05:53.433Z", "event": "alias_rewrite", "severity": "info", "message": "3 alias rewrites applied", "context": {"count": 3}}
+{"ts": "2025-10-19T09:05:53.434Z", "event": "report_built", "severity": "info", "message": "report built", "context": {"exercise": "squat.bodyweight", "score": null, "quality": null, "unscored": true}}
+{"ts": "2025-10-19T09:05:53.434Z", "event": "alias_rewrite", "severity": "info", "message": "5 alias rewrites applied", "context": {"count": 5}}
+{"ts": "2025-10-19T09:05:53.435Z", "event": "report_built", "severity": "info", "message": "report built", "context": {"exercise": "squat.bodyweight", "score": 0.6190476190476192, "quality": "full", "unscored": false}}
+{"ts": "2025-10-19T09:05:53.436Z", "event": "alias_rewrite", "severity": "info", "message": "4 alias rewrites applied", "context": {"count": 4}}
+{"ts": "2025-10-19T09:05:53.437Z", "event": "report_built", "severity": "info", "message": "report built", "context": {"exercise": "squat.bodyweight", "score": null, "quality": null, "unscored": true}}
+{"ts": "2025-10-19T09:05:53.437Z", "event": "alias_rewrite", "severity": "info", "message": "4 alias rewrites applied", "context": {"count": 4}}
+{"ts": "2025-10-19T09:05:53.438Z", "event": "report_built", "severity": "info", "message": "report built", "context": {"exercise": "squat.bodyweight", "score": null, "quality": null, "unscored": true}}
+{"ts": "2025-10-19T09:05:53.438Z", "event": "alias_rewrite", "severity": "info", "message": "4 alias rewrites applied", "context": {"count": 4}}
+{"ts": "2025-10-19T09:05:53.438Z", "event": "report_built", "severity": "info", "message": "report built", "context": {"exercise": "squat.bodyweight", "score": null, "quality": null, "unscored": true}}
+{"ts": "2025-10-19T09:05:53.439Z", "event": "alias_rewrite", "severity": "info", "message": "5 alias rewrites applied", "context": {"count": 5}}
+{"ts": "2025-10-19T09:05:53.439Z", "event": "report_built", "severity": "info", "message": "report built", "context": {"exercise": "squat.bodyweight", "score": 0.6666666666666666, "quality": "full", "unscored": false}}
+{"ts": "2025-10-19T09:05:53.440Z", "event": "alias_rewrite", "severity": "info", "message": "5 alias rewrites applied", "context": {"count": 5}}
+{"ts": "2025-10-19T09:05:53.440Z", "event": "report_built", "severity": "info", "message": "report built", "context": {"exercise": "squat.bodyweight", "score": 0.6666666666666666, "quality": "full", "unscored": false}}
+{"ts": "2025-10-19T09:05:53.440Z", "event": "alias_rewrite", "severity": "info", "message": "5 alias rewrites applied", "context": {"count": 5}}
+{"ts": "2025-10-19T09:05:53.441Z", "event": "report_built", "severity": "info", "message": "report built", "context": {"exercise": "squat.bodyweight", "score": 0.6666666666666666, "quality": "full", "unscored": false}}
+{"ts": "2025-10-19T09:05:53.445Z", "event": "alias_rewrite", "severity": "info", "message": "5 alias rewrites applied", "context": {"count": 5}}
+{"ts": "2025-10-19T09:05:53.445Z", "event": "grace_period_active", "severity": "info", "message": "scoring delayed due to grace window", "context": {"ms_remaining": 1000, "exercise": "ex.strong"}}
+{"ts": "2025-10-19T09:05:53.446Z", "event": "report_built", "severity": "info", "message": "report built (grace period)", "context": {"score": null, "unscored": true}}
+{"ts": "2025-10-19T09:05:53.449Z", "event": "alias_rewrite", "severity": "info", "message": "5 alias rewrites applied", "context": {"count": 5}}
+{"ts": "2025-10-19T09:05:53.450Z", "event": "grace_bypassed", "severity": "info", "message": "bypass grace due to strong override", "context": {"exercise": "ex.strong", "margin": 0.55}}
+{"ts": "2025-10-19T09:05:53.452Z", "event": "report_built", "severity": "info", "message": "report built", "context": {"exercise": "ex.strong", "score": 0.6666666666666666, "quality": "full", "unscored": false}}
