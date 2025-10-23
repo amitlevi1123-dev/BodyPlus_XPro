@@ -1,12 +1,12 @@
-# Ignore virtual environment
-.venv/
+﻿.venv/
 venv/
+test_env/
 __pycache__/
 *.pyc
-
-# Ignore system & temporary files
-.idea/
+*.pyo
 *.log
 .DS_Store
 Thumbs.db
-pip freeze > requirements.txt
+constraints_runtime.txt
+requirements.bak
+.idea/
