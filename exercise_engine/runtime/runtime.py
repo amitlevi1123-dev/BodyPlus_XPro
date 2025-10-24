@@ -385,7 +385,7 @@ def run_once(*, raw_metrics: Dict[str, Any], library: Library,
     except Exception as e:
         _emit("set_counter_error", "warn", f"set counter error: {e}")
 
-    # normalize: None → ערכי ברירת מחדל בשדות rep.*
+    # normalize: None → ערכי ברירת מחדל בשדות rep.* (ליציבות ה-UI)
     if "rep.state" in canonical or "rep.rep_id" in canonical:
         for k, v in list(canonical.items()):
             if k.startswith("rep.") and v is None:
@@ -434,7 +434,7 @@ def run_once(*, raw_metrics: Dict[str, Any], library: Library,
         per_criterion_scores=per_crit_scores,
     )
 
-    # הזרקת score_pct לכל קריטריון (אם יש ציון)
+    # הזרקת score_pct לכל קריטריון (אם יש ציון) — שימושי ל-Tooltip
     try:
         if per_crit_scores and "scoring" in report and isinstance(report["scoring"].get("criteria"), list):
             def _to_pct_local(x):

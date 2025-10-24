@@ -2,25 +2,14 @@
 # -----------------------------------------------------------------------------
 # 📘 report_builder.py — בניית דוחות סופיים לממשק המשתמש (UI)
 # -----------------------------------------------------------------------------
-# הסבר קצר (עברית):
-# בניית דו"ח סופי ל-UI. תומך ב-Safety Caps, Grade Bands, ובשדות תצוגה:
-# - score_pct (שלם 0..100) לציון הכללי
-# - score_pct לכל קריטריון
-# מוסיף בלוק Coverage שמסביר כמה קריטריונים היו זמינים ולמה חסרים:
-#
-# coverage = {
-#   available_ratio: float (0..1),
-#   available_pct: int (0..100),
-#   available_count: int,
-#   total_criteria: int,
-#   missing_reasons_top: [str, ...] (עד טופ 3),
-#   missing_critical: [criterion_id, ...]
-# }
-#
-# חידוש:
-# 1. פונקציית עזר לצירוף סיכום מצלמה (camera_summary) לדוח,
-#    כולל ברירת מחדל "המדידה תקינה" אם אין הערות מיוחדות.
-# 2. שמירה של כל המדדים הקנוניים (כולל rep.*) בתוך הדוח — גם שטוחים וגם בעץ.
+# שינויי מפתח:
+# • אין Grade במערכת.
+# • criteria כוללים score ו-score_pct (ל-tooltip פירוק קריטריונים).
+# • הוספת report_health חכם: OK/WARN/FAIL + issues[].
+# • תמיכה אופציונלית ב-sets[] ו-reps[] (נשלחים מבחוץ; לא חובה).
+# • שמירת canonical ו-rep היררכי (נשמר).
+# • שמירת camera + הזרקת הודעת ריסק כרמז (נשמר).
+# • הוספת ui_ranges לפס הצבעוני (אדום/כתום/ירוק).
 # -----------------------------------------------------------------------------
 
 from __future__ import annotations
@@ -43,17 +32,6 @@ def _to_pct(x: Optional[float]) -> Optional[int]:
     except Exception:
         return None
 
-def _compute_grade(overall: Optional[float], bands: Dict[str, float]) -> Optional[str]:
-    if overall is None:
-        return None
-    a = _safe_float(bands.get("A"), 0.85)
-    b = _safe_float(bands.get("B"), 0.75)
-    c = _safe_float(bands.get("C"), 0.60)
-    if overall >= a: return "A"
-    if overall >= b: return "B"
-    if overall >= c: return "C"
-    return "D"
-
 def _eval_cap_condition(expr: str, per_scores: Dict[str, Any]) -> Tuple[Optional[str], Optional[float], Optional[str]]:
     if not isinstance(expr, str):
         return (None, None, None)
@@ -75,10 +53,10 @@ def _eval_cap_condition(expr: str, per_scores: Dict[str, Any]) -> Tuple[Optional
         return (None, None, None)
     ok = False
     if score_val is not None:
-        if op == "<=": ok = score_val <= rhs
-        elif op == "<": ok = score_val < rhs
+        if   op == "<=": ok = score_val <= rhs
+        elif op == "<":  ok = score_val <  rhs
         elif op == ">=": ok = score_val >= rhs
-        elif op == ">": ok = score_val > rhs
+        elif op == ">":  ok = score_val >  rhs
         elif op == "==": ok = abs(score_val - rhs) < 1e-9
     return (crit, score_val if ok else None, op)
 
@@ -94,7 +72,7 @@ def _apply_safety_caps(exercise, overall: Optional[float], per_scores: Dict[str,
             cap_val = float(item.get("cap"))
         except Exception:
             continue
-        crit, actual, op = _eval_cap_condition(cond, per_scores)
+        crit, actual, _op = _eval_cap_condition(cond, per_scores)
         if actual is None:
             continue
         before = new_overall
@@ -146,6 +124,38 @@ def _compute_coverage(exercise, availability: Dict[str, Dict[str, Any]]) -> Dict
         "missing_critical": missing_critical,
     }
 
+# ---------------------------- Report Health ----------------------------
+
+_HEALTH_RULES = [
+    # (code, predicate, level, message_fn)
+    ("NO_EXERCISE",      lambda r: r.get("exercise") is None,                               "FAIL", "לא זוהה תרגיל. בדוק classifier/aliases."),
+    ("UNSCORED",         lambda r: r.get("scoring", {}).get("score") is None,               "WARN", "לא חושב ציון (unscored)."),
+    ("LOW_COVERAGE",     lambda r: (r.get("coverage", {}).get("available_pct", 100) < 60),  "WARN", "זמינות נמוכה (coverage<60%)."),
+    ("MISSING_CRITICAL", lambda r: len(r.get("coverage", {}).get("missing_critical", []))>0,"FAIL", "חסרים קריטריונים קריטיים."),
+    ("CAMERA_RISK",      lambda r: bool(r.get("camera", {}).get("visibility_risk", False)),"WARN", "תנאי צילום גבוליים — ייתכנו סטיות במדידה."),
+    ("LOW_QUALITY",      lambda r: r.get("scoring", {}).get("quality") == "poor",           "WARN", "איכות שקלול נמוכה (poor)."),
+    # אינדיקציות לפי diagnostics:
+    ("ALIAS_CONFLICTS",  lambda r: any(d.get("type")=="alias_conflict" for d in r.get("diagnostics", [])),"WARN","התנגשות ערכים בין אליאסים."),
+    ("SET_COUNTER_ERROR",lambda r: any(d.get("type")=="set_counter_error" for d in r.get("diagnostics", [])),"WARN","שגיאת ספירת סטים."),
+    ("REP_ENGINE_ERROR", lambda r: any(d.get("type")=="rep_segmenter_error" for d in r.get("diagnostics", [])),"WARN","שגיאת מנוע חזרות."),
+]
+
+def _compute_report_health(report: Dict[str, Any]) -> Dict[str, Any]:
+    issues: List[Dict[str, Any]] = []
+    levels = {"OK":0,"WARN":1,"FAIL":2}
+    worst = "OK"
+    for code, pred, level, msg in _HEALTH_RULES:
+        try:
+            if pred(report):
+                issues.append({"code": code, "level": level, "message": msg})
+                if levels[level] > levels[worst]:
+                    worst = level
+        except Exception:
+            # לא חוסם דו"ח — לכל היותר נוסיף אינדיקציה כללית
+            issues.append({"code": "HEALTH_RULE_ERROR", "level": "WARN", "message": f"כלל אינדיקציה נכשל: {code}"})
+            worst = "WARN" if worst != "FAIL" else worst
+    return {"status": worst, "issues": issues}
+
 # ---------------------------- Report Builder ----------------------------
 
 def build_payload(
@@ -161,29 +171,52 @@ def build_payload(
     library_version: str,
     payload_version: str,
     per_criterion_scores: Optional[Dict[str, Any]] = None,
+    # אופציונלי: אוספים מוכנים של סטים/חזרות (אם קיימים אצלך ברנטיים)
+    sets: Optional[List[Dict[str, Any]]] = None,
+    reps: Optional[List[Dict[str, Any]]] = None,
 ) -> Dict[str, Any]:
-    grade_bands = getattr(exercise, "grade_bands", {}) if exercise is not None else {}
+
     applied_caps: List[Dict[str, Any]] = []
     final_score = overall_score
 
+    # Safety caps (אם הוגדרו ב-YAML של התרגיל)
     if exercise and overall_score is not None and isinstance(per_criterion_scores, dict):
         final_score, applied_caps = _apply_safety_caps(exercise, overall_score, per_criterion_scores)
 
-    grade = _compute_grade(final_score, grade_bands) if final_score is not None else None
-
+    # רשימת קריטריונים לתצוגה (כולל score/score_pct לכל קריטריון)
     criteria_list: List[Dict[str, Any]] = []
     for name, info in (availability or {}).items():
         if not isinstance(info, dict):
             continue
-        criteria_list.append({
+        item = {
             "id": name,
             "available": bool(info.get("available", False)),
             "missing": list(info.get("missing", [])) if isinstance(info.get("missing"), list) else [],
             "reason": info.get("reason"),
             "score": None,
-        })
+            "score_pct": None,
+        }
+        # נשיכת הציון אם קיים ב-per_criterion_scores
+        if isinstance(per_criterion_scores, dict) and name in per_criterion_scores:
+            try:
+                sc = getattr(per_criterion_scores[name], "score", None)
+                if sc is not None:
+                    item["score"] = float(sc)
+                    item["score_pct"] = _to_pct(sc)
+            except Exception:
+                pass
+        criteria_list.append(item)
 
     coverage = _compute_coverage(exercise, availability)
+
+    # מטא + טווחי צבע ל-UI (פס צבעוני מתחת לעיגול)
+    ui_ranges = {
+        "color_bar": [
+            {"label": "red",   "from_pct": 0,  "to_pct": 60},
+            {"label": "orange","from_pct": 60, "to_pct": 75},
+            {"label": "green", "from_pct": 75, "to_pct": 100},
+        ]
+    }
 
     report: Dict[str, Any] = {
         "meta": {
@@ -193,18 +226,19 @@ def build_payload(
         },
         "exercise": None if exercise is None else {
             "id": exercise.id,
-            "family": exercise.family,
-            "equipment": exercise.equipment,
+            "family": getattr(exercise, "family", None),
+            "equipment": getattr(exercise, "equipment", None),
             "display_name": getattr(exercise, "display_name", exercise.id),
         },
+        "ui_ranges": ui_ranges,
         "scoring": {
-            "score": final_score,
-            "score_pct": _to_pct(final_score),
-            "quality": overall_quality,
+            "score": final_score,                 # 0..1 או None
+            "score_pct": _to_pct(final_score),    # 0..100 או None
+            "quality": overall_quality,           # full/partial/poor
             "unscored_reason": unscored_reason,
-            "grade": grade,
-            "applied_caps": applied_caps,
-            "criteria": criteria_list,
+            # אין Grade במערכת
+            "applied_caps": applied_caps,         # אם הוחלו caps
+            "criteria": criteria_list,            # כולל score_pct לכל קריטריון
         },
         "coverage": coverage,
         "hints": list(hints or []),
@@ -213,7 +247,7 @@ def build_payload(
     }
 
     # ---------------------------------------------------------------------
-    # ✅ תוספת חשובה: שמירת בלוקי canonical + rep לדוחות
+    # canonical שטוח + בלוק rep היררכי (לשיחזור ולדשבורד)
     # ---------------------------------------------------------------------
     try:
         canonical_block = {}
@@ -233,7 +267,19 @@ def build_payload(
             report["rep"] = rep_block
     except Exception:
         pass
+
     # ---------------------------------------------------------------------
+    # sets[] / reps[] — אם הועברו (לא חובה; תואם UI מפורט)
+    # ---------------------------------------------------------------------
+    if isinstance(sets, list) and sets:
+        report["sets"] = sets
+    if isinstance(reps, list) and reps:
+        report["reps"] = reps
+
+    # ---------------------------------------------------------------------
+    # Report Health — אינדיקציות חכמות (OK/WARN/FAIL)
+    # ---------------------------------------------------------------------
+    report["report_health"] = _compute_report_health(report)
 
     return report
 
