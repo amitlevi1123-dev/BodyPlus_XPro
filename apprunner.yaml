@@ -1,10 +1,18 @@
 version: 1.0
-runtime: python3
+runtime: python3.11
+
 build:
   commands:
-    - pip install --upgrade pip
-    - pip install -r requirements.txt
+    - pip install --no-cache-dir -r requirements.txt
+
 run:
-  command: gunicorn -w 2 -k gthread -t 0 -b 0.0.0.0:8080 app.main:app
+  command: gunicorn app.main:app --bind 0.0.0.0:8080 --workers 1 --threads 8 --timeout 120
   network:
     port: 8080
+
+healthcheck:
+  path: /healthz
+  interval: 10
+  timeout: 5
+  healthy_threshold: 1
+  unhealthy_threshold: 3
