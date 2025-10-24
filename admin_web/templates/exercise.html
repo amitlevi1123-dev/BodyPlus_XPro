@@ -30,7 +30,7 @@
   .pill-k{ background:#eef2ff; color:#3730a3; }
   .pill-r{ background:#fee2e2; color:#991b1b; }
 
-  /* תוספות חסרות */
+  /* תוספות */
   .status-dot{width:10px;height:10px;border-radius:9999px;background:#ef4444;display:inline-block}
   .status-dot.connected{background:#22c55e}
   .chip{display:inline-flex;align-items:center;background:#f1f5f9;border:1px solid #e5e7eb;border-radius:9999px;padding:.2rem .55rem;font-size:.75rem;color:#334155}
@@ -67,19 +67,19 @@
         </div>
         <div class="grid grid-cols-2 gap-4">
           <div class="flex flex-col items-center gap-1">
-            <div id="gaugeRep" class="gauge"></div>
+            <div id="gaugeRep" class="gauge" title=""></div>
             <div class="text-sm text-gray-600">חזרה אחרונה</div>
           </div>
           <div class="flex flex-col items-center gap-1">
-            <div id="gaugeSet" class="gauge"></div>
+            <div id="gaugeSet" class="gauge" title=""></div>
             <div class="text-sm text-gray-600">סט אחרון</div>
           </div>
         </div>
         <div class="text-xs text-gray-500">
-          מדרג צבעים: <span class="font-medium text-red-600">אדום</span> (גרוע) ·
-          <span class="font-medium text-orange-500">כתום</span> ·
-          <span class="font-medium text-yellow-500">צהוב</span> ·
-          <span class="font-medium text-green-600">ירוק</span> (טוב)
+          מדרג צבעים:
+          <span class="font-medium text-red-600">אדום</span> (0–60%)
+          · <span class="font-medium text-orange-500">כתום</span> (60–75%)
+          · <span class="font-medium text-green-600">ירוק</span> (75–100%)
         </div>
       </div>
     </div>
@@ -130,7 +130,6 @@
             <th class="py-2 px-3 text-right">חזרה</th>
             <th class="py-2 px-3 text-right">תרגיל</th>
             <th class="py-2 px-3 text-right">% ציון</th>
-            <th class="py-2 px-3 text-right">דרוג</th>
             <th class="py-2 px-3 text-right">איכות</th>
             <th class="py-2 px-3 text-right">Unscored</th>
             <th class="py-2 px-3 text-right">הערה</th>
@@ -138,7 +137,7 @@
           </tr>
         </thead>
         <tbody id="simTbody">
-          <tr><td colspan="9" class="py-6 text-center text-gray-400">אין נתונים — הרץ סימולציה</td></tr>
+          <tr><td colspan="8" class="py-6 text-center text-gray-400">אין נתונים — הרץ סימולציה</td></tr>
         </tbody>
       </table>
     </div>

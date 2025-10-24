@@ -43,9 +43,11 @@
     detailsLists: $('#details-lists'),
   };
 
-  // אחסון דוחות (key -> report)
-  const REP_STORE = new Map();
+  // ---------- State ----------
+  const REP_STORE = new Map();   // rid -> report
   let REP_AUTO_ID = 1;
+  let LAST_COLOR_RANGES = null;  // ייקבע מדוחות השרת (ui_ranges.color_bar)
+  let simRunning = false;        // לנעילת הכפתור
 
   // ---------- Status Poll ----------
   async function pollStatus(){
@@ -68,55 +70,61 @@
     const R = 52, C = 2*Math.PI*R;
     root.innerHTML = `
       <svg viewBox="0 0 140 140" class="block">
-        <circle cx="70" cy="70" r="${R}" fill="none" stroke-width="12" class="bg"></circle>
-        <circle cx="70" cy="70" r="${R}" fill="none" stroke-width="12" class="fg" stroke-dasharray="${C}" stroke-dashoffset="${C}"></circle>
-        <text x="70" y="62" class="value" text-anchor="middle">—</text>
-        <text x="70" y="84" class="label" text-anchor="middle">${escapeHtml(label||'Score')}</text>
+        <circle cx="70" cy="70" r="${R}" fill="none" stroke-width="12" class="bg" style="stroke:#e5e7eb"></circle>
+        <circle cx="70" cy="70" r="${R}" fill="none" stroke-width="12" class="fg" stroke-dasharray="${C}" stroke-dashoffset="${C}" style="stroke:#9ca3af"></circle>
+        <text x="70" y="62" class="value" text-anchor="middle" style="font-size:22px;font-weight:700;fill:#111827">—</text>
+        <text x="70" y="84" class="label" text-anchor="middle" style="font-size:14px;fill:#6b7280">${escapeHtml(label||'Score')}</text>
       </svg>`;
-    return { R, C, fg:root.querySelector('.fg'), val:root.querySelector('.value') };
+    return { R, C, root, fg:root.querySelector('.fg'), val:root.querySelector('.value') };
   }
   const gRep = makeGauge(el.gaugeRep, 'חזרה');
   const gSet = makeGauge(el.gaugeSet, 'סט');
 
-  // מדרג צבעים: 0–49 אדום · 50–64 כתום · 65–74 צהוב · 75–89 ירוק · 90–100 ירוק כהה
-  function colorForPct(p){
-    if(p==null) return '#9ca3af';
-    if(p <= 49) return '#ef4444';      // red
-    if(p <= 64) return '#f97316';      // orange
-    if(p <= 74) return '#eab308';      // yellow
-    if(p <= 89) return '#22c55e';      // green
-    return '#16a34a';                  // dark green
+  // טווחי צבעים מהשרת (fallback לדיפולט: 0–60 אדום, 60–75 כתום, 75–100 ירוק)
+  function colorFromRanges(pct, ranges) {
+    if (pct == null) return '#9ca3af';
+    if (Array.isArray(ranges) && ranges.length) {
+      for (const r of ranges) {
+        const from = Number(r.from_pct ?? 0), to = Number(r.to_pct ?? 100);
+        if (pct >= from && pct < to) {
+          if (r.label === 'red')    return '#ef4444';
+          if (r.label === 'orange') return '#f97316';
+          if (r.label === 'green')  return '#22c55e';
+        }
+      }
+    }
+    if (pct < 60) return '#ef4444';
+    if (pct < 75) return '#f97316';
+    return '#22c55e';
   }
-  function setGauge(g, pct){
+  function setGauge(g, pct, colorRanges){
+    if (pct==null || !isFinite(pct)) {
+      g.fg.style.strokeDashoffset = String(g.C);
+      g.fg.style.stroke = '#9ca3af';
+      g.val.textContent = '—';
+      return;
+    }
     const p = clamp(Number(pct)||0, 0, 100);
     const off = g.C * (1 - p/100);
     g.fg.style.strokeDashoffset = String(off);
-    g.fg.style.stroke = colorForPct(p);
-    g.val.textContent = isFinite(p)? `${p}%` : '—';
+    g.fg.style.stroke = colorFromRanges(p, colorRanges || LAST_COLOR_RANGES);
+    g.val.textContent = `${p}%`;
   }
   setGauge(gRep, null); setGauge(gSet, null);
 
-  // ---------- Helpers: score/grade ----------
-  function gradeForPct(p){
-    if(p==null) return '—';
-    if(p>=90) return 'A';
-    if(p>=80) return 'B';
-    if(p>=70) return 'C';
-    if(p>=60) return 'D';
-    return 'E';
-  }
+  // ---------- Helpers ----------
   const repScorePct = (rep)=> {
     const s = rep?.scoring?.score;
     if(s==null) return null;
-    return Math.round( (Number(s)||0) * 100 );
+    const v = Number(s);
+    return isFinite(v) ? Math.round(v * 100) : null;
   };
 
-  // ---------- Criticality bucketing ----------
   function severityScore(item){
-    const unavailable = !item.available;
-    const reason = String(item.reason||'').toLowerCase();
+    const unavailable = !item?.available;
+    const reason = String(item?.reason||'').toLowerCase();
     const badReason = reason.includes('missing_critical') || reason.includes('missing');
-    const pct = (item.score_pct!=null) ? Number(item.score_pct) : (item.score!=null ? Number(item.score)*100 : null);
+    const pct = (item?.score_pct!=null) ? Number(item.score_pct) : (item?.score!=null ? Number(item.score)*100 : null);
 
     if (unavailable || badReason) return { bucket:'critical', order: (pct!=null? pct: 0) };
     if (pct==null) return { bucket:'major', order: 0 };
@@ -139,17 +147,46 @@
   }
   const chip = (html)=> `<span class="chip">${html}</span>`;
 
+  // Tooltip פירוק קריטריונים
+  function criteriaTooltipText(rep) {
+    try {
+      const br = rep?.scoring?.criteria_breakdown_pct;
+      let entries = br && typeof br === 'object' ? Object.entries(br) : null;
+
+      if (!entries || !entries.length) {
+        const list = Array.isArray(rep?.scoring?.criteria) ? rep.scoring.criteria : [];
+        entries = list
+          .filter(c => c?.score_pct != null || c?.score != null)
+          .map(c => [String(c.id), c.score_pct!=null ? Number(c.score_pct) : Math.round(Number(c.score)*100)]);
+      }
+
+      entries = entries
+        .filter(([_, v]) => v != null && isFinite(Number(v)))
+        .sort((a,b)=> Number(a[1])-Number(b[1]));
+
+      if (!entries.length) return 'אין פירוק קריטריונים זמין';
+      return entries.map(([k,v])=> `${k}: ${v}%`).join('\n');
+    } catch {
+      return 'אין פירוק קריטריונים זמין';
+    }
+  }
+
   // ---------- Details Modal ----------
   function openDetails(rep, meta){
-    $('#details-sub').textContent = `סט ${meta?.setIdx||'—'} · חזרה ${meta?.repIdx||'—'}`;
-    $('#details-chips').innerHTML = [
+    el.detailsSub.textContent = `סט ${meta?.setIdx||'—'} · חזרה ${meta?.repIdx||'—'}`;
+
+    const health = rep?.report_health?.status;
+    const healthChip = health ? chip(`בריאות דוח: ${escapeHtml(health)}`) : '';
+
+    el.detailsChips.innerHTML = [
       chip(`תרגיל: ${escapeHtml(rep?.exercise?.id||'—')}`),
       chip(`ציון: ${repScorePct(rep) ?? '—'}%`),
-      chip(`דרוג: ${escapeHtml(rep?.scoring?.grade||'—')}`),
       chip(`איכות: ${escapeHtml(rep?.scoring?.quality||'—')}`),
       chip(`Unscored: ${escapeHtml(rep?.scoring?.unscored_reason||'—')}`),
-    ].join(' ');
-    $('#details-raw').textContent = safeJSON(rep);
+      healthChip,
+    ].filter(Boolean).join(' ');
+
+    el.detailsRaw.textContent = safeJSON(rep);
 
     const buckets = bucketizeCriteria(rep);
     const sections = [
@@ -159,11 +196,11 @@
       { key:'good',     title:'עבר',   cls:'crit-good' },
     ];
     function row(it, cls){
-      const pct = it.score_pct!=null? `${it.score_pct}%` : (it.score!=null? (Math.round(it.score*100)+'%') : '—');
-      const reason = escapeHtml(it.reason||'');
+      const pct = it?.score_pct!=null? `${it.score_pct}%` : (it?.score!=null? (Math.round(it.score*100)+'%') : '—');
+      const reason = escapeHtml(it?.reason||'');
       return `<div class="crit-item ${cls}">
-        <div><span class="pill pill-k">${escapeHtml(it.id||'קריטריון')}</span> ${reason? `<span class="pill pill-r">${reason}</span>`:''}</div>
-        <div class="text-sm text-gray-600">${it.available? 'זמין':'לא זמין'}</div>
+        <div><span class="pill pill-k">${escapeHtml(it?.id||'קריטריון')}</span> ${reason? `<span class="pill pill-r">${reason}</span>`:''}</div>
+        <div class="text-sm text-gray-600">${it?.available? 'זמין':'לא זמין'}</div>
         <div class="text-sm font-semibold">${pct}</div>
       </div>`;
     }
@@ -177,14 +214,92 @@
         </div>
       </div>`;
     }).join('');
-    $('#details-lists').innerHTML = html || '<div class="text-sm text-gray-500">אין פרטים להצגה.</div>';
-    $('#details-modal').classList.add('show');
+    el.detailsLists.innerHTML = html || '<div class="text-sm text-gray-500">אין פרטים להצגה.</div>';
+
+    // tooltip breakdown על המדדים
+    const t = criteriaTooltipText(rep);
+    el.gaugeRep?.setAttribute('title', t);
+    el.gaugeSet?.setAttribute('title', t);
+
+    el.detailsModal.classList.add('show');
   }
-  function closeDetails(){ $('#details-modal').classList.remove('show'); }
+  function closeDetails(){ el.detailsModal.classList.remove('show'); }
   el.detailsClose?.addEventListener('click', closeDetails);
   el.detailsModal?.addEventListener('click', (ev)=>{ if(ev.target===el.detailsModal) closeDetails(); });
+  window.addEventListener('keydown', (e)=>{ if(e.key==='Escape') closeDetails(); });
 
-  // ---------- Simulator: local fake generation ----------
+  // ---------- Server endpoints ----------
+  async function serverSimulate({sets, reps, mode, noise}) {
+    const res = await fetch('/api/exercise/simulate', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ sets, reps, mode, noise })
+    });
+    if (!res.ok) throw new Error(`simulate HTTP ${res.status}`);
+    return res.json();
+  }
+  async function serverScore(metricsObj) {
+    const res = await fetch('/api/exercise/score', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ metrics: metricsObj || { demo:true } })
+    });
+    if (!res.ok) throw new Error(`score HTTP ${res.status}`);
+    return res.json();
+  }
+
+  // ---------- Gauges setter (incl. tooltip) ----------
+  function setGaugesFromReport(rep){
+    const pct = repScorePct(rep);
+    const ranges = rep?.ui_ranges?.color_bar || null;
+    if (ranges) LAST_COLOR_RANGES = ranges;
+
+    setGauge(gRep, pct, ranges);
+    setGauge(gSet, pct, ranges);
+
+    const tooltip = criteriaTooltipText(rep);
+    el.gaugeRep?.setAttribute('title', tooltip);
+    el.gaugeSet?.setAttribute('title', tooltip);
+  }
+
+  // ---------- Table row + set summary ----------
+  function pushRow(setIdx, repIdx, rep){
+    if(el.simTB.querySelector('td[colspan]')) el.simTB.innerHTML='';
+    const tr=document.createElement('tr');
+    const pct = repScorePct(rep);
+    const rid = `r${REP_AUTO_ID++}`;
+    REP_STORE.set(rid, rep);
+
+    tr.innerHTML = `<td class="py-2 px-3">${setIdx}</td>
+      <td class="py-2 px-3">${repIdx}</td>
+      <td class="py-2 px-3">${escapeHtml(rep?.exercise?.id||'—')}</td>
+      <td class="py-2 px-3">${pct!=null? pct+'%':'—'}</td>
+      <td class="py-2 px-3">${escapeHtml(rep?.scoring?.quality||'—')}</td>
+      <td class="py-2 px-3">${escapeHtml(rep?.scoring?.unscored_reason||'—')}</td>
+      <td class="py-2 px-3 text-gray-500">${(rep?.hints && rep.hints[0])? escapeHtml(rep.hints[0]) : ''}</td>
+      <td class="py-2 px-3">
+        <button class="px-2 py-1 rounded bg-gray-100 hover:bg-gray-200 text-sm" data-rid="${rid}" data-set="${setIdx}" data-rep="${repIdx}">פירוט</button>
+      </td>`;
+    tr.querySelector('button')?.addEventListener('click', (ev)=>{
+      const btn = ev.currentTarget;
+      const id  = btn.getAttribute('data-rid');
+      const set = Number(btn.getAttribute('data-set'));
+      const rix = Number(btn.getAttribute('data-rep'));
+      const report = REP_STORE.get(id);
+      openDetails(report, { setIdx:set, repIdx:rix });
+    });
+    el.simTB.appendChild(tr);
+  }
+
+  function pushSetSummary(setIdx, repLikeForSummary){
+    const buckets = bucketizeCriteria(repLikeForSummary||{});
+    const topBad = [...(buckets.critical||[]), ...(buckets.major||[])].slice(0,3).map(x=>x.id).filter(Boolean);
+    const summary = topBad.length ? ('מוקדים לשיפור: ' + topBad.join(', ')) : 'ביצוע נקי יחסית בסט זה.';
+    const tr = document.createElement('tr');
+    tr.className='bg-white';
+    tr.innerHTML = `<td colspan="8" class="py-2 px-3 text-sm text-gray-600">סט ${setIdx}: ${escapeHtml(summary)}</td>`;
+    el.simTB.appendChild(tr);
+  }
+
+  // ---------- Local Simulation (fallback) ----------
   const SAMPLE_EX = 'squat.bodyweight';
   function randf(a=0,b=1){ return a + Math.random()*(b-a); }
   function jitter(v,noise){ return clamp(v + (randf(-noise,noise)*100), 0, 100); }
@@ -192,7 +307,7 @@
     const base = [
       { id:'depth',        available:true,  score_pct: 85 },
       { id:'knee_valgus',  available:true,  score_pct: 90 },
-      { id:'torso_angle',  available:true,  score_pct: 88 },
+      { id:'posture',      available:true,  score_pct: 88 },
       { id:'stance_width', available:true,  score_pct: 92 },
       { id:'tempo',        available:true,  score_pct: 86 },
     ];
@@ -214,144 +329,122 @@
     const avail = criteria.filter(c=>c.available && c.score_pct!=null);
     if(!avail.length) return {score: null, quality: null};
     const avg = avail.reduce((s,c)=>s+c.score_pct,0)/avail.length;
-    const quality = avg>=85?'good':(avg>=70?'ok':'weak');
+    const quality = avg>=85?'full':(avg>=70?'partial':'poor');
     return {score: avg/100, quality};
   }
   function fakeReport({mode, noisePct}){
     const criteria = makeCriteria(mode).map(c=> ({...c, score_pct: c.score_pct!=null? Math.round(jitter(c.score_pct, noisePct)) : c.score_pct }));
     const ov = criteriaToOverall(criteria);
-    const grade = gradeForPct(Math.round((ov.score||0)*100));
     const hints = [];
     const bad = criteria.filter(c=>c.available && (c.score_pct??0)<70).sort((a,b)=>a.score_pct-b.score_pct);
     if(bad[0]) hints.push(`שפר ${bad[0].id} (כעת ${bad[0].score_pct}%)`);
     return {
+      ui_ranges: { color_bar: [{label:'red',from_pct:0,to_pct:60},{label:'orange',from_pct:60,to_pct:75},{label:'green',from_pct:75,to_pct:100}] },
       exercise: { id: SAMPLE_EX },
       scoring: {
-        score: ov.score, quality: ov.quality, grade,
+        score: ov.score, quality: ov.quality,
         unscored_reason: criteria.some(c=>!c.available && String(c.reason||'').includes('missing_critical')) ? 'missing_critical' : null,
-        criteria: criteria.map(c=>({ id:c.id, available:!!c.available, score_pct:c.score_pct, reason:c.reason||null }))
+        criteria: criteria.map(c=>({ id:c.id, available:!!c.available, score_pct:c.score_pct, reason:c.reason||null })),
+        criteria_breakdown_pct: Object.fromEntries(criteria.map(c=>[c.id, c.score_pct ?? null])),
       },
       hints
     };
   }
 
-  // ---------- Server simulate/score ----------
-  async function serverSimulate({sets, reps, mean, std}) {
-    const res = await fetch('/api/exercise/simulate', {
-      method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ sets, reps, mean_score: mean, std })
-    });
-    if (!res.ok) throw new Error(`simulate HTTP ${res.status}`);
-    return res.json();
-  }
-  async function serverScore(metricsObj) {
-    const res = await fetch('/api/exercise/score', {
-      method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ metrics: metricsObj || { demo:true } })
-    });
-    if (!res.ok) throw new Error(`score HTTP ${res.status}`);
-    return res.json();
-  }
-
-  // ---------- Table row + set summary ----------
-  function pushRow(setIdx, repIdx, rep){
-    if(el.simTB.querySelector('td[colspan]')) el.simTB.innerHTML='';
-    const tr=document.createElement('tr');
-    const pct = repScorePct(rep);
-    const rid = `r${REP_AUTO_ID++}`;
-    REP_STORE.set(rid, rep);
-
-    tr.innerHTML = `<td class="py-2 px-3">${setIdx}</td>
-      <td class="py-2 px-3">${repIdx}</td>
-      <td class="py-2 px-3">${escapeHtml(rep?.exercise?.id||'—')}</td>
-      <td class="py-2 px-3">${pct!=null? pct+'%':'—'}</td>
-      <td class="py-2 px-3">${escapeHtml(rep?.scoring?.grade||'—')}</td>
-      <td class="py-2 px-3">${escapeHtml(rep?.scoring?.quality||'—')}</td>
-      <td class="py-2 px-3">${escapeHtml(rep?.scoring?.unscored_reason||'—')}</td>
-      <td class="py-2 px-3 text-gray-500">${(rep?.hints && rep.hints[0])? escapeHtml(rep.hints[0]) : ''}</td>
-      <td class="py-2 px-3">
-        <button class="px-2 py-1 rounded bg-gray-100 hover:bg-gray-200 text-sm" data-rid="${rid}" data-set="${setIdx}" data-rep="${repIdx}">פירוט</button>
-      </td>`;
-    tr.querySelector('button')?.addEventListener('click', (ev)=>{
-      const btn = ev.currentTarget;
-      const id  = btn.getAttribute('data-rid');
-      const set = Number(btn.getAttribute('data-set'));
-      const rix = Number(btn.getAttribute('data-rep'));
-      const report = REP_STORE.get(id);
-      openDetails(report, { setIdx:set, repIdx:rix });
-    });
-    el.simTB.appendChild(tr);
-  }
-  function pushSetSummary(setIdx){
-    const lastBtn = el.simTB.querySelector('tr:last-child button');
-    const rep = lastBtn ? REP_STORE.get(lastBtn.getAttribute('data-rid')) : null;
-    const buckets = bucketizeCriteria(rep||{});
-    const topBad = [...(buckets.critical||[]), ...(buckets.major||[])].slice(0,3).map(x=>x.id).filter(Boolean);
-    const summary = topBad.length ? ('מוקדים לשיפור: ' + topBad.join(', ')) : 'ביצוע נקי יחסית בסט זה.';
-    const tr = document.createElement('tr');
-    tr.className='bg-white';
-    tr.innerHTML = `<td colspan="9" class="py-2 px-3 text-sm text-gray-600">סט ${setIdx}: ${escapeHtml(summary)}</td>`;
-    el.simTB.appendChild(tr);
-  }
-
-  // ---------- Simulation run (prefers server, fallback to local) ----------
+  // ---------- Simulation run ----------
   async function runSimulation(){
-    const sets = clamp(parseInt(el.simSets.value||'2',10),1,10);
-    const reps = clamp(parseInt(el.simReps.value||'5',10),1,30);
-    const mode = el.simMode.value || 'mixed';
+    if (simRunning) return;
+    simRunning = true;
+    el.btnRun?.setAttribute('disabled','disabled');
+
+    const sets  = clamp(parseInt(el.simSets.value||'2',10),1,10);
+    const reps  = clamp(parseInt(el.simReps.value||'5',10),1,30);
+    const mode  = el.simMode.value || 'mixed';
     const noise = clamp(Number(el.simNoise.value||0.25), 0, 0.5);
 
     try {
-      const sim = await serverSimulate({ sets, reps, mean: 0.75, std: noise });
-      for (const s of sim.sets || []) {
+      // שרת
+      const sim = await serverSimulate({ sets, reps, mode, noise });
+      LAST_COLOR_RANGES = sim?.ui_ranges?.color_bar || LAST_COLOR_RANGES;
+
+      for (const s of (sim.sets || [])) {
         const setIdx = s.set ?? 1;
         const repArr = Array.isArray(s.reps) ? s.reps : [];
         let setScores = [];
+        let lastRepLike = null;
+
         for (const r of repArr) {
-          const reportLike = {
-            exercise: { id: 'squat.bodyweight' },
+          const criteria = Array.isArray(r.criteria) ? r.criteria : [];
+          const repLike = {
+            ui_ranges: sim.ui_ranges || null,
+            exercise: { id: r.exercise_id || s.exercise_id || 'squat.bodyweight' },
             scoring: {
-              score: (r.score_pct!=null ? r.score_pct/100 : r.score ?? 0.7),
-              grade: gradeForPct(r.score_pct ?? Math.round((r.score ?? 0.7)*100)),
-              quality: ((r.score_pct ?? 70) >= 85 ? 'good' : ((r.score_pct ?? 70) >= 70 ? 'ok' : 'weak')),
-              unscored_reason: null,
-              criteria: []
+              score: (r.score_pct!=null ? r.score_pct/100 : (r.score ?? null)),
+              quality: r.quality || (r.score_pct!=null ? (r.score_pct>=85?'full':(r.score_pct>=70?'partial':'poor')) : null),
+              unscored_reason: r.unscored_reason ?? null,
+              criteria: criteria,
+              criteria_breakdown_pct: r.criteria_breakdown_pct || (criteria.length
+                ? Object.fromEntries(criteria.map(c => [c.id, c.score_pct ?? (c.score!=null? Math.round(c.score*100): null)]))
+                : null),
             },
             hints: (r.notes||[]).map(n=> n.text || n.crit || '')
           };
-          pushRow(setIdx, r.rep ?? (repArr.indexOf(r)+1), reportLike);
-          const rpct = repScorePct(reportLike);
-          setGauge(gRep, rpct);
-          setScores.push(rpct ?? 0);
-          await new Promise(res=>setTimeout(res, 80));
-        }
-        const setPct = s.set_score_pct!=null ? s.set_score_pct : Math.round(setScores.reduce((a,b)=>a+b,0)/Math.max(1,setScores.length));
-        setGauge(gSet, setPct);
-        pushSetSummary(setIdx);
-      }
-      return; // הצליח מהשרת
-    } catch(e) {
-      console.warn('serverSimulate failed, falling back to local fake:', e);
-    }
 
-    // Fallback: סימולציה מקומית
-    for(let s=1; s<=sets; s++){
-      let setScores = [];
-      for(let r=1; r<=reps; r++){
-        const rep = fakeReport({mode: mode==='mixed'? (Math.random()<.33?'good':(Math.random()<.5?'shallow':'missing')):mode, noisePct:noise});
-        pushRow(s, r, rep);
-        const rpct = repScorePct(rep);
-        setGauge(gRep, rpct);
-        setScores.push(rpct ?? 0);
-        await new Promise(res=>setTimeout(res, 120));
+          pushRow(setIdx, r.rep ?? (repArr.indexOf(r)+1), repLike);
+          const rpct = repScorePct(repLike);
+          setGauge(gRep, rpct, LAST_COLOR_RANGES);
+          const t = criteriaTooltipText(repLike);
+          el.gaugeRep?.setAttribute('title', t);
+          el.gaugeSet?.setAttribute('title', t);
+          setScores.push(rpct ?? 0);
+          lastRepLike = repLike;
+          await new Promise(res=>setTimeout(res, 60));
+        }
+
+        const setPct = s.set_score_pct!=null ? s.set_score_pct : Math.round(setScores.reduce((a,b)=>a+b,0)/Math.max(1,setScores.length));
+        setGauge(gSet, setPct, LAST_COLOR_RANGES);
+        pushSetSummary(setIdx, lastRepLike);
       }
-      const setPct = Math.round(setScores.reduce((a,b)=>a+b,0)/setScores.length);
-      setGauge(gSet, setPct);
-      pushSetSummary(s);
+    } catch(e) {
+      console.warn('serverSimulate failed, local fallback:', e);
+      // Fallback: סימולציה מקומית
+      for(let s=1; s<=sets; s++){
+        let setScores = [];
+        let lastRepLike = null;
+        for(let r=1; r<=reps; r++){
+          const pickedMode = (mode==='mixed')
+            ? (Math.random()<.33?'good':(Math.random()<.5?'shallow':'missing'))
+            : mode;
+          const rep = fakeReport({mode: pickedMode, noisePct:noise});
+          LAST_COLOR_RANGES = rep?.ui_ranges?.color_bar || LAST_COLOR_RANGES;
+          pushRow(s, r, rep);
+          const rpct = repScorePct(rep);
+          setGauge(gRep, rpct, LAST_COLOR_RANGES);
+          const t = criteriaTooltipText(rep);
+          el.gaugeRep?.setAttribute('title', t);
+          el.gaugeSet?.setAttribute('title', t);
+          setScores.push(rpct ?? 0);
+          lastRepLike = rep;
+          await new Promise(res=>setTimeout(res, 100));
+        }
+        const setPct = Math.round(setScores.reduce((a,b)=>a+b,0)/setScores.length);
+        setGauge(gSet, setPct, LAST_COLOR_RANGES);
+        pushSetSummary(s, lastRepLike);
+      }
+    } finally {
+      simRunning = false;
+      el.btnRun?.removeAttribute('disabled');
     }
   }
   el.btnRun?.addEventListener('click', runSimulation);
-  el.btnClear?.addEventListener('click', ()=>{ el.simTB.innerHTML='<tr><td colspan="9" class="py-6 text-center text-gray-400">נוקה.</td></tr>'; setGauge(gRep,null); setGauge(gSet,null); });
+
+  el.btnClear?.addEventListener('click', ()=>{
+    el.simTB.innerHTML='<tr><td colspan="8" class="py-6 text-center text-gray-400">נוקה.</td></tr>';
+    setGauge(gRep,null);
+    setGauge(gSet,null);
+    el.gaugeRep?.removeAttribute('title');
+    el.gaugeSet?.removeAttribute('title');
+  });
 
   // ---------- Diagnostics SSE ----------
   let diagES = null;
@@ -380,9 +473,8 @@
   el.btnServerScore?.addEventListener('click', async ()=>{
     try{
       const j = await serverScore({ demo:true });
-      const pct = Math.round((j?.scoring?.score || 0) * 100);
-      setGauge(gRep, pct);
-      setGauge(gSet, pct);
+      LAST_COLOR_RANGES = j?.ui_ranges?.color_bar || LAST_COLOR_RANGES;
+      setGaugesFromReport(j);
 
       const rep = j || {};
       const rid = `r${REP_AUTO_ID++}`;

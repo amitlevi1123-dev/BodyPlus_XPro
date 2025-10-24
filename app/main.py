@@ -19,7 +19,6 @@ os.environ["TF_CPP_MIN_LOG_LEVEL"] = "2"
 # ומנסה אוטומטית נתיב מתוקן כשפותחים קבצים/בודקים קיום.
 import builtins, functools
 
-# כאן שים את בסיס(י) הנתיב הישנים שהופיעו בקוד/קבצים:
 _LEGACY_BASES = [
     r"C:\Users\Owner\Desktop\BodyPlus\BodyPlus_XPro",
     r"C:/Users/Owner/Desktop/BodyPlus/BodyPlus_XPro",
@@ -38,7 +37,6 @@ def _map_legacy_path(p) -> str:
             return fixed
     return s
 
-# monkey-patch ל-open: אם המקורי נכשל (FileNotFoundError) ננסה נתיב ממופה
 _real_open = builtins.open
 @functools.wraps(_real_open)
 def _open_patched(file, *args, **kwargs):
@@ -49,10 +47,8 @@ def _open_patched(file, *args, **kwargs):
         if mapped and mapped != str(file):
             return _real_open(mapped, *args, **kwargs)
         raise
-
 builtins.open = _open_patched
 
-# patch עדין ל-os.path.exists כדי שבדיקות קיום יעבדו גם עם נתיב ממופה
 import os.path as _osp
 _exists_real = _osp.exists
 def _exists_patched(path):
@@ -60,14 +56,11 @@ def _exists_patched(path):
         return True
     mapped = _map_legacy_path(path)
     return _exists_real(mapped)
-
 _osp.exists = _exists_patched
 
-# פונקציות עזר מפורשות לשימוש ישיר כשנוח:
 def normalize_path(p: str) -> str:
     """אם p מוחלט תחת בסיס ישן → החזר נתיב יחסי לשורש הפרויקט; אחרת השאר כמו שהוא."""
     s = _map_legacy_path(p)
-    # אם יצא מוחלט בתוך הפרויקט, נהפוך ליחסי נקי
     try:
         pp = pathlib.Path(s)
         if pp.is_absolute():
@@ -78,7 +71,7 @@ def normalize_path(p: str) -> str:
     return s
 
 def normalize_inplace(obj):
-    """עובר על dict/list ומנרמל מחרוזות נתיב בתוכן (למשל אחרי טעינת YAML)."""
+    """מנרמל מחרוזות נתיב בתוך dict/list (למשל אחרי טעינת YAML)."""
     if isinstance(obj, dict):
         for k, v in list(obj.items()):
             if isinstance(v, str):
@@ -107,6 +100,16 @@ except Exception:
 from admin_web.server import create_app
 app = create_app()
 
+# --- Health endpoints (LB expects simple 200) ---
+@app.get("/health")
+def health():
+    return "ok", 200
+
+@app.get("/ping")
+def ping():
+    return "pong", 200
+
+# נשאיר גם את /healthz למי שצריך תאימות לאחור
 try:
     @app.get("/healthz")
     def _healthz():
@@ -402,15 +405,13 @@ class App:
             logger.warning("זיהוי אובייקטים לא זמין — רץ בלי OD.")
             return
         try:
-            # נתיב ה-YAML עובר נרמול (עובד גם אם בטעות נשאר C:\... בקוד/קובץ)
-            yaml_path = normalize_path("core/object_detection/object_detection.yaml")  # <<< PATH FIXER
+            yaml_path = normalize_path("core/object_detection/object_detection.yaml")
             self.od_engine = ObjectDetectionEngine.from_yaml(yaml_path)
 
-            # אם ל-engine יש קונפיג דינאמי שנקרא למילון — ננרמל גם בתוכו (ליתר ביטחון)
             try:
                 det_cfg = getattr(self.od_engine, "detector_cfg", None)
                 if isinstance(det_cfg, dict):
-                    normalize_inplace(det_cfg)  # <<< PATH FIXER
+                    normalize_inplace(det_cfg)
             except Exception:
                 pass
 
