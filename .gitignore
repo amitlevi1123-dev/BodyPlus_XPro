@@ -7,6 +7,4 @@ __pycache__/
 *.log
 .DS_Store
 Thumbs.db
-constraints_runtime.txt
-requirements.bak
 .idea/
