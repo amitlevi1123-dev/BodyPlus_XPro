@@ -10,6 +10,8 @@
 # • שמירת canonical ו-rep היררכי (נשמר).
 # • שמירת camera + הזרקת הודעת ריסק כרמז (נשמר).
 # • הוספת ui_ranges לפס הצבעוני (אדום/כתום/ירוק).
+# • NEW: criteria_breakdown_pct (מפה ידידותית ל-Tooltip).
+# • NEW: quality ברירת מחדל ל-"partial" אם לא ניתן.
 # -----------------------------------------------------------------------------
 
 from __future__ import annotations
@@ -127,14 +129,12 @@ def _compute_coverage(exercise, availability: Dict[str, Dict[str, Any]]) -> Dict
 # ---------------------------- Report Health ----------------------------
 
 _HEALTH_RULES = [
-    # (code, predicate, level, message_fn)
     ("NO_EXERCISE",      lambda r: r.get("exercise") is None,                               "FAIL", "לא זוהה תרגיל. בדוק classifier/aliases."),
     ("UNSCORED",         lambda r: r.get("scoring", {}).get("score") is None,               "WARN", "לא חושב ציון (unscored)."),
     ("LOW_COVERAGE",     lambda r: (r.get("coverage", {}).get("available_pct", 100) < 60),  "WARN", "זמינות נמוכה (coverage<60%)."),
     ("MISSING_CRITICAL", lambda r: len(r.get("coverage", {}).get("missing_critical", []))>0,"FAIL", "חסרים קריטריונים קריטיים."),
     ("CAMERA_RISK",      lambda r: bool(r.get("camera", {}).get("visibility_risk", False)),"WARN", "תנאי צילום גבוליים — ייתכנו סטיות במדידה."),
     ("LOW_QUALITY",      lambda r: r.get("scoring", {}).get("quality") == "poor",           "WARN", "איכות שקלול נמוכה (poor)."),
-    # אינדיקציות לפי diagnostics:
     ("ALIAS_CONFLICTS",  lambda r: any(d.get("type")=="alias_conflict" for d in r.get("diagnostics", [])),"WARN","התנגשות ערכים בין אליאסים."),
     ("SET_COUNTER_ERROR",lambda r: any(d.get("type")=="set_counter_error" for d in r.get("diagnostics", [])),"WARN","שגיאת ספירת סטים."),
     ("REP_ENGINE_ERROR", lambda r: any(d.get("type")=="rep_segmenter_error" for d in r.get("diagnostics", [])),"WARN","שגיאת מנוע חזרות."),
@@ -151,7 +151,6 @@ def _compute_report_health(report: Dict[str, Any]) -> Dict[str, Any]:
                 if levels[level] > levels[worst]:
                     worst = level
         except Exception:
-            # לא חוסם דו"ח — לכל היותר נוסיף אינדיקציה כללית
             issues.append({"code": "HEALTH_RULE_ERROR", "level": "WARN", "message": f"כלל אינדיקציה נכשל: {code}"})
             worst = "WARN" if worst != "FAIL" else worst
     return {"status": worst, "issues": issues}
@@ -171,7 +170,6 @@ def build_payload(
     library_version: str,
     payload_version: str,
     per_criterion_scores: Optional[Dict[str, Any]] = None,
-    # אופציונלי: אוספים מוכנים של סטים/חזרות (אם קיימים אצלך ברנטיים)
     sets: Optional[List[Dict[str, Any]]] = None,
     reps: Optional[List[Dict[str, Any]]] = None,
 ) -> Dict[str, Any]:
@@ -179,12 +177,13 @@ def build_payload(
     applied_caps: List[Dict[str, Any]] = []
     final_score = overall_score
 
-    # Safety caps (אם הוגדרו ב-YAML של התרגיל)
+    # Safety caps
     if exercise and overall_score is not None and isinstance(per_criterion_scores, dict):
         final_score, applied_caps = _apply_safety_caps(exercise, overall_score, per_criterion_scores)
 
-    # רשימת קריטריונים לתצוגה (כולל score/score_pct לכל קריטריון)
+    # criteria rows + flat breakdown for tooltip
     criteria_list: List[Dict[str, Any]] = []
+    criteria_breakdown_pct: Dict[str, Optional[int]] = {}
     for name, info in (availability or {}).items():
         if not isinstance(info, dict):
             continue
@@ -196,7 +195,6 @@ def build_payload(
             "score": None,
             "score_pct": None,
         }
-        # נשיכת הציון אם קיים ב-per_criterion_scores
         if isinstance(per_criterion_scores, dict) and name in per_criterion_scores:
             try:
                 sc = getattr(per_criterion_scores[name], "score", None)
@@ -206,17 +204,24 @@ def build_payload(
             except Exception:
                 pass
         criteria_list.append(item)
+        # breakdown map (only if available & has score_pct)
+        if item["available"]:
+            criteria_breakdown_pct[name] = item["score_pct"]
+        else:
+            criteria_breakdown_pct[name] = None
 
     coverage = _compute_coverage(exercise, availability)
 
-    # מטא + טווחי צבע ל-UI (פס צבעוני מתחת לעיגול)
     ui_ranges = {
         "color_bar": [
-            {"label": "red",   "from_pct": 0,  "to_pct": 60},
-            {"label": "orange","from_pct": 60, "to_pct": 75},
-            {"label": "green", "from_pct": 75, "to_pct": 100},
+            {"label": "red",    "from_pct": 0,  "to_pct": 60},
+            {"label": "orange", "from_pct": 60, "to_pct": 75},
+            {"label": "green",  "from_pct": 75, "to_pct": 100},
         ]
     }
+
+    # default quality
+    quality_effective = overall_quality or ("partial" if final_score is not None else None)
 
     report: Dict[str, Any] = {
         "meta": {
@@ -232,13 +237,13 @@ def build_payload(
         },
         "ui_ranges": ui_ranges,
         "scoring": {
-            "score": final_score,                 # 0..1 או None
-            "score_pct": _to_pct(final_score),    # 0..100 או None
-            "quality": overall_quality,           # full/partial/poor
+            "score": final_score,
+            "score_pct": _to_pct(final_score),
+            "quality": quality_effective,             # <- ברירת מחדל "partial"
             "unscored_reason": unscored_reason,
-            # אין Grade במערכת
-            "applied_caps": applied_caps,         # אם הוחלו caps
-            "criteria": criteria_list,            # כולל score_pct לכל קריטריון
+            "applied_caps": applied_caps,
+            "criteria": criteria_list,
+            "criteria_breakdown_pct": criteria_breakdown_pct,  # <- חדש ל-Tooltip
         },
         "coverage": coverage,
         "hints": list(hints or []),
@@ -246,9 +251,7 @@ def build_payload(
         "measurements": dict(canonical or {}),
     }
 
-    # ---------------------------------------------------------------------
-    # canonical שטוח + בלוק rep היררכי (לשיחזור ולדשבורד)
-    # ---------------------------------------------------------------------
+    # canonical + rep tree
     try:
         canonical_block = {}
         rep_block = {}
@@ -268,17 +271,13 @@ def build_payload(
     except Exception:
         pass
 
-    # ---------------------------------------------------------------------
-    # sets[] / reps[] — אם הועברו (לא חובה; תואם UI מפורט)
-    # ---------------------------------------------------------------------
+    # sets / reps (optional)
     if isinstance(sets, list) and sets:
         report["sets"] = sets
     if isinstance(reps, list) and reps:
         report["reps"] = reps
 
-    # ---------------------------------------------------------------------
-    # Report Health — אינדיקציות חכמות (OK/WARN/FAIL)
-    # ---------------------------------------------------------------------
+    # health
     report["report_health"] = _compute_report_health(report)
 
     return report
