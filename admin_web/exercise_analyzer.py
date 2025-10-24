@@ -32,6 +32,18 @@ __all__ = [
     "analyze_exercise",
 ]
 
+# ============ UI constants ============
+
+_UI_COLOR_BAR = [
+    {"label": "red",    "from_pct": 0,  "to_pct": 60},
+    {"label": "orange", "from_pct": 60, "to_pct": 75},
+    {"label": "green",  "from_pct": 75, "to_pct": 100},
+]
+
+def _ui_ranges() -> Dict[str, Any]:
+    # עטיפה עקבית ל-UI
+    return {"color_bar": list(_UI_COLOR_BAR)}
+
 # ============ Utilities ============
 
 def _clamp01(x: float) -> float:
@@ -91,10 +103,12 @@ def sanitize_metrics_payload(obj: Any) -> Dict[str, Any]:
                     if t.lower() in ("true", "false"):
                         out[k] = (t.lower() == "true")
                     else:
+                        # מנסה להמיר למספר (שלם/צף)
                         fv = float(t) if "." in t else float(int(t))
                         if math.isfinite(fv):
                             out[k] = fv
                 except Exception:
+                    # מחרוזות מורשות
                     if k in ("rep.phase", "view.mode", "view.primary", "exercise.id"):
                         out[k] = t
             elif isinstance(v, bool):
@@ -105,54 +119,92 @@ def sanitize_metrics_payload(obj: Any) -> Dict[str, Any]:
 
 # ============ Simulation ============
 
+def _mode_to_mean_std(mode: Optional[str], default_mean: float, default_std: float, noise: Optional[float]) -> Tuple[float, float]:
+    """
+    מפה 'mode' (אם התקבל מהלקוח) לממוצע/סטיית תקן סימולציה.
+    """
+    m = (mode or "").strip().lower()
+    if m == "good":
+        base_mean, base_std = 0.85, 0.05
+    elif m == "shallow":
+        base_mean, base_std = 0.65, 0.10
+    elif m == "missing":
+        base_mean, base_std = 0.55, 0.15
+    elif m == "mixed":
+        base_mean, base_std = 0.75, 0.12
+    else:
+        base_mean, base_std = default_mean, default_std
+    if noise is not None:
+        try:
+            base_std = max(0.0, min(0.5, float(noise)))
+        except Exception:
+            pass
+    return _clamp01(base_mean), base_std
+
 def simulate_exercise(
     sets: int = 1,
     reps: int = 6,
     mean_score: float = 0.75,
-    std: float = 0.10
+    std: float = 0.10,
+    # פרמטרים אופציונליים (לא שוברים תאימות): ייתכן ויגיעו מהראוטר
+    mode: Optional[str] = None,
+    noise: Optional[float] = None,
+    seed: Optional[int] = 42,
 ) -> Dict[str, Any]:
     """
     מייצר דמו (mock) של סט/חזרות — בפורמט שה-UI/בדיקות מצפות.
-    יציב-תוצאות (seed) כדי שבדיקות יהיו עקביות.
+    מחזיר גם ui_ranges.color_bar. יציב-תוצאות (seed) כדי שבדיקות יהיו עקביות.
     """
     try:
         sets = max(1, min(10, int(sets)))
         reps = max(1, min(30, int(reps)))
-        mean = _clamp01(mean_score)
-        std = max(0.0, min(0.5, float(std)))
 
-        rng = random.Random(42)  # יציב
-        reps_list: List[Dict[str, Any]] = []
-        for i in range(reps):
-            # תנודה קטנה סביב הממוצע (דפוס + רעש רך)
-            delta = (std if (i % 2 == 0) else -std) * (0.9 + 0.2 * rng.random())
-            score = _clamp01(round(mean + delta, 3))
-            reps_list.append({
-                "rep": i + 1,
-                "score": score,
-                "score_pct": int(round(score * 100)),
-                "notes": [
-                    {"crit": "depth", "severity": "med", "text": "עמוק מעט יותר"},
-                    {"crit": "knees", "severity": "low", "text": "שמור על ברכיים בקו האצבעות"},
-                ],
+        # אם התקבלו mode/noise — נמפה אותם לממוצע/סטיית תקן; אחרת נשארים עם ברירות המחדל
+        mean, std = _mode_to_mean_std(mode, _clamp01(mean_score), max(0.0, min(0.5, float(std))), noise)
+
+        rng = random.Random(seed if seed is not None else 42)  # יציב
+        sets_out: List[Dict[str, Any]] = []
+
+        for s in range(1, sets + 1):
+            reps_list: List[Dict[str, Any]] = []
+            for i in range(reps):
+                # תנודה קטנה סביב הממוצע (דפוס + רעש רך)
+                # חיוב/שלילה מתחלפים כדי לתת גיוון יציב
+                sign = 1.0 if (i % 2 == 0) else -1.0
+                delta = sign * std * (0.9 + 0.2 * rng.random())
+                score = _clamp01(round(mean + delta, 3))
+                reps_list.append({
+                    "rep": i + 1,
+                    "score": score,
+                    "score_pct": int(round(score * 100)),
+                    # ניתן להרחיב: criteria/criteria_breakdown_pct ל-rep בודד (כרגע משאירים לראוטר/אנלייזר מלא)
+                    "notes": [
+                        {"crit": "depth", "severity": "med", "text": "עמוק מעט יותר"},
+                        {"crit": "knees", "severity": "low", "text": "שמור על ברכיים בקו האצבעות"},
+                    ],
+                })
+
+            set_score = _clamp01(mean)  # מייצגים את הסט סביב הממוצע
+            sets_out.append({
+                "set": s,
+                "exercise_id": "squat.bodyweight",
+                "set_score": round(set_score, 4),
+                "set_score_pct": int(round(set_score * 100)),
+                "reps": reps_list,
             })
 
         out = {
             "ok": True,
+            "ui_ranges": _ui_ranges(),
             "sets_total": sets,
             "reps_total": reps,
-            "sets": [{
-                "set": 1,
-                "set_score": round(mean, 2),
-                "set_score_pct": int(round(mean * 100)),
-                "reps": reps_list,
-            }]
+            "sets": sets_out,
         }
         return out
     except Exception as e:
         logger.error("simulate_exercise: unexpected error: %s", e, exc_info=True)
         # נפילה רכה — תחזיר מבנה מינימלי כדי שה-UI לא יקרוס
-        return {"ok": False, "error": "simulate_failed"}
+        return {"ok": False, "error": "simulate_failed", "ui_ranges": _ui_ranges(), "sets": []}
 
 # ============ Analyzer (heuristics) ============
 
@@ -292,6 +344,27 @@ def _criteria_from_metrics(m: Dict[str, float]) -> List[Dict[str, Any]]:
 
     return crit
 
+def _criteria_breakdown_pct(criteria: List[Dict[str, Any]]) -> Dict[str, Optional[int]]:
+    """
+    מחזיר מילון id->score_pct ל-tooltip. אם חסר score_pct אבל יש score, יומר ל-%.
+    """
+    out: Dict[str, Optional[int]] = {}
+    for c in (criteria or []):
+        try:
+            cid = str(c.get("id") or "")
+            if not cid:
+                continue
+            if c.get("score_pct") is not None:
+                out[cid] = int(c["score_pct"])
+            elif c.get("score") is not None:
+                out[cid] = _safe_pct(float(c["score"]))
+            else:
+                out[cid] = None
+        except Exception:
+            # לא מפיל את כל הפונקציה
+            pass
+    return out
+
 def _overall_from_criteria(criteria: List[Dict[str, Any]]) -> Tuple[Optional[float], str, List[str], Optional[str]]:
     """
     מחזיר: (overall_score[0..1], grade[A..E], hints[list], unscored_reason[str|None])
@@ -350,18 +423,21 @@ def analyze_exercise(payload: Dict[str, Any]) -> Dict[str, Any]:
         metrics, has_any = _extract_metrics(payload)
         if not has_any:
             logger.info("analyze_exercise: no metrics -> returning demo unscored")
+            # החזרה תואמת UI + כולל ui_ranges ל-Gauges
             return {
                 "exercise": {"id": exercise_id},
+                "ui_ranges": _ui_ranges(),
                 "scoring": {
                     "score": 0.67,
                     "score_pct": 67,
                     "grade": "C",
-                    "quality": "C",
+                    "quality": "C",  # תאימות לאחור ל-UI ישן
                     "unscored_reason": "missing_critical",
                     "criteria": [
                         {"id": "depth", "available": False, "score": None, "score_pct": None, "reason": "missing_critical"},
                         {"id": "knees", "available": False, "score": None, "score_pct": None, "reason": "missing"},
                     ],
+                    "criteria_breakdown_pct": {"depth": None, "knees": None},
                 },
                 "hints": ["אין מספיק מידע לניקוד — ודא שמדדים מוזרמים"],
             }
@@ -369,17 +445,22 @@ def analyze_exercise(payload: Dict[str, Any]) -> Dict[str, Any]:
         criteria = _criteria_from_metrics(metrics)
         overall, grade, hints, unscored_reason = _overall_from_criteria(criteria)
 
+        # breakdown ל-tooltip
+        breakdown = _criteria_breakdown_pct(criteria)
+
         if overall is None:
             logger.warning("analyze_exercise: unscored -> %s", unscored_reason)
             return {
                 "exercise": {"id": exercise_id},
+                "ui_ranges": _ui_ranges(),
                 "scoring": {
                     "score": None,
                     "score_pct": None,
                     "grade": grade,
-                    "quality": grade,
+                    "quality": grade,  # תאימות לאחור (אם UI היסטורי צופה quality=Grade)
                     "unscored_reason": unscored_reason or "missing_critical",
                     "criteria": criteria,
+                    "criteria_breakdown_pct": breakdown,
                 },
                 "hints": hints or ["אין מספיק מידע לניקוד — ודא שמדדים מוזרמים"],
             }
@@ -387,6 +468,7 @@ def analyze_exercise(payload: Dict[str, Any]) -> Dict[str, Any]:
         pct = _pct(overall) or 0
         return {
             "exercise": {"id": exercise_id},
+            "ui_ranges": _ui_ranges(),
             "scoring": {
                 "score": round(float(overall), 4),
                 "score_pct": pct,
@@ -394,6 +476,7 @@ def analyze_exercise(payload: Dict[str, Any]) -> Dict[str, Any]:
                 "quality": grade,  # תאימות לאחור (UI ישנים)
                 "unscored_reason": None,
                 "criteria": criteria,
+                "criteria_breakdown_pct": breakdown,
             },
             "hints": hints,
         }
@@ -403,10 +486,12 @@ def analyze_exercise(payload: Dict[str, Any]) -> Dict[str, Any]:
         # החזרה רכה כדי שלא יפיל את ה-UI
         return {
             "exercise": {"id": "squat.bodyweight"},
+            "ui_ranges": _ui_ranges(),
             "scoring": {
                 "score": 0.67, "score_pct": 67, "grade": "C", "quality": "C",
                 "unscored_reason": "analyzer_error",
-                "criteria": []
+                "criteria": [],
+                "criteria_breakdown_pct": {},
             },
             "hints": ["שגיאת ניתוח – ראה לוגים"],
         }

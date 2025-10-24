@@ -1,5 +1,5 @@
 # =============================================================================
-# 🇮🇱 MediaPipeRunner (Pose + Hands) עם אופציית Overlay פנימית
+# 🇮🇱 MediaPipeRunner (Pose + Hands) עם אופציית Overlay פנימית (תואם גם בלי OpenCV)
 # I/O:
 #   קלט : פריים BGR (numpy array)
 #   פלט : tuple -> (results_pose, results_hands) או (None, None) במקרה כשל
@@ -8,11 +8,11 @@
 #   pose, hands = mpr.process(frame)
 #   mpr.release()
 #
-# ציור Overlay מתוך הרץ (ללא שינוי חתימה):
+# ציור Overlay מתוך הרץ:
 #   from app.ui.video import get_streamer
 #   mpr = MediaPipeRunner(enable_pose=True, enable_hands=True, overlay=True, overlay_hz=12).start()
 #   mpr.set_overlay_sink(get_streamer().push_bgr_frame)  # דחיפה לווידאו (MJPEG)
-#   pose, hands = mpr.process(frame)  # יצייר על עותק של frame בקצב מוגבל וידחוף ל-sink
+#   pose, hands = mpr.process(frame)
 # =============================================================================
 
 from __future__ import annotations
@@ -166,15 +166,18 @@ class MediaPipeRunner:
         except Exception as e:
             self._fail("import numpy", e); return
 
-        # 2) cv2
+        # 2) cv2 (אופציונלי)
         try:
             import cv2
             self._cv2 = cv2
             self._diag["opencv"] = getattr(cv2, "__version__", None)
             self._diag["opencv_path"] = getattr(cv2, "__file__", None)
             self._diag["steps"].append("cv2:OK")
-        except Exception as e:
-            self._fail("import cv2", e); return
+        except Exception:
+            # לא נכשלים בלי OpenCV
+            self._cv2 = None
+            self._diag["opencv"] = None
+            self._diag["steps"].append("cv2:SKIP")
 
         # 3) mediapipe
         try:
@@ -269,6 +272,7 @@ class MediaPipeRunner:
         """
         מקבל פריים BGR ומחזיר (pose_results, hands_results).
         אם overlay פעיל — נצייר על עותק של הפריים ונדחוף ל-sink בקצב מוגבל.
+        אם אין OpenCV — נפרסם JSON של הנקודות ל-frontend (לציור בקנבס).
         """
         if frame is None or not self.is_open:
             return None, None
@@ -277,15 +281,36 @@ class MediaPipeRunner:
         try:
             cv2 = self._cv2
             proc = frame
+
+            # resize אם צריך: עם cv2 אם יש; אחרת ננסה PIL; ואם לא — נשאיר כמות־שהוא
             if self.max_width and hasattr(proc, "shape") and proc.shape[1] > self.max_width:
                 try:
-                    scale = self.max_width / proc.shape[1]
-                    proc = cv2.resize(proc, (self.max_width, int(proc.shape[0] * scale)), interpolation=cv2.INTER_AREA)
+                    if cv2 is not None:
+                        scale = self.max_width / proc.shape[1]
+                        proc = cv2.resize(proc, (self.max_width, int(proc.shape[0] * scale)), interpolation=cv2.INTER_AREA)
+                    else:
+                        try:
+                            from PIL import Image
+                            import numpy as np
+                            img = Image.fromarray(proc[:, :, ::-1].copy())  # BGR->RGB ל-PIL
+                            h = int(proc.shape[0] * (self.max_width / proc.shape[1]))
+                            img = img.resize((self.max_width, h), Image.BILINEAR)
+                            proc = np.array(img)[:, :, ::-1].copy()  # חזרה ל-BGR
+                        except Exception:
+                            pass
                 except Exception:
                     proc = frame
 
-            rgb = cv2.cvtColor(proc, cv2.COLOR_BGR2RGB) if self.input_is_bgr else proc
+            # BGR->RGB: עם cv2 אם יש; אחרת באמצעות flip צירים
+            if self.input_is_bgr:
+                if cv2 is not None:
+                    rgb = cv2.cvtColor(proc, cv2.COLOR_BGR2RGB)
+                else:
+                    rgb = proc[:, :, ::-1]
+            else:
+                rgb = proc
 
+            # --- הרצה של MediaPipe ---
             pose = self._pose.process(rgb) if (self.enable_pose and self._ok_pose and self._pose) else None
 
             hands = None
@@ -294,25 +319,90 @@ class MediaPipeRunner:
 
             self._frame_idx += 1
 
-            # ----- Overlay (אופציונלי) -----
-            if self.overlay_enabled and _HAS_OVERLAY:
+            # ----- Overlay / Landmark publish -----
+            if self.overlay_enabled:
                 now_ms = time.time() * 1000.0
                 if (now_ms - self._last_overlay_ms) >= self._overlay_period_ms:
-                    try:
-                        annotated = frame.copy()
-                        hud = None  # אפשר להזריק HUD מהחוץ אם תרצה — השארתי פשוט
-                        draw_overlay(annotated, pose, hands, hud=hud)
-                        self._last_annotated = annotated
-                        sink = self._overlay_sink
-                        if callable(sink):
+
+                    if _HAS_OVERLAY and (self._cv2 is not None):
+                        # יש OpenCV + draw_overlay -> ציור בשרת כמו קודם
+                        try:
+                            annotated = frame.copy()
+                            hud = None  # אפשר להזרים HUD אם תרצה
+                            draw_overlay(annotated, pose, hands, hud=hud)
+                            self._last_annotated = annotated
+                            sink = self._overlay_sink
+                            if callable(sink):
+                                try:
+                                    sink(annotated)  # דחיפה ל-MJPEG
+                                except Exception:
+                                    pass
+                        except Exception:
+                            pass
+
+                    else:
+                        # אין OpenCV -> נפרסם נקודות כ-JSON ל-frontend לציור בקנבס
+                        try:
+                            h, w = (proc.shape[0], proc.shape[1]) if hasattr(proc, "shape") else (0, 0)
+                            payload: Dict[str, Any] = {"ok": False, "w": int(w), "h": int(h)}
+
+                            # Pose (33 נק')
+                            if pose and getattr(pose, "pose_landmarks", None) and hasattr(pose.pose_landmarks, "landmark"):
+                                lm = pose.pose_landmarks.landmark
+                                def xyv(i: int) -> Dict[str, float]:
+                                    p = lm[i]
+                                    return {
+                                        "x": float(p.x) * w,
+                                        "y": float(p.y) * h,
+                                        "v": float(getattr(p, "visibility", 1.0)),
+                                    }
+                                payload["pose"] = {
+                                    "NOSE": xyv(0),
+                                    "L_EYE": xyv(2), "R_EYE": xyv(5),
+                                    "L_EAR": xyv(7), "R_EAR": xyv(8),
+                                    "L_SH": xyv(11), "R_SH": xyv(12),
+                                    "L_EL": xyv(13), "R_EL": xyv(14),
+                                    "L_WR": xyv(15), "R_WR": xyv(16),
+                                    "L_HIP": xyv(23), "R_HIP": xyv(24),
+                                    "L_KNEE": xyv(25), "R_KNEE": xyv(26),
+                                    "L_ANK": xyv(27), "R_ANK": xyv(28),
+                                    "L_HEEL": xyv(29), "R_HEEL": xyv(30),
+                                    "L_TOE": xyv(31), "R_TOE": xyv(32),
+                                }
+                                payload["ok"] = True
+
+                            # Hands (אם קיימות)
+                            hands_arr = []
+                            if hands and getattr(hands, "multi_hand_landmarks", None):
+                                for hlm in hands.multi_hand_landmarks:
+                                    pts = []
+                                    for i in range(21):
+                                        p = hlm.landmark[i]
+                                        pts.append({"x": float(p.x) * w, "y": float(p.y) * h})
+                                    hands_arr.append(pts)
+                            if hands_arr:
+                                payload["hands"] = hands_arr
+
+                            # HUD אופציונלי
+                            payload["hud"] = {"view": "Front", "conf": 0.85, "qs": 90}
+
+                            # פרסום ל-state (כדי שה-frontend יצייר)
                             try:
-                                sink(annotated)
+                                from admin_web.state import set_last_pose  # type: ignore
+                                set_last_pose(payload)
                             except Exception:
                                 pass
-                        self._last_overlay_ms = now_ms
-                    except Exception:
-                        # לא מפיל — ממשיך רגיל
-                        pass
+
+                            # להזרים את הפריים המקורי ל-MJPEG (עדיין תראה וידאו)
+                            if callable(self._overlay_sink):
+                                try:
+                                    self._overlay_sink(frame)
+                                except Exception:
+                                    pass
+                        except Exception:
+                            pass
+
+                    self._last_overlay_ms = now_ms
 
             return pose, hands
 
