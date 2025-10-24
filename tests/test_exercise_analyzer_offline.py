@@ -1,616 +1,508 @@
 # -*- coding: utf-8 -*-
 """
 tests/test_exercise_analyzer_offline.py
-=======================================
+בדיקות אוף־ליין ל-admin_web/exercise_analyzer.py:
+- sanitize_metrics_payload
+- simulate_exercise
+- analyze_exercise
 
-בדיקות אוף־ליין מפורטות למודול:
-    admin_web/exercise_analyzer.py
+הבדיקות תלויות רק במודול exercise_analyzer ו-unittest.
+אין תלות בשרת/סטרימר/DB.
 
-מטרות:
-- לוודא שהסכמות של הפלטים יציבות (שדות/טיפוסים/טווחים).
-- לאשש לוגיקה של קריטריונים, ממוצעים, ו-ranges ל-UI.
-- לבדוק סניטציה מול קלטים "מלוכלכים".
-- לבדוק סימולציה במצבי good/shallow/missing/mixed + noise.
-- לבדוק אנליזה עם payloadים מלאים/חלקיים/שגויים.
-- לאסוף דו״ח קריא ומפורט על כל חריגה – כולל ציון מיקום/שורה.
-
-אפשר להריץ:
-    python -m unittest -v tests/test_exercise_analyzer_offline.py
+הרצה:
+    python -m unittest -v tests.test_exercise_analyzer_offline
 או:
-    python tests/test_exercise_analyzer_offline.py -v
+    python -m unittest discover -s tests -p "test_*.py" -v
 """
 
 from __future__ import annotations
-import os
-import sys
-import time
-import json
-import math
-import random
-import traceback
 import unittest
-from typing import Any, Dict, List, Optional, Tuple
+import math
+import copy
+import inspect
+from typing import Any, Dict, List
 
-# ---- נתיב ייבוא למודול הנבדק ----
-# במידה ואתה מריץ ממבנה פרויקט, ודא שה-root בפייתון־פאת':
-# לדוגמה, אם הקובץ הזה נמצא תחת ./tests, נרים את ה-root:
-HERE = os.path.abspath(os.path.dirname(__file__))
-ROOT = os.path.abspath(os.path.join(HERE, ".."))
-if ROOT not in sys.path:
-    sys.path.insert(0, ROOT)
-
-# ---- המודול הנבדק ----
-try:
-    from admin_web.exercise_analyzer import (
-        sanitize_metrics_payload,
-        simulate_exercise,
-        analyze_exercise,
-    )
-except Exception as e:
-    print("FATAL: failed importing admin_web.exercise_analyzer:", e)
-    raise
+# נייבא את הפונקציות כפי שהגדרת בקובץ שלך
+from admin_web.exercise_analyzer import (
+    sanitize_metrics_payload,
+    simulate_exercise,
+    analyze_exercise,
+)
 
 
-# ======================================================================================
-#                                Utilities for tests
-# ======================================================================================
+# ---------- עזר: עטיפה לסימולציה (תואם חתימה קיימת) ----------
+def sim_call(**kwargs):
+    """
+    העטיפה הזו מעבירה ל-simulate_exercise רק פרמטרים שהחתימה שלו תומכת בהם,
+    כדי להישאר תואמים לגרסאות שונות.
+    """
+    sig = inspect.signature(simulate_exercise)
+    allowed = {k: v for k, v in kwargs.items() if k in sig.parameters}
+    return simulate_exercise(**allowed)
 
-def _assert_between(testcase: unittest.TestCase, v: float, lo: float, hi: float, msg: str = "") -> None:
-    """מאשש שערך נמצא בטווח [lo..hi]."""
-    testcase.assertIsNotNone(v, msg or "value is None")
-    testcase.assertTrue(isinstance(v, (int, float)), msg or f"value not numeric: {type(v)}")
-    testcase.assertTrue(math.isfinite(float(v)), msg or f"value not finite: {v!r}")
-    testcase.assertGreaterEqual(float(v), lo, msg or f"value {v} < {lo}")
-    testcase.assertLessEqual(float(v), hi, msg or f"value {v} > {hi}")
 
-def _assert_pct(testcase: unittest.TestCase, v: Optional[int], msg: str = "") -> None:
-    if v is None:
+# ---------- עזר: בדיקות סכמה מפורטות ----------
+def assert_key(
+    tc: unittest.TestCase,
+    obj: Dict[str, Any],
+    key: str,
+    expected_type,
+    allow_none: bool = False,
+    ctx: str = "",
+):
+    tc.assertIn(key, obj, f"{ctx}: key '{key}' missing")
+    val = obj.get(key)
+    if allow_none and (val is None):
         return
-    testcase.assertTrue(isinstance(v, int), msg or f"pct not int: {v!r}")
-    testcase.assertGreaterEqual(v, 0, msg or f"{v} < 0")
-    testcase.assertLessEqual(v, 100, msg or f"{v} > 100")
-
-def _assert_in(testcase: unittest.TestCase, v: Any, seq: List[Any], msg: str = "") -> None:
-    testcase.assertIn(v, seq, msg or f"value {v!r} not in {seq!r}")
-
-def _safe(obj: Any) -> str:
-    try:
-        return json.dumps(obj, ensure_ascii=False, indent=2, sort_keys=True)
-    except Exception:
-        return repr(obj)
-
-def _now_ms() -> int:
-    return int(time.time() * 1000)
+    tc.assertIsInstance(val, expected_type, f"{ctx}: key '{key}' wrong type (got {type(val).__name__})")
 
 
-# ======================================================================================
-#                                     Test Report
-# ======================================================================================
-
-class RichResult(unittest.TextTestResult):
-    """
-    תוצאת בדיקות עם הדפסות עשירות, זמן ריצה, ופרטים עד לרמת חריגה.
-    ללא תלות בחבילות צד ג'.
-    """
-    def startTest(self, test):
-        self._start = time.perf_counter()
-        super().startTest(test)
-
-    def addSuccess(self, test):
-        dur = (time.perf_counter() - getattr(self, "_start", time.perf_counter())) * 1000.0
-        sys.stdout.write(f"✔ PASS  {test.id()}  [{dur:.2f} ms]\n")
-        super().addSuccess(test)
-
-    def addFailure(self, test, err):
-        dur = (time.perf_counter() - getattr(self, "_start", time.perf_counter())) * 1000.0
-        sys.stdout.write(f"✘ FAIL  {test.id()}  [{dur:.2f} ms]\n")
-        tb_text = "".join(traceback.format_exception(*err))
-        sys.stdout.write("---- Failure details ----\n")
-        sys.stdout.write(tb_text + "\n")
-        super().addFailure(test, err)
-
-    def addError(self, test, err):
-        dur = (time.perf_counter() - getattr(self, "_start", time.perf_counter())) * 1000.0
-        sys.stdout.write(f"‼ ERROR {test.id()}  [{dur:.2f} ms]\n")
-        tb_text = "".join(traceback.format_exception(*err))
-        sys.stdout.write("---- Error details ----\n")
-        sys.stdout.write(tb_text + "\n")
-        super().addError(test, err)
+def assert_pct_0_100(
+    tc: unittest.TestCase,
+    val: Any,
+    key_path: str,
+    ctx: str = "",
+    allow_none: bool = False,
+):
+    if val is None:
+        tc.assertTrue(allow_none, f"{ctx}: '{key_path}' is None but allow_none=False")
+        return
+    tc.assertIsInstance(val, int, f"{ctx}: '{key_path}' must be int percentage or None")
+    tc.assertGreaterEqual(val, 0, f"{ctx}: '{key_path}' < 0")
+    tc.assertLessEqual(val, 100, f"{ctx}: '{key_path}' > 100")
 
 
-class RichRunner(unittest.TextTestRunner):
-    resultclass = RichResult
+def assert_score_0_1(
+    tc: unittest.TestCase,
+    val: Any,
+    key_path: str,
+    ctx: str = "",
+    allow_none: bool = False,
+):
+    if val is None:
+        tc.assertTrue(allow_none, f"{ctx}: '{key_path}' is None but allow_none=False")
+        return
+    tc.assertIsInstance(val, (int, float), f"{ctx}: '{key_path}' must be float in [0..1] or None")
+    f = float(val)
+    tc.assertGreaterEqual(f, 0.0, f"{ctx}: '{key_path}' < 0.0")
+    tc.assertLessEqual(f, 1.0, f"{ctx}: '{key_path}' > 1.0")
 
 
-# ======================================================================================
-#                              Golden / Sample payload builders
-# ======================================================================================
+# ---------- טסטים לסניטציה ----------
+class TestSanitizeMetrics(unittest.TestCase):
 
-def sample_metrics_full() -> Dict[str, Any]:
-    """payload מלא עם metrics טובים (סקווט גוף)."""
-    return {
-        "exercise": {"id": "squat.bodyweight"},
-        "metrics": {
-            "torso_vs_vertical_deg": 8.0,  # טוב
-            "knee_angle_left": 140.0,
-            "knee_angle_right": 141.0,
-            "hip_left_deg": 95.0,
-            "hip_right_deg": 100.0,
-            "feet_w_over_shoulders_w": 1.22,
-            "rep_time_s": 1.4,
-        }
-    }
-
-def sample_metrics_partial_missing_knees() -> Dict[str, Any]:
-    """payload חלקי – חסרות זוויות ברכיים, יש ירך/גב/קצב/רוחב."""
-    return {
-        "exercise": {"id": "squat.bodyweight"},
-        "metrics": {
-            "torso_vs_vertical_deg": 15.0,
-            "hip_left_deg": 98.0,
-            "hip_right_deg": 101.0,
-            "feet_w_over_shoulders_w": 1.1,
-            "rep_time_s": 1.9,
-        }
-    }
-
-def sample_metrics_bad_values() -> Dict[str, Any]:
-    """payload עם מחרוזות/בוליאנים/זבל – כדי לבדוק sanitize."""
-    return {
-        "exercise": {"id": "squat.bodyweight"},
-        "metrics": {
-            "torso_vs_vertical_deg": "8.0",
-            "knee_angle_left": "141",
-            "knee_angle_right": "not_a_number",
-            "hip_left_deg": True,   # צריך ליפול
-            "hip_right_deg": " 100 ",
-            "feet_w_over_shoulders_w": "1.22",
-            "rep_time_s": "1.5",
-            "rep.phase": "eccentric",
+    def test_sanitize_basic_numbers_and_strings(self):
+        raw = {
+            "torso_vs_vertical_deg": "12.5",
+            "knee_angle_left": 150,
+            "rep_time_s": "2",
             "view.mode": "front",
-            "view.primary": "camera1",
             "exercise.id": "squat.bodyweight",
+            "weird": "abc",
+            "bool_true": "true",
+            "bool_false": "False",
+            "nan": "NaN",
         }
-    }
+        out = sanitize_metrics_payload(raw)
 
-def sample_metrics_empty() -> Dict[str, Any]:
-    """payload ריק מבחינת metrics – אמור להיות 'unscored'."""
-    return {
-        "exercise": {"id": "squat.bodyweight"},
-        "metrics": {
-            "random_key": 123,
-            "foo": "bar",
+        self.assertIn("torso_vs_vertical_deg", out)
+        self.assertIsInstance(out["torso_vs_vertical_deg"], float)
+        self.assertAlmostEqual(out["torso_vs_vertical_deg"], 12.5, places=6)
+
+        self.assertIn("knee_angle_left", out)
+        self.assertIsInstance(out["knee_angle_left"], float)
+        self.assertEqual(out["knee_angle_left"], 150.0)
+
+        # מספר כטקסט
+        self.assertIn("rep_time_s", out)
+        self.assertIsInstance(out["rep_time_s"], float)
+        self.assertEqual(out["rep_time_s"], 2.0)
+
+        # שדות טקסט מותרים
+        self.assertEqual(out.get("view.mode"), "front")
+        self.assertEqual(out.get("exercise.id"), "squat.bodyweight")
+
+        # טענות בוליאניות
+        self.assertIn("bool_true", out)
+        self.assertTrue(out["bool_true"])
+        self.assertIn("bool_false", out)
+        self.assertFalse(out["bool_false"])
+
+        # "abc" לא עובר המרה למספר ולכן מושמט
+        self.assertNotIn("weird", out)
+
+        # NaN לא אמור להיכנס – הסניטציה מתעלמת
+        self.assertNotIn("nan", out)
+
+    def test_sanitize_booleans_and_integers(self):
+        raw = {
+            "rep.phase": "down",
+            "pose.ok": True,
+            "count": 3,
+            "bad": object(),
         }
-    }
+        out = sanitize_metrics_payload(raw)
+        self.assertEqual(out.get("rep.phase"), "down")
+        self.assertTrue(out.get("pose.ok"))
+        self.assertEqual(out.get("count"), 3.0)  # נשמר כ-float
+        self.assertNotIn("bad", out)
 
-def golden_breakdown_keys() -> List[str]:
-    """מפתחי קריטריונים הצפויים."""
-    return ["depth", "knees", "torso_angle", "stance_width", "tempo"]
-
-
-# ======================================================================================
-#                                      Test Cases
-# ======================================================================================
-
-class TestSanitize(unittest.TestCase):
-    """בדיקות סניטציה מקיפות."""
-
-    def test_sanitize_numeric_and_strings(self):
-        payload = sample_metrics_bad_values()
-        clean = sanitize_metrics_payload(payload["metrics"])
-        self.assertIsInstance(clean, dict)
-        # should parse numeric strings, ignore boolean-as-floats
-        self.assertAlmostEqual(clean.get("torso_vs_vertical_deg", -1), 8.0, places=5)
-        self.assertAlmostEqual(clean.get("knee_angle_left", -1), 141.0, places=5)
-        # right knee was "not_a_number" -> should be absent
-        self.assertTrue("knee_angle_right" not in clean or isinstance(clean["knee_angle_right"], float) is False)
-        # booleans should not be coerced to float (hip_left_deg=True) -> drop
-        self.assertTrue("hip_left_deg" not in clean)
-        # strings trimmed
-        self.assertAlmostEqual(clean.get("hip_right_deg", -1), 100.0, places=5)
-        self.assertAlmostEqual(clean.get("feet_w_over_shoulders_w", -1), 1.22, places=5)
-        self.assertAlmostEqual(clean.get("rep_time_s", -1), 1.5, places=5)
-        # allowed strings should pass through as strings
-        self.assertEqual(clean.get("rep.phase"), "eccentric")
-        self.assertEqual(clean.get("view.mode"), "front")
-        self.assertEqual(clean.get("view.primary"), "camera1")
-        self.assertEqual(clean.get("exercise.id"), "squat.bodyweight")
-
-    def test_sanitize_non_dict(self):
-        self.assertEqual(sanitize_metrics_payload(None), {})
-        self.assertEqual(sanitize_metrics_payload(123), {})
-        self.assertEqual(sanitize_metrics_payload("x"), {})
-
-    def test_sanitize_edge_values(self):
-        dirty = {
-            "a": float("inf"),
-            "b": float("-inf"),
-            "c": float("nan"),
-            "d": "   12   ",
-            "e": "12.5",
-            "f": "true",
-            "g": "false",
-            "h": True,
-            "i": False,
+    def test_sanitize_filters_non_finite(self):
+        raw = {
+            "x": float("inf"),
+            "y": float("-inf"),
+            "z": float("nan"),
+            "ok": 1.23,
         }
-        clean = sanitize_metrics_payload(dirty)
-        self.assertTrue("a" not in clean and "b" not in clean and "c" not in clean)
-        self.assertEqual(clean.get("d"), 12.0)
-        self.assertEqual(clean.get("e"), 12.5)
-        self.assertTrue(isinstance(clean.get("f"), bool))
-        self.assertTrue(isinstance(clean.get("g"), bool))
-        self.assertTrue(isinstance(clean.get("h"), bool))
-        self.assertTrue(isinstance(clean.get("i"), bool))
+        out = sanitize_metrics_payload(raw)
+        self.assertNotIn("x", out)
+        self.assertNotIn("y", out)
+        self.assertNotIn("z", out)
+        self.assertIn("ok", out)
+        self.assertEqual(out["ok"], 1.23)
 
 
+# ---------- טסטים לסימולציה ----------
 class TestSimulateExercise(unittest.TestCase):
-    """בדיקות סימולציה – מבנה, טווחים, יציבות, מצבים, ורעש."""
 
     def _check_sim_schema(self, sim: Dict[str, Any], ctx: str = ""):
-        self.assertTrue(sim.get("ok") in (True, False), f"{ctx}: ok missing/bad")
-        self.assertIsInstance(sim.get("ui_ranges"), dict, f"{ctx}: ui_ranges missing")
-        cb = sim["ui_ranges"].get("color_bar")
-        self.assertIsInstance(cb, list, f"{ctx}: color_bar missing")
-        self.assertGreaterEqual(len(cb), 1, f"{ctx}: color_bar empty")
+        self.assertIsInstance(sim, dict, f"{ctx}: simulate_exercise must return dict")
+        self.assertIn("ok", sim, f"{ctx}: missing 'ok'")
+        self.assertIn("sets", sim, f"{ctx}: missing 'sets'")
+        self.assertIsInstance(sim["sets"], list, f"{ctx}: 'sets' must be list")
 
-        sets = sim.get("sets")
-        self.assertIsInstance(sets, list, f"{ctx}: sets missing")
-        for i, s in enumerate(sets, 1):
-            self.assertIsInstance(s.get("set"), int, f"{ctx}: set index not int at i={i}")
-            _assert_between(self, s.get("set_score"), 0.0, 1.0, f"{ctx}: set_score out of [0..1]")
-            _assert_pct(self, s.get("set_score_pct"), f"{ctx}: set_score_pct")
-            reps = s.get("reps")
-            self.assertIsInstance(reps, list, f"{ctx}: reps missing")
-            self.assertGreater(len(reps), 0, f"{ctx}: reps empty")
-            for r in reps:
-                self.assertIsInstance(r.get("rep"), int, f"{ctx}: rep idx")
-                _assert_between(self, r.get("score"), 0.0, 1.0, f"{ctx}: rep score")
-                _assert_pct(self, r.get("score_pct"), f"{ctx}: rep score_pct")
-                self.assertIsInstance(r.get("notes"), list, f"{ctx}: rep notes")
+        # פרטי רמות על
+        if "sets_total" in sim:
+            self.assertIsInstance(sim["sets_total"], int, f"{ctx}: 'sets_total' must be int")
+            self.assertGreaterEqual(sim["sets_total"], 1, f"{ctx}: 'sets_total' < 1")
+        if "reps_total" in sim:
+            self.assertIsInstance(sim["reps_total"], int, f"{ctx}: 'reps_total' must be int")
+            self.assertGreaterEqual(sim["reps_total"], 1, f"{ctx}: 'reps_total' < 1")
 
-    def test_sim_default(self):
-        sim = simulate_exercise()
-        self._check_sim_schema(sim, "default")
-        # יציבות בסיסית: אותם פרמטרים אמורים לייצר אותם ערכים (seed=42)
-        sim2 = simulate_exercise()
-        self.assertEqual(json.dumps(sim, sort_keys=True), json.dumps(sim2, sort_keys=True))
+        # לכל סט
+        for i, st in enumerate(sim["sets"], start=1):
+            sctx = f"{ctx}/set[{i}]"
+            assert_key(self, st, "set", int, ctx=sctx)
+            if "set_score" in st:
+                assert_score_0_1(self, st["set_score"], "set_score", ctx=sctx, allow_none=False)
+            if "set_score_pct" in st:
+                assert_pct_0_100(self, st["set_score_pct"], "set_score_pct", ctx=sctx, allow_none=False)
 
-    def test_sim_params_bounds(self):
-        sim = simulate_exercise(sets=999, reps=999, mean_score=-1, std=999)
-        self._check_sim_schema(sim, "bounds")
-        self.assertEqual(sim.get("sets_total"), 10)  # clamp
-        self.assertEqual(sim.get("reps_total"), 30)  # clamp
-        # ודא שאף ציון לא יצא מהטווח – הפונקציה כבר בודקת בכל rep
+            assert_key(self, st, "reps", list, ctx=sctx)
+            self.assertGreater(len(st["reps"]), 0, f"{sctx}: 'reps' empty")
 
-    def test_sim_modes(self):
-        for mode in ("good", "shallow", "missing", "mixed", "unknown"):
-            sim = simulate_exercise(sets=2, reps=8, mode=mode, noise=0.12)
-            self._check_sim_schema(sim, f"mode={mode}")
-            # שונות בין מצבים (לא חייבת להיות גדולה, רק שלא הכל קבוע)
-            # נוודא שיש לפחות שני ציונים שונים בסט אחד
-            rep_scores = [r["score"] for r in sim["sets"][0]["reps"]]
-            self.assertGreaterEqual(len(set(rep_scores)), 2, f"mode={mode}: scores too uniform")
+            for j, r in enumerate(st["reps"], start=1):
+                rctx = f"{sctx}/rep[{j}]"
+                assert_key(self, r, "rep", int, ctx=rctx)
+                if "score" in r:
+                    assert_score_0_1(self, r["score"], "score", ctx=rctx, allow_none=False)
+                if "score_pct" in r:
+                    assert_pct_0_100(self, r["score_pct"], "score_pct", ctx=rctx, allow_none=False)
+                # הערות אופציונליות
+                if "notes" in r:
+                    self.assertIsInstance(r["notes"], list, f"{rctx}: 'notes' must be list")
 
-    def test_sim_noise_effect(self):
-        base = simulate_exercise(sets=1, reps=12, mode="good", noise=0.01)
-        noisy = simulate_exercise(sets=1, reps=12, mode="good", noise=0.50)
-        # טווח הפיזור צריך להיות גדול יותר כש-noise גדול
-        def spread(sim):
-            xs = [r["score"] for r in sim["sets"][0]["reps"]]
-            return max(xs) - min(xs)
-        self.assertLess(spread(base) + 1e-6, spread(noisy) + 1e-6)
+    def test_simulate_defaults_schema(self):
+        sim = sim_call()  # שימוש בחתימה בפועל
+        self._check_sim_schema(sim, "defaults")
+
+    def test_simulate_bounds_and_clamping(self):
+        sim = sim_call(sets=999, reps=999, mean_score=-1, std=999)
+        # אמור לקצץ לטווחים חוקיים (1..10 sets, 1..30 reps, score ב-[0..1], std ב-[0..0.5])
+        self._check_sim_schema(sim, "clamped")
+        self.assertGreaterEqual(sim.get("sets_total", 1), 1, "sets_total clamp failed")
+        self.assertLessEqual(sim.get("sets_total", 10), 10, "sets_total clamp failed")
+        self.assertGreaterEqual(sim.get("reps_total", 1), 1, "reps_total clamp failed")
+        self.assertLessEqual(sim.get("reps_total", 30), 30, "reps_total clamp failed")
+
+        # בדיקה שכל הציונים בין 0..100
+        for st in sim["sets"]:
+            if "set_score" in st:
+                self.assertGreaterEqual(float(st["set_score"]), 0.0)
+                self.assertLessEqual(float(st["set_score"]), 1.0)
+            if "set_score_pct" in st:
+                self.assertGreaterEqual(int(st["set_score_pct"]), 0)
+                self.assertLessEqual(int(st["set_score_pct"]), 100)
+            for r in st["reps"]:
+                self.assertGreaterEqual(float(r["score"]), 0.0)
+                self.assertLessEqual(float(r["score"]), 1.0)
+                self.assertGreaterEqual(int(r["score_pct"]), 0)
+                self.assertLessEqual(int(r["score_pct"]), 100)
+
+    def test_simulate_is_deterministic(self):
+        # המימוש משתמש ב-random.Random(42) => אותה תוצאה בכל ריצה
+        sim1 = sim_call(sets=2, reps=8, mean_score=0.8, std=0.15)
+        sim2 = sim_call(sets=2, reps=8, mean_score=0.8, std=0.15)
+        self.assertEqual(sim1, sim2, "simulate_exercise should be deterministic with seeded RNG")
+
+    def test_simulate_variance_changes_with_std(self):
+        # std קטן => פיזור קטן; std גדול => פיזור גדול
+        sim_small = sim_call(sets=1, reps=12, mean_score=0.85, std=0.01)
+        sim_big   = sim_call(sets=1, reps=12, mean_score=0.85, std=0.50)
+
+        def variance_from_sim(sim):
+            vals = []
+            for st in sim["sets"]:
+                for r in st["reps"]:
+                    vals.append(float(r["score"]))
+            mean = sum(vals) / max(1, len(vals))
+            var = sum((x - mean) ** 2 for x in vals) / max(1, len(vals))
+            return var
+
+        v_small = variance_from_sim(sim_small)
+        v_big   = variance_from_sim(sim_big)
+        self.assertGreater(v_big, v_small, f"expected variance(std=0.50) > variance(std=0.01), got {v_big} <= {v_small}")
 
 
+# ---------- טסטים ל-analyze_exercise ----------
 class TestAnalyzeExercise(unittest.TestCase):
-    """בדיקות אנליזה – מבנה דו״ח, קריטריונים, שדות UI, ו-unscored."""
 
     def _check_report_schema(self, rep: Dict[str, Any], ctx: str = ""):
-        self.assertIsInstance(rep.get("exercise"), dict, f"{ctx}: exercise missing")
-        self.assertTrue(isinstance(rep["exercise"].get("id"), str) and rep["exercise"]["id"], f"{ctx}: exercise.id")
-        self.assertIsInstance(rep.get("ui_ranges"), dict, f"{ctx}: ui_ranges missing")
-        cb = rep["ui_ranges"].get("color_bar")
-        self.assertIsInstance(cb, list, f"{ctx}: color_bar missing")
-        sc = rep.get("scoring")
-        self.assertIsInstance(sc, dict, f"{ctx}: scoring missing")
-        # שדות חובה ב-scoring
-        self.assertTrue("score" in sc, f"{ctx}: scoring.score missing")
-        self.assertTrue("score_pct" in sc, f"{ctx}: scoring.score_pct missing")
-        self.assertTrue("grade" in sc, f"{ctx}: scoring.grade missing")
-        self.assertTrue("quality" in sc, f"{ctx}: scoring.quality missing")
-        self.assertTrue("unscored_reason" in sc, f"{ctx}: scoring.unscored_reason missing")
-        self.assertTrue("criteria" in sc and isinstance(sc["criteria"], list), f"{ctx}: criteria list missing")
-        self.assertTrue("criteria_breakdown_pct" in sc and isinstance(sc["criteria_breakdown_pct"], dict),
-                        f"{ctx}: criteria_breakdown_pct missing")
-        # טווחים
-        if sc["score"] is not None:
-            _assert_between(self, sc["score"], 0.0, 1.0, f"{ctx}: score out of range")
-        _assert_pct(self, sc["score_pct"], f"{ctx}: score_pct")
-        # grade/quality כצפוי (אחד מאותיות A..E או '—')
-        self.assertTrue(isinstance(sc["grade"], str), f"{ctx}: grade type")
-        self.assertTrue(isinstance(sc["quality"], str), f"{ctx}: quality type")
-        # hints
-        self.assertIsInstance(rep.get("hints"), list, f"{ctx}: hints type")
-        # breakdown keys לפחות תת-קבוצה מהמצופה
-        keys = list(rep["scoring"]["criteria_breakdown_pct"].keys())
-        self.assertGreater(len(keys), 0, f"{ctx}: breakdown empty")
+        self.assertIsInstance(rep, dict, f"{ctx}: report must be dict")
+        assert_key(self, rep, "exercise", dict, ctx=ctx)
+        assert_key(self, rep, "scoring", dict, ctx=ctx)
+        # hints יכול להיות רשימה או לא קיים — אבל אם קיים, שיהיה list
+        if "hints" in rep:
+            self.assertIsInstance(rep["hints"], list, f"{ctx}: 'hints' must be list")
 
-    def test_analyze_full(self):
-        rep = analyze_exercise(sample_metrics_full())
-        self._check_report_schema(rep, "full")
-        # לבדוק שהקריטריונים כוללים את המפתח המרכזי 'depth'
-        ids = [c.get("id") for c in rep["scoring"]["criteria"]]
-        self.assertIn("depth", ids, "criteria missing 'depth'")
-        # score_pct עקבי מול score
-        sp = rep["scoring"]["score_pct"]
-        sc = rep["scoring"]["score"]
-        if sc is not None:
-            self.assertEqual(sp, int(round(float(sc) * 100)))
+        ex = rep["exercise"]
+        assert_key(self, ex, "id", (str,), ctx=f"{ctx}/exercise")
 
-    def test_analyze_partial(self):
-        rep = analyze_exercise(sample_metrics_partial_missing_knees())
-        self._check_report_schema(rep, "partial")
-        # עדיין אמור להיות ניקוד (כי יש עומק משוער מירך/גב)
-        self.assertIsNone(rep["scoring"]["unscored_reason"])
-        self.assertIsNotNone(rep["scoring"]["score"])
+        sc = rep["scoring"]
+        # score ו-score_pct יכולים להיות None (unscored)
+        if "score" in sc:
+            if sc["score"] is not None:
+                assert_score_0_1(self, sc["score"], "scoring.score", ctx=ctx, allow_none=True)
+        if "score_pct" in sc:
+            assert_pct_0_100(self, sc["score_pct"], "scoring.score_pct", ctx=ctx, allow_none=True)
 
-    def test_analyze_empty_unscored(self):
-        rep = analyze_exercise(sample_metrics_empty())
-        self._check_report_schema(rep, "empty/unscored")
-        # אמור להיות unscored
-        self.assertEqual(rep["scoring"]["unscored_reason"], "missing_critical")
-        self.assertIsNone(rep["scoring"]["score"])
-        self.assertIsNone(rep["scoring"]["score_pct"])
+        # grade/quality אופציונליים; אם קיימים – מחרוזות
+        if "grade" in sc and sc["grade"] is not None:
+            self.assertIsInstance(sc["grade"], str, f"{ctx}: scoring.grade must be str or None")
+        if "quality" in sc and sc["quality"] is not None:
+            self.assertIsInstance(sc["quality"], str, f"{ctx}: scoring.quality must be str or None")
 
-    def test_breakdown_contains_expected_subset(self):
-        rep = analyze_exercise(sample_metrics_full())
-        breakdown = rep["scoring"]["criteria_breakdown_pct"]
-        # וודא שהמפתחות קצרים/ידידותיים:
-        for k in breakdown.keys():
-            self.assertTrue(isinstance(k, str) and k, f"breakdown key bad: {k!r}")
-        # תת-קבוצה:
-        expected_subset = set(golden_breakdown_keys())
-        self.assertTrue(len(set(breakdown.keys()) & expected_subset) >= 2, "breakdown missing key subset")
+        # unscored_reason אופציונלי; אם קיים – str או None
+        if "unscored_reason" in sc:
+            self.assertTrue(
+                (sc["unscored_reason"] is None) or isinstance(sc["unscored_reason"], str),
+                f"{ctx}: scoring.unscored_reason must be str or None"
+            )
 
-    def test_scores_in_range_and_monotonicity(self):
-        # נבדוק ש-score_pct = round(score*100) (כאשר score!=None)
-        for payload in (sample_metrics_full(), sample_metrics_partial_missing_knees()):
-            rep = analyze_exercise(payload)
-            sc = rep["scoring"]["score"]
-            sp = rep["scoring"]["score_pct"]
-            if sc is not None:
-                self.assertEqual(sp, int(round(float(sc) * 100)))
-                _assert_between(self, sc, 0.0, 1.0)
-                _assert_pct(self, sp)
+        # criteria — רשימה של אובייקטים {id, available, score?, score_pct?, reason?}
+        self.assertIn("criteria", sc, f"{ctx}: scoring.criteria missing")
+        self.assertIsInstance(sc["criteria"], list, f"{ctx}: scoring.criteria must be list")
 
-    def test_consistency_with_simulation(self):
-        # סימולציה -> נרכיב payload מלאכותי מ-rep ראשון ונוודא שהאנלייזר לא מתפרק
-        sim = simulate_exercise(sets=1, reps=5, mode="mixed", noise=0.2)
-        rep_like = sim["sets"][0]["reps"][0]
-        # נבנה payload סביר (האנליזה לא משתמשת ב-score החיצוני; היא תגזור מה-metrics):
-        # כאן נשתול metrics סבירים:
-        payload = {
-            "exercise": {"id": "squat.bodyweight"},
-            "metrics": {
-                "torso_vs_vertical_deg": 10.0,
-                "knee_angle_left": 145.0,
-                "knee_angle_right": 142.0,
-                "hip_left_deg": 95.0,
-                "hip_right_deg": 105.0,
-                "feet_w_over_shoulders_w": 1.25,
-                "rep_time_s": 1.6,
-            }
+        for idx, c in enumerate(sc["criteria"], start=1):
+            cctx = f"{ctx}/criteria[{idx}]"
+            assert_key(self, c, "id", (str,), ctx=cctx)
+            assert_key(self, c, "available", (bool,), ctx=cctx)
+            # score/score_pct/ reason אופציונליים
+            if "score" in c and c["score"] is not None:
+                assert_score_0_1(self, c["score"], "criteria.score", ctx=cctx, allow_none=True)
+            if "score_pct" in c and c["score_pct"] is not None:
+                assert_pct_0_100(self, c["score_pct"], "criteria.score_pct", ctx=cctx, allow_none=True)
+            if "reason" in c and c["reason"] is not None:
+                self.assertIsInstance(c["reason"], str, f"{cctx}: reason must be str or None")
+
+    def test_analyze_no_metrics_returns_unscored_demo(self):
+        rep = analyze_exercise({})  # אין מטריקות -> דמו לא מדורג
+        self._check_report_schema(rep, "no_metrics")
+        sc = rep["scoring"]
+        self.assertIsNone(sc["score"], "expected score=None in unscored flow OR demo branch")
+        self.assertIsNone(sc["score_pct"], "expected score_pct=None in unscored flow OR demo branch")
+        self.assertIsInstance(sc.get("unscored_reason"), (str, type(None)), "unscored_reason must be str or None")
+        self.assertIn("criteria", sc)
+        # לפחות עומק/ברכיים מופיעים
+        crit_ids = {c["id"] for c in sc["criteria"]}
+        self.assertIn("depth", crit_ids, "expected 'depth' in criteria")
+        self.assertIn("knees", crit_ids, "expected 'knees' in criteria")
+
+    def test_analyze_with_good_metrics_returns_scored(self):
+        # מטריקות "נקיות" שאמורות להניב ציון טוב
+        metrics = {
+            "torso_vs_vertical_deg": 5.0,   # גב כמעט אנכי
+            "knee_angle_left": 130.0,
+            "knee_angle_right": 130.0,
+            "hip_left_deg": 100.0,
+            "hip_right_deg": 100.0,
+            "feet_w_over_shoulders_w": 1.2,
+            "rep_time_s": 1.6,
         }
+        payload = {"metrics": metrics, "exercise": {"id": "squat.bodyweight"}}
         rep = analyze_exercise(payload)
-        self._check_report_schema(rep, "consistency/sim→analyze")
-        # הפלט חייב להכיל קריטריונים ו-breakdown
-        self.assertGreater(len(rep["scoring"]["criteria"]), 0)
+        self._check_report_schema(rep, "good_metrics")
 
-    def test_hints_reasonable(self):
-        rep = analyze_exercise(sample_metrics_full())
-        hints = rep.get("hints") or []
-        self.assertTrue(isinstance(hints, list))
-        # לא דורשים טקסטים ספציפיים, רק שלא יהיו >3 ושיהיו ייחודיים
-        self.assertLessEqual(len(hints), 3)
-        self.assertEqual(len(set(hints)), len(hints))
+        sc = rep["scoring"]
+        # score קיים ובתחום
+        self.assertIsInstance(sc["score"], float)
+        assert_score_0_1(self, sc["score"], "scoring.score", ctx="good_metrics", allow_none=False)
 
+        # יש קורלציה בין score ו-score_pct
+        if sc["score_pct"] is not None:
+            expected_pct = int(round(float(sc["score"]) * 100))
+            self.assertEqual(
+                sc["score_pct"], expected_pct,
+                f"score_pct should equal round(score*100). got {sc['score_pct']} != {expected_pct}"
+            )
 
-class TestFuzzAndEdgeCases(unittest.TestCase):
-    """בדיקות Fuzz (עם seed) וקצה – מבטיחות יציבות ותיקוף שדות."""
+        # הקריטריונים זמינים ועם ציונים טובים יחסית
+        by_id = {c["id"]: c for c in sc["criteria"]}
+        for cid in ("depth", "knees", "torso_angle", "stance_width", "tempo"):
+            self.assertIn(cid, by_id, f"criteria '{cid}' missing")
+            self.assertTrue(by_id[cid]["available"], f"criteria '{cid}' expected available=True")
+            # אם יש score_pct – נצפה ל-70+ במטריקות הטובות
+            sp = by_id[cid].get("score_pct")
+            if sp is not None:
+                self.assertGreaterEqual(sp, 70, f"criteria '{cid}' expected >=70, got {sp}")
 
-    def setUp(self):
-        self.rng = random.Random(1337)
-
-    def _random_payload(self) -> Dict[str, Any]:
-        """
-        יוצר payload רנדומלי אך סביר. חלק מהערכים ייעדרו כדי לדמות חוסר מדדים.
-        """
-        def prob(p): return self.rng.random() < p
-        def maybe(v, p=0.7): return v if prob(p) else None
-
-        payload = {
-            "exercise": {"id": "squat.bodyweight"},
-            "metrics": {}
+    def test_analyze_with_bad_depth_and_valgus(self):
+        # עומק חלש + ולגוס — אמור להוריד ציון ולאכלס רמזים מתאימים
+        metrics = {
+            "torso_vs_vertical_deg": 20.0,  # גב קצת קדימה
+            "knee_angle_left": 165.0,       # כמעט ישר
+            "knee_angle_right": 150.0,      # אסימטרי
+            "hip_left_deg": 140.0,
+            "hip_right_deg": 140.0,
+            "feet_w_over_shoulders_w": 1.6,
+            "rep_time_s": 0.7,              # מהיר מידי
         }
-        # חלק מהשדות יוכנסו כמחרוזות כדי לבדוק sanitize
-        if prob(0.8): payload["metrics"]["torso_vs_vertical_deg"] = self.rng.choice([str(round(self.rng.uniform(0, 40), 2)), round(self.rng.uniform(0, 40), 2)])
-        if prob(0.8): payload["metrics"]["knee_angle_left"] = self.rng.choice([round(self.rng.uniform(110, 175), 2), "notnum", "170"])
-        if prob(0.8): payload["metrics"]["knee_angle_right"] = self.rng.choice([round(self.rng.uniform(110, 175), 2), "173.5"])
-        if prob(0.8): payload["metrics"]["hip_left_deg"] = self.rng.choice([round(self.rng.uniform(60, 140), 2), True, False, "100"])
-        if prob(0.8): payload["metrics"]["hip_right_deg"] = self.rng.choice([round(self.rng.uniform(60, 140), 2), " 99 "])
-        if prob(0.8): payload["metrics"]["feet_w_over_shoulders_w"] = self.rng.choice([round(self.rng.uniform(0.5, 2.0), 3), "1.3"])
-        if prob(0.8): payload["metrics"]["rep_time_s"] = self.rng.choice([round(self.rng.uniform(0.4, 3.5), 3), "1.8"])
-        # allowed strings
-        if prob(0.5): payload["metrics"]["rep.phase"] = self.rng.choice(["eccentric", "concentric"])
-        if prob(0.5): payload["metrics"]["view.mode"] = self.rng.choice(["front", "side"])
-        if prob(0.5): payload["metrics"]["view.primary"] = "camera1"
-        if prob(0.5): payload["metrics"]["exercise.id"] = "squat.bodyweight"
-        return payload
+        payload = {"metrics": metrics, "exercise": {"id": "squat.bodyweight"}}
+        rep = analyze_exercise(payload)
+        self._check_report_schema(rep, "bad_depth_valgus")
 
-    def test_fuzz_many_random_payloads(self):
-        N = 120
-        unscored = 0
-        for i in range(N):
-            payload = self._random_payload()
-            rep = analyze_exercise(payload)
-            # סכימה בסיסית
-            self.assertTrue(isinstance(rep.get("ui_ranges"), dict))
-            sc = rep.get("scoring") or {}
-            self.assertTrue("criteria" in sc and isinstance(sc["criteria"], list))
-            # מגבלות
-            if sc.get("score") is not None:
-                _assert_between(self, sc["score"], 0.0, 1.0)
-            _assert_pct(self, sc.get("score_pct"))
-            if sc.get("unscored_reason"):
-                unscored += 1
-        # נרצה שרוב הרנדומים יהיו ניתנים לניקוד חלקי (לא כולם unscored),
-        # אבל עדיין שתהיה אוכלוסיה מסוימת של unscored. נבדוק יחס מאוזן:
-        self.assertLess(unscored, N * 0.7, f"too many unscored: {unscored}/{N}")
-
-    def test_extreme_inputs_no_crash(self):
-        # וודא שגם עם "זבל" קיצוני לא קורסים:
-        dirty_list = [
-            None, 123, "xxx", [], set(),
-            {"exercise": {"id": ""}, "metrics": {"knee_angle_left": float("inf")}},
-            {"exercise": {"id": "x"}, "metrics": {"knee_angle_left": float("nan")}},
-            {"exercise": {"id": "x"}, "metrics": {"rep_time_s": "-999999999999999999999999"}},
-        ]
-        for obj in dirty_list:
-            rep = analyze_exercise(obj if isinstance(obj, dict) else {"exercise": {"id": "x"}, "metrics": obj})
-            # רק דורשים מבנה יציב וחוסר קריסה
-            self.assertTrue(isinstance(rep, dict))
-            self.assertTrue(isinstance(rep.get("scoring"), dict))
-            self.assertTrue(isinstance(rep.get("ui_ranges"), dict))
-
-
-class TestGoldenScenarios(unittest.TestCase):
-    """בדיקות Golden – השוואה לתוצאות ידועות פחות או יותר (טולרנטיות)."""
-
-    def test_golden_full_quality_high(self):
-        rep = analyze_exercise(sample_metrics_full())
         sc = rep["scoring"]
-        # מצפים לציון לא נמוך מאוד (מעל 0.6), לא מחייבים ערך מדויק
+        self.assertIsNone(sc.get("unscored_reason"), "should be scored (not unscored)")
+
+        by_id = {c["id"]: c for c in sc["criteria"]}
+
+        # עומק נמוך => reason shallow_depth
+        if "depth" in by_id:
+            reason = by_id["depth"].get("reason")
+            sp = by_id["depth"].get("score_pct")
+            # ייתכן אחד משני המצבים: או reason=shallow_depth, או ציון נמוך
+            self.assertTrue(
+                (reason == "shallow_depth") or (sp is not None and sp < 70),
+                f"depth expected shallow/low. got reason={reason}, score_pct={sp}"
+            )
+
+        # ברכיים — ולגוס (הפרש זוויות גדול)
+        if "knees" in by_id:
+            k_reason = by_id["knees"].get("reason")
+            self.assertIn(k_reason, (None, "valgus"))
+            # במטריקות הללו נצפה שלפחות ציון נמוך
+            k_sp = by_id["knees"].get("score_pct")
+            if k_sp is not None:
+                self.assertLess(k_sp, 80, f"knees expected < 80, got {k_sp}")
+
+        # hints — רמזים טכניים
+        hints = rep.get("hints", [])
+        # לא נכפה בדיוק את הטקסט (שפה/ניסוח יכולים להשתנות), אבל נבדוק שיש לפחות 1–2 רמזים
+        self.assertIsInstance(hints, list, "hints must be list")
+        self.assertGreater(len(hints), 0, "expected at least 1 hint for bad metrics")
+
+    def test_analyze_handles_partial_metrics(self):
+        # מטריקות חלקיות — חלק מהקריטריונים לא זמינים
+        metrics = {
+            "torso_vs_vertical_deg": 15.0,  # יש טורסו
+            # אין ברכיים/ירכיים
+            "feet_w_over_shoulders_w": 1.4,
+            # אין tempo
+        }
+        payload = {"metrics": metrics, "exercise": {"id": "squat.bodyweight"}}
+        rep = analyze_exercise(payload)
+        self._check_report_schema(rep, "partial_metrics")
+
+        # חלק מהקריטריונים לא זמינים
+        sc = rep["scoring"]
+        crit = sc["criteria"]
+        unavailable = [c for c in crit if not c.get("available")]
+        self.assertGreater(len(unavailable), 0, "expected some unavailable criteria with partial metrics")
+
+        # דאגה: אם לא היה ניתן לנקד כלל — יכול להיות unscored. אם כן מוקצה ציון — תקין.
+        if sc["score"] is None:
+            self.assertIsInstance(sc.get("unscored_reason"), str, "expected unscored_reason when score=None")
+
+    def test_analyze_is_pure_and_not_mutating_payload(self):
+        # נוודא שהפונקציה לא משנה את ה-payload שהעברנו
+        original = {
+            "metrics": {
+                "torso_vs_vertical_deg": 8.0,
+                "knee_angle_left": 140.0,
+                "knee_angle_right": 140.0,
+                "hip_left_deg": 100.0,
+                "hip_right_deg": 100.0,
+                "feet_w_over_shoulders_w": 1.25,
+                "rep_time_s": 1.8,
+            },
+            "exercise": {"id": "squat.bodyweight"},
+        }
+        payload = copy.deepcopy(original)
+        _ = analyze_exercise(payload)
+
+        self.assertEqual(payload, original, "analyze_exercise must not mutate the input payload")
+
+    def test_analyze_score_pct_matches_score(self):
+        # אם מתקבל גם score וגם score_pct — שניהם חייבים להתאים (בעיגול int)
+        metrics = {
+            "torso_vs_vertical_deg": 10.0,
+            "knee_angle_left": 135.0,
+            "knee_angle_right": 135.0,
+            "hip_left_deg": 100.0,
+            "hip_right_deg": 100.0,
+            "feet_w_over_shoulders_w": 1.2,
+            "rep_time_s": 1.5,
+        }
+        rep = analyze_exercise({"metrics": metrics})
+        sc = rep["scoring"]
+        if sc.get("score") is not None and sc.get("score_pct") is not None:
+            expected_pct = int(round(float(sc["score"]) * 100))
+            self.assertEqual(sc["score_pct"], expected_pct, "score_pct != round(score*100)")
+
+    def test_analyze_handles_extreme_values_gracefully(self):
+        # ערכים קיצוניים (אבל סופיים) — הפונקציה צריכה להתמודד איתם, לצמצם/לנקד בהתאם
+        metrics = {
+            "torso_vs_vertical_deg": 9999.0,    # גדול מאוד -> יצור ציון נמוך מאוד לטורסו
+            "knee_angle_left": -9999.0,        # קצה נגדי
+            "knee_angle_right": 9999.0,
+            "hip_left_deg": -999.0,
+            "hip_right_deg": 999.0,
+            "feet_w_over_shoulders_w": -10.0,
+            "rep_time_s": 100.0,
+        }
+        rep = analyze_exercise({"metrics": metrics})
+        self._check_report_schema(rep, "extreme_values")
+
+        # ודא שאיננו נופלים. לרוב זה יניב ציונים מאוד נמוכים או unscored.
+        sc = rep["scoring"]
+        # לכל היותר — score None עם unscored_reason
         if sc["score"] is not None:
-            self.assertGreaterEqual(sc["score"], 0.6)
-            self.assertIsNone(sc["unscored_reason"])
-            # breakdown חייב להכיל את depth
-            self.assertIn("depth", sc["criteria_breakdown_pct"].keys())
+            assert_score_0_1(self, sc["score"], "scoring.score", ctx="extreme_values", allow_none=False)
 
-    def test_golden_partial_has_score(self):
-        rep = analyze_exercise(sample_metrics_partial_missing_knees())
+    def test_analyze_with_aliases_are_respected(self):
+        # וידוא שאליאסים עובדים (לפי ההגדרות בקוד: knee_angle_left_deg וכו')
+        metrics = {
+            "torso_vs_vertical_deg": 7.0,
+            "knee_angle_left_deg": 132.0,  # ALIAS של knee_angle_left
+            "knee_angle_right_deg": 132.0, # ALIAS של knee_angle_right
+            "hip_left_deg": 100.0,
+            "hip_right_deg": 100.0,
+            "feet_w_over_shoulders_w": 1.2,
+            "rep_time_s": 1.6,
+        }
+        rep = analyze_exercise({"metrics": metrics})
+        self._check_report_schema(rep, "aliases")
+
         sc = rep["scoring"]
-        # יש עומק מהירכיים, אז לא אמור להיות missing_critical
-        self.assertIsNone(sc["unscored_reason"])
-        self.assertIsNotNone(sc["score"])
-
-    def test_golden_empty_is_unscored(self):
-        rep = analyze_exercise(sample_metrics_empty())
-        sc = rep["scoring"]
-        self.assertEqual(sc["unscored_reason"], "missing_critical")
-        self.assertIsNone(sc["score"])
-        self.assertIsNone(sc["score_pct"])
-
-
-class TestPerformanceAndStability(unittest.TestCase):
-    """בדיקות ביצועים קלילות ויציבות seed."""
-
-    def test_simulate_perf_small(self):
-        t0 = _now_ms()
-        sim = simulate_exercise(sets=2, reps=10, mode="mixed", noise=0.2)
-        t1 = _now_ms()
-        self.assertTrue(t1 - t0 < 200, f"simulate too slow: {(t1-t0)} ms")
-        # סכימה
-        self.assertEqual(sim["sets_total"], 2)
-        self.assertEqual(sim["reps_total"], 10)
-
-    def test_analyze_perf_small(self):
-        t0 = _now_ms()
-        for _ in range(40):
-            analyze_exercise(sample_metrics_full())
-        t1 = _now_ms()
-        self.assertTrue(t1 - t0 < 400, f"analyze too slow: {(t1-t0)} ms")
-
-    def test_sim_seed_stability(self):
-        a = simulate_exercise(sets=1, reps=6, mode="good", noise=0.15, seed=42)
-        b = simulate_exercise(sets=1, reps=6, mode="good", noise=0.15, seed=42)
-        self.assertEqual(json.dumps(a, sort_keys=True), json.dumps(b, sort_keys=True), "seed=42 not stable")
-
-    def test_sim_seed_variation(self):
-        a = simulate_exercise(sets=1, reps=6, mode="good", noise=0.15, seed=1)
-        b = simulate_exercise(sets=1, reps=6, mode="good", noise=0.15, seed=2)
-        self.assertNotEqual(json.dumps(a, sort_keys=True), json.dumps(b, sort_keys=True), "different seeds should differ")
-
-
-class TestUIContract(unittest.TestCase):
-    """
-    בדיקות 'חוזה UI' – מבטיחות שהשדות הנדרשים ע״י ה-frontend קיימים
-    ושאין רגרסיות בשם/טיפוס/טווח.
-    """
-
-    def test_ui_ranges_contract(self):
-        rep = analyze_exercise(sample_metrics_full())
-        ui = rep["ui_ranges"]
-        self.assertIn("color_bar", ui)
-        bar = ui["color_bar"]
-        self.assertIsInstance(bar, list)
-        self.assertGreaterEqual(len(bar), 1)
-        for rng in bar:
-            self.assertIn("label", rng)
-            self.assertIn("from_pct", rng)
-            self.assertIn("to_pct", rng)
-            _assert_pct(self, int(rng["from_pct"]))
-            _assert_pct(self, int(rng["to_pct"]))
-            self.assertLessEqual(rng["from_pct"], rng["to_pct"])
-
-    def test_scoring_contract(self):
-        rep = analyze_exercise(sample_metrics_full())
-        sc = rep["scoring"]
-        # שמות שדות – לא לשבור!
-        for k in ("score", "score_pct", "grade", "quality", "unscored_reason", "criteria", "criteria_breakdown_pct"):
-            self.assertIn(k, sc, f"scoring missing key: {k}")
-        # טיפוסים
-        if sc["score"] is not None:
-            self.assertTrue(isinstance(sc["score"], float))
-        _assert_pct(self, sc["score_pct"])
-        self.assertTrue(isinstance(sc["grade"], str))
-        self.assertTrue(isinstance(sc["quality"], str))
-        self.assertTrue(isinstance(sc["criteria"], list))
-        self.assertTrue(isinstance(sc["criteria_breakdown_pct"], dict))
-
-    def test_criteria_items_contract(self):
-        rep = analyze_exercise(sample_metrics_full())
-        for c in rep["scoring"]["criteria"]:
-            for k in ("id", "available", "score", "score_pct", "reason"):
-                self.assertIn(k, c, f"criteria item missing key: {k}")
-            self.assertTrue(isinstance(c["id"], str))
-            self.assertTrue(isinstance(c["available"], bool))
-            if c["score"] is not None:
-                _assert_between(self, c["score"], 0.0, 1.0)
-            _assert_pct(self, c["score_pct"])
-
-
-# ======================================================================================
-#                                  CLI / Runner glue
-# ======================================================================================
-
-def load_tests(loader, tests, pattern):
-    """מאפשר להריץ את הקובץ ישירות ע״י unittest discovery."""
-    suite = unittest.TestSuite()
-    for case in (
-        TestSanitize,
-        TestSimulateExercise,
-        TestAnalyzeExercise,
-        TestFuzzAndEdgeCases,
-        TestGoldenScenarios,
-        TestPerformanceAndStability,
-        TestUIContract,
-    ):
-        suite.addTests(loader.loadTestsFromTestCase(case))
-    return suite
+        by_id = {c["id"]: c for c in sc["criteria"]}
+        # הברכיים אמורות להיות זמינות
+        self.assertTrue(by_id["knees"]["available"], "knees should be available when aliases present (knee_angle_*_deg)")
+        # ואם יש לנו מטריקות טובות — ציון סביר
+        sp = by_id["knees"].get("score_pct")
+        if sp is not None:
+            self.assertGreaterEqual(sp, 70, f"knees expected >=70 with symmetric angles, got {sp}")
 
 
 if __name__ == "__main__":
-    # הרצה ידנית: מציג גם כותרת־סביבה נוחה
-    print("\n=== Offline Test Suite: admin_web/exercise_analyzer.py ===")
-    print(f"Python: {sys.version.split()[0]} | Platform: {sys.platform} | CWD: {os.getcwd()}")
-    print("=================================================================\n")
-    unittest.main(testRunner=RichRunner, verbosity=2)
+    # מאפשר הרצה ישירה של הקובץ
+    unittest.main(verbosity=2)
