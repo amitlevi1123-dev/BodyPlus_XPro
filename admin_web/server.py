@@ -7,6 +7,10 @@ server.py — Admin UI + API (גרסה רזה, בלי video_manager)
 • סטרימר ל-MJPEG דרך routes_video (אם נטען) או ישירות מ-app.ui.video
 • ObjDet ב-blueprint נפרד (routes_objdet.py)
 • תרגילים: /api/exercise/*
+
+תיקון חשוב:
+- אם יש קבצי UI דחוסים מראש (*.html.gz / .js.gz / .css.gz) – נוספו ראוטים שמחזירים אותם
+  עם Content-Encoding: gzip כדי שהדפדפן יציג נכון ולא "ג'יבריש".
 """
 
 from __future__ import annotations
@@ -18,17 +22,17 @@ from urllib.parse import parse_qs
 
 from flask import (
     Flask, Response, jsonify, render_template, request, send_from_directory,
-    stream_with_context, redirect, url_for
+    stream_with_context, redirect, url_for, send_file, make_response
 )
 
 # === וידאו — חובה שה-BP ייטען; אם יש שגיאה, שנדע עליה ===
 from admin_web.routes_video import video_bp  # אל תעטוף ב-try/except
 
 # === חדש: Blueprint לטאב "העלאת וידאו" ===
-from admin_web.routes_upload_video import upload_video_bp  # <- תוספת
+from admin_web.routes_upload_video import upload_video_bp
 
 # === חדש: Action Bus + Video State ===
-from admin_web.routes_actions import actions_bp, state_bp  # <- זה מה שחסר היה
+from admin_web.routes_actions import actions_bp, state_bp
 
 # (אופציונלי) worker שמחבר את הווידאו למדידות בזמן אמת
 try:
@@ -59,7 +63,7 @@ except Exception:
     def get_shared_payload() -> Dict[str, Any]:
         return {}
 
-# ===== ObjDet status (נפילת-חסד אם ה־BP לא קיים) =====
+# ===== ObjDet status (נפילת-חסד אם ה-BP לא קיים) =====
 try:
     from admin_web.routes_objdet import OBJDET_STATUS, OBJDET_STATUS_LOCK  # type: ignore
 except Exception:
@@ -130,7 +134,7 @@ EXR_DIAG_PING_MS   = int(os.getenv("EXR_DIAG_PING_MS", "10000"))
 
 BASE_DIR      = Path(__file__).resolve().parent
 TPL_DIR       = BASE_DIR / "templates"
-STATIC_DIR    = BASE_DIR / "static"
+STATIC_DIR    = BASE_DIR / "static"         # כאן נשמור קבצי UI אם זה SPA (index.html או index.html.gz)
 LEGACY_IMAGES = BASE_DIR / "images"
 
 _now_ms = lambda: int(time.time() * 1000)
@@ -376,21 +380,19 @@ def create_app() -> Flask:
     if ENABLE_HEARTBEAT:
         threading.Thread(target=_background_log_heartbeat, daemon=True).start()
 
-    # --- רישום blueprints (וידאו — מחייב) ---
+    # --- רישום blueprints ---
     app.register_blueprint(video_bp)
     logger.info("[Server] Registered video_bp blueprint")
 
-    # --- רישום Blueprint לטאב 'העלאת וידאו' (חדש) ---
     app.register_blueprint(upload_video_bp)
     logger.info("[Server] Registered upload_video_bp blueprint")
 
-    # --- Action Bus + Video State (חדש) ---
     app.register_blueprint(actions_bp)
     logger.info("[Server] Registered actions_bp (/api/action)")
+
     app.register_blueprint(state_bp)
     logger.info("[Server] Registered state_bp (/api/video/state)")
 
-    # objdet (אופציונלי)
     try:
         from admin_web.routes_objdet import objdet_bp
         app.register_blueprint(objdet_bp)
@@ -398,7 +400,6 @@ def create_app() -> Flask:
     except Exception:
         pass
 
-    # מפעיל worker של מדידות מווידאו (אם קיים במערכת)
     if callable(start_video_metrics_worker):
         try:
             start_video_metrics_worker()
@@ -433,11 +434,51 @@ def create_app() -> Flask:
             "app_version": APP_VERSION,
         }
 
-    # ---- דפים ----
-    @app.route("/")
-    def index():
+    # ---------------- UI: עדיפות להגשת SPA מ-static (כולל קבצים דחוסים) ----------------
+    def _serve_gz_or_plain(path_no_gz: Path, default_mime: str) -> Response:
+        gz = path_no_gz.with_suffix(path_no_gz.suffix + ".gz")
+        if gz.exists():
+            resp = make_response(send_file(gz, mimetype=default_mime))
+            resp.headers["Content-Encoding"] = "gzip"
+            return resp
+        return send_file(path_no_gz, mimetype=default_mime)
+
+    @app.get("/")
+    def root_index():
+        idx = STATIC_DIR / "index.html"
+        if idx.exists() or idx.with_suffix(".html.gz").exists():
+            return _serve_gz_or_plain(idx, "text/html")
+        # אם אין SPA – נעבור לדשבורד של התבניות
         return redirect(url_for("dashboard"))
 
+    @app.get("/ui")
+    def ui_index():
+        idx = STATIC_DIR / "index.html"
+        if idx.exists() or idx.with_suffix(".html.gz").exists():
+            return _serve_gz_or_plain(idx, "text/html")
+        return redirect(url_for("dashboard"))
+
+    @app.get("/ui/<path:filename>")
+    def ui_static(filename: str):
+        p = STATIC_DIR / filename
+        # תמיכה בקבצי JS/CSS דחוסים מראש
+        if not p.exists() and not filename.endswith(".gz"):
+            gz = STATIC_DIR / (filename + ".gz")
+            if gz.exists():
+                mime = "application/octet-stream"
+                if filename.endswith(".js"):
+                    mime = "application/javascript"
+                elif filename.endswith(".css"):
+                    mime = "text/css"
+                elif filename.endswith(".html"):
+                    mime = "text/html"
+                resp = make_response(send_file(gz, mimetype=mime))
+                resp.headers["Content-Encoding"] = "gzip"
+                return resp
+        # אחרת – הגשה רגילה מהתיקייה
+        return send_from_directory(str(STATIC_DIR), filename)
+
+    # ---- דפי תבניות (Jinja) ----
     @app.route("/dashboard", methods=["GET"])
     def dashboard():
         return render_template("dashboard.html", active_page="dashboard", app_version=APP_VERSION)
@@ -541,7 +582,7 @@ def create_app() -> Flask:
                             "objdet": _get_empty_objdet_payload(),
                             "payload_version": PAYLOAD_VERSION}), 500
 
-    # ---- קבלת payload מה-main (אם יש דוחפים חיצוניים) ----
+    # ---- קבלת payload חיצוני (OD) ----
     REQUIRED_KEYS = ("detections",)
     MAX_DETS = int(os.getenv("MAX_DETECTIONS", "500"))
 
@@ -620,7 +661,7 @@ def create_app() -> Flask:
 
         return jsonify(ok=True, stored=True, ts=time.time()), 200
 
-    # ---- Metrics/Diagnostics כלליים ----
+    # ---- Metrics/Diagnostics ----
     @app.route("/api/metrics", methods=["GET"])
     def api_metrics():
         try:
@@ -832,7 +873,7 @@ def create_app() -> Flask:
         return Response(
             payload,
             mimetype="text/plain; charset=utf-8",
-            headers={"Content-Disposition": 'attachment; filename=\"logs.txt\"'}
+            headers={"Content-Disposition": 'attachment; filename="logs.txt"'}
         )
 
     @app.route("/api/logs/stream", methods=["GET"])
@@ -900,5 +941,4 @@ if __name__ == "__main__":
     port = int(os.getenv("PORT", "5000"))
     app = create_app()
     logger.info("Server ready. אם main.py רץ – /payload ו-/video עובדים מהתהליך הראשי.")
-    # שים לב: לפריסה חיצונית אפשר להחליף ל- host='0.0.0.0'
     app.run(host="127.0.0.1", port=port, debug=False, use_reloader=False, threaded=True)
