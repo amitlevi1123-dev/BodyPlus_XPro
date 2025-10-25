@@ -11,6 +11,10 @@ server.py — Admin UI + API (גרסה רזה, בלי video_manager)
 תיקון חשוב:
 - אם יש קבצי UI דחוסים מראש (*.html.gz / .js.gz / .css.gz) – נוספו ראוטים שמחזירים אותם
   עם Content-Encoding: gzip כדי שהדפדפן יציג נכון ולא "ג'יבריש".
+
+הרחבות קריטיות:
+- /version  • /healthz (משודרג)  • /readyz
+- Rate-limit לפרוצדורות start/stop וידאו (429 אם מהר מדי)
 """
 
 from __future__ import annotations
@@ -119,6 +123,7 @@ except Exception:
 
 # =================== קונפיג כללי ===================
 APP_VERSION = os.getenv("APP_VERSION", "dev")
+GIT_COMMIT  = os.getenv("GIT_COMMIT", "")[:12] or None
 DEFAULT_BACKEND = os.getenv("DEFAULT_BACKEND", "").strip()
 ENABLE_HEARTBEAT = os.getenv("ENABLE_HEARTBEAT", "1") == "1"
 HEARTBEAT_INTERVAL_SEC = float(os.getenv("HEARTBEAT_INTERVAL_SEC", "30"))
@@ -134,7 +139,7 @@ EXR_DIAG_PING_MS   = int(os.getenv("EXR_DIAG_PING_MS", "10000"))
 
 BASE_DIR      = Path(__file__).resolve().parent
 TPL_DIR       = BASE_DIR / "templates"
-STATIC_DIR    = BASE_DIR / "static"         # כאן נשמור קבצי UI אם זה SPA (index.html או index.html.gz)
+STATIC_DIR    = BASE_DIR / "static"
 LEGACY_IMAGES = BASE_DIR / "images"
 
 _now_ms = lambda: int(time.time() * 1000)
@@ -410,6 +415,28 @@ def create_app() -> Flask:
     logger.info("=== Admin UI (Flask – Single server) ===")
     logger.info(f"APP_VERSION={APP_VERSION}  DEFAULT_BACKEND={DEFAULT_BACKEND or '(none)'}")
 
+    # ---------------- Rate-limit ל-start/stop (פר-IP) ----------------
+    from time import time as _now
+    _RL_GAP = float(os.getenv("VIDEO_RATE_LIMIT_SEC", "3.0"))
+    _RL_PATHS = {"/api/video/start", "/api/video/stop"}
+    _RL_STATE: Dict[str, Dict[str, float]] = {p: {} for p in _RL_PATHS}
+
+    @app.before_request
+    def _throttle_video_start_stop():
+        try:
+            if request.path not in _RL_PATHS or request.method != "POST":
+                return None
+            ip = (request.headers.get("X-Forwarded-For", "") or request.remote_addr or "0.0.0.0").split(",")[0].strip()
+            now = _now()
+            last = _RL_STATE[request.path].get(ip, 0.0)
+            if (now - last) < _RL_GAP:
+                retry = max(0.0, _RL_GAP - (now - last))
+                return jsonify({"ok": False, "error": "too_fast", "retry_after_sec": round(retry, 2)}), 429
+            _RL_STATE[request.path][ip] = now
+        except Exception:
+            pass
+        return None
+
     @app.after_request
     def _no_cache(resp: Response):
         resp.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
@@ -448,7 +475,6 @@ def create_app() -> Flask:
         idx = STATIC_DIR / "index.html"
         if idx.exists() or idx.with_suffix(".html.gz").exists():
             return _serve_gz_or_plain(idx, "text/html")
-        # אם אין SPA – נעבור לדשבורד של התבניות
         return redirect(url_for("dashboard"))
 
     @app.get("/ui")
@@ -475,7 +501,6 @@ def create_app() -> Flask:
                 resp = make_response(send_file(gz, mimetype=mime))
                 resp.headers["Content-Encoding"] = "gzip"
                 return resp
-        # אחרת – הגשה רגילה מהתיקייה
         return send_from_directory(str(STATIC_DIR), filename)
 
     # ---- דפי תבניות (Jinja) ----
@@ -537,10 +562,87 @@ def create_app() -> Flask:
         def legacy_images(filename: str):
             return send_from_directory(str(LEGACY_IMAGES), filename)
 
-    # ---- בריאות/מערכת ----
-    @app.route("/healthz", methods=["GET"])
+    # ---- בריאות/מערכת (משודרג) ----
+    @app.get("/version")
+    def version():
+        up = max(0.0, time.time() - START_TS)
+        return jsonify({
+            "app_version": APP_VERSION,
+            "git_commit": GIT_COMMIT,
+            "payload_version": PAYLOAD_VERSION,
+            "uptime_sec": round(up, 1),
+            "env": {"runpod": bool(os.getenv("RUNPOD_BASE"))}
+        }), 200
+
+    @app.get("/healthz")
     def healthz():
-        return jsonify(ok=True, ver=APP_VERSION, now=time.time())
+        try:
+            snap = {}
+            try:
+                snap = get_snapshot() or {}
+            except Exception:
+                snap = {}
+
+            # payload + גיל
+            payload = {}
+            try:
+                payload = get_shared_payload() or {}
+            except Exception:
+                payload = {}
+            if not payload and isinstance(LAST_PAYLOAD, dict):
+                payload = LAST_PAYLOAD or {}
+            now = time.time()
+            ts = float(payload.get("ts", now))
+            age = max(0.0, now - ts)
+
+            # וידאו
+            opened = running = False
+            gs = _import_get_streamer()
+            if callable(gs):
+                s = gs()
+                opened = bool(getattr(s, "is_open", lambda: False)())
+                running = bool(getattr(s, "is_running", lambda: False)())
+
+            # GPU קיים?
+            gpu_av = bool((snap.get("gpu") or {}).get("available", False))
+
+            ok = (age < 3.0)  # קריטריון פשוט וברור
+            return jsonify({
+                "ok": ok,
+                "payload": {"age_sec": round(age, 3), "present": bool(payload)},
+                "video": {"opened": opened, "running": running},
+                "gpu": {"available": gpu_av},
+                "system": {"ok": bool(snap.get("ok", True))},
+                "ts": int(now)
+            }), 200
+        except Exception as e:
+            return jsonify({"ok": False, "error": str(e)}), 200
+
+    @app.get("/readyz")
+    def readyz():
+        try:
+            # מוכנות בסיסית: תבניות/סטטיק קיימים, snapshot לא נכשל חזק, וידאו לא שבור
+            t_ok = TPL_DIR.exists()
+            s_ok = STATIC_DIR.exists()
+            snap_ok = True
+            try:
+                s = get_snapshot()
+                if isinstance(s, dict) and s.get("error"):
+                    snap_ok = False
+            except Exception:
+                snap_ok = False
+
+            gs = _import_get_streamer()
+            streamer_ok = callable(gs)
+
+            ok = all([t_ok, s_ok, snap_ok, streamer_ok])
+            code = 200 if ok else 503
+            return jsonify({
+                "ok": ok, "templates": t_ok, "static": s_ok,
+                "system_monitor": snap_ok, "streamer_available": streamer_ok
+            }), code
+        except Exception as e:
+            return jsonify({"ok": False, "error": str(e)}), 503
 
     @app.route("/api/health", methods=["GET"])
     def api_health():
@@ -776,7 +878,7 @@ def create_app() -> Flask:
             out = {}
             for k, v in obj.items():
                 if isinstance(v, (int, float)) and math.isfinite(float(v)):
-                    out[k] = float(v)
+                    out = {**out, k: float(v)}
                 elif isinstance(v, str):
                     t = v.strip()
                     try:

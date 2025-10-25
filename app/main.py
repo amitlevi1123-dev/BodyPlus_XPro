@@ -15,20 +15,14 @@ if str(_PROJECT_ROOT) not in sys.path:
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "2"
 
 # =============== <<< PATH FIXER (עובד גם מקומית וגם בענן) ===============
-# ממפה נתיבי Windows מוחלטים ישנים אל שורש הפרויקט הנוכחי,
-# ומנסה אוטומטית נתיב מתוקן כשפותחים קבצים/בודקים קיום.
 import builtins, functools
-
 _LEGACY_BASES = [
     r"C:\Users\Owner\Desktop\BodyPlus\BodyPlus_XPro",
     r"C:/Users/Owner/Desktop/BodyPlus/BodyPlus_XPro",
 ]
-
 def _map_legacy_path(p) -> str:
-    if p is None:
-        return p
-    s = str(p)
-    s_norm = s.replace("\\\\", "\\").replace("\\", "/")
+    if p is None: return p
+    s = str(p); s_norm = s.replace("\\\\", "\\").replace("\\", "/")
     for base in _LEGACY_BASES:
         b = base.replace("\\\\", "\\").replace("\\", "/").rstrip("/")
         if s_norm.lower().startswith(b.lower()):
@@ -36,7 +30,6 @@ def _map_legacy_path(p) -> str:
             fixed = (_PROJECT_ROOT / rel).as_posix()
             return fixed
     return s
-
 _real_open = builtins.open
 @functools.wraps(_real_open)
 def _open_patched(file, *args, **kwargs):
@@ -48,18 +41,14 @@ def _open_patched(file, *args, **kwargs):
             return _real_open(mapped, *args, **kwargs)
         raise
 builtins.open = _open_patched
-
 import os.path as _osp
 _exists_real = _osp.exists
 def _exists_patched(path):
-    if _exists_real(path):
-        return True
+    if _exists_real(path): return True
     mapped = _map_legacy_path(path)
     return _exists_real(mapped)
 _osp.exists = _exists_patched
-
 def normalize_path(p: str) -> str:
-    """אם p מוחלט תחת בסיס ישן → החזר נתיב יחסי לשורש הפרויקט; אחרת השאר כמו שהוא."""
     s = _map_legacy_path(p)
     try:
         pp = pathlib.Path(s)
@@ -69,15 +58,11 @@ def normalize_path(p: str) -> str:
     except Exception:
         pass
     return s
-
 def normalize_inplace(obj):
-    """מנרמל מחרוזות נתיב בתוך dict/list (למשל אחרי טעינת YAML)."""
     if isinstance(obj, dict):
         for k, v in list(obj.items()):
-            if isinstance(v, str):
-                obj[k] = normalize_path(v)
-            else:
-                normalize_inplace(v)
+            if isinstance(v, str): obj[k] = normalize_path(v)
+            else: normalize_inplace(v)
     elif isinstance(obj, list):
         for i, v in enumerate(obj):
             obj[i] = normalize_path(v) if isinstance(v, str) else (normalize_inplace(v) or v)
@@ -109,7 +94,7 @@ def health():
 def ping():
     return "pong", 200
 
-# נשאיר גם את /healthz למי שצריך תאימות לאחור
+# נשאיר תאימות (server.py כבר מספק /healthz מתקדם; כאן לא מזיק)
 try:
     @app.get("/healthz")
     def _healthz():
@@ -154,6 +139,10 @@ DEFAULT_MIRROR_X = True
 PUSH_PERIOD_MS   = int(os.getenv("PUSH_PERIOD_MS", "200"))
 SEND_HTTP_PUSH   = os.getenv("SEND_HTTP_PUSH", "0") == "1"
 _PUSH_ERR_STATE  = {"sig": None, "count": 0, "last": 0.0}
+
+WATCHDOG_ENABLED     = True
+WATCHDOG_IDLE_SEC    = float(os.getenv("VIDEO_WATCHDOG_IDLE_SEC", "10"))
+WATCHDOG_CHECK_EVERY = 1.0
 
 # אופציונלי: OpenCV
 try:
@@ -209,11 +198,7 @@ def _extract_mp_landmarks_norm(results_pose, frame_w: int, frame_h: int) -> Opti
                 x /= float(frame_w); y /= float(frame_h)
             if not (x == x and y == y):
                 continue
-            out.append({
-                "x": max(0.0, min(1.0, x)),
-                "y": max(0.0, min(1.0, y)),
-                "visibility": max(0.0, min(1.0, v))
-            })
+            out.append({"x": max(0.0, min(1.0, x)), "y": max(0.0, min(1.0, y)), "visibility": max(0.0, min(1.0, v))})
         return out if len(out) >= 17 else None
     except Exception:
         return None
@@ -241,10 +226,8 @@ def _ensure_detections_block(payload: Dict[str, Any]) -> Dict[str, Any]:
     if isinstance(objs, list):
         for o in objs:
             try:
-                if not isinstance(o, dict):
-                    continue
-                conf = o.get("conf")
-                bbox = o.get("bbox")
+                if not isinstance(o, dict): continue
+                conf = o.get("conf"); bbox = o.get("bbox")
                 bb: List[float] = []
                 if isinstance(bbox, dict):
                     x = bbox.get("x", bbox.get("x1")); y = bbox.get("y", bbox.get("y1"))
@@ -257,17 +240,13 @@ def _ensure_detections_block(payload: Dict[str, Any]) -> Dict[str, Any]:
                             bb = [float(x1), float(y1), float(x2), float(y2)]
                 elif isinstance(bbox, (list, tuple)) and len(bbox) >= 4:
                     x1, y1, a, b = [float(bbox[0]), float(bbox[1]), float(bbox[2]), float(bbox[3])]
-                    if a > 0 and b > 0:  # [x,y,w,h]
-                        bb = [x1, y1, x1 + a, y1 + b]
-                    else:                # [x1,y1,x2,y2]
-                        bb = [x1, y1, a, b]
+                    bb = [x1, y1, x1 + a, y1 + b] if a > 0 and b > 0 else [x1, y1, a, b]
                 item: Dict[str, Any] = {}
                 if bb and all(isinstance(v, (int, float)) for v in bb):
                     item["bbox"] = [float(v) for v in bb[:4]]
                 if isinstance(conf, (int, float)) and math.isfinite(float(conf)):
                     item["conf"] = float(conf)
-                if item:
-                    dets.append(item)
+                if item: dets.append(item)
             except Exception:
                 continue
     payload["detections"] = dets if dets else []
@@ -278,22 +257,58 @@ def _ensure_detections_block(payload: Dict[str, Any]) -> Dict[str, Any]:
 
 def _dedup_push_error(name: str, detail: Any) -> None:
     try:
-        sig = (name, bool(detail))
-        now = time.time()
+        sig = (name, bool(detail)); now = time.time()
         if _PUSH_ERR_STATE["sig"] != sig or (now - _PUSH_ERR_STATE["last"] > 5.0):
             cnt = _PUSH_ERR_STATE["count"]
             _PUSH_ERR_STATE.update({"sig": sig, "count": 0, "last": now})
             if name not in ("timeout", "payload_push timeout", "payload_push warning: timeout"):
                 msg = f"payload_push warning: {name}"
-                if detail is not None:
-                    msg += f" | detail={detail!r}"
-                if cnt:
-                    msg += f" | suppressed={cnt}"
+                if detail is not None: msg += f" | detail={detail!r}"
+                if cnt: msg += f" | suppressed={cnt}"
                 logger.warning(msg)
         else:
             _PUSH_ERR_STATE["count"] += 1
     except Exception:
         pass
+
+
+# ======================= עטיפות סטרימר + Watchdog =======================
+def _safe_bool(x) -> bool:
+    try:
+        return bool(x())
+    except Exception:
+        try:
+            return bool(x)
+        except Exception:
+            return False
+
+def video_start() -> None:
+    try:
+        s = get_streamer()
+        if hasattr(s, "start"): s.start()
+        elif hasattr(s, "open"): s.open()
+        logger.info("video_start() invoked")
+    except Exception as e:
+        logger.warning(f"video_start failed: {e}")
+
+def video_stop() -> None:
+    try:
+        s = get_streamer()
+        if hasattr(s, "stop"): s.stop()
+        elif hasattr(s, "close"): s.close()
+        logger.info("video_stop() invoked")
+    except Exception as e:
+        logger.warning(f"video_stop failed: {e}")
+
+def video_restart(sleep_between: float = 1.0) -> None:
+    try:
+        logger.warning("video_restart(): stopping…")
+        video_stop()
+        time.sleep(max(0.1, sleep_between))
+        logger.warning("video_restart(): starting…")
+        video_start()
+    except Exception as e:
+        logger.error(f"video_restart failed: {e}")
 
 
 class App:
@@ -345,7 +360,7 @@ class App:
             "view_mode": "unknown",
             "metrics": {},
             "visibility": {},
-            "meta": {"fps": 0, "warnings": []}
+            "meta": {"fps": 0.0, "warnings": []}
         }
         self._pl_lock = threading.Lock()
 
@@ -357,17 +372,20 @@ class App:
         try:
             s = get_streamer()
             env_stream_fps = os.getenv("STREAM_FPS")
-            if env_stream_fps:
+            if env_stream_fps and hasattr(s, "set_target_fps"):
                 s.set_target_fps(int(env_stream_fps))
             env_dec = os.getenv("STREAM_DECIMATION")
-            if env_dec:
+            if env_dec and hasattr(s, "set_decimation"):
                 s.set_decimation(int(env_dec))
         except Exception as e:
             logger.warning(f"streamer pacing init skipped: {e}")
 
         # ריצה מקומית בלבד (בענן Gunicorn משרת את app הגלובלי)
         start_admin_ui_server(host="127.0.0.1", port=5000)
+
+        # הפעלה + Watchdog
         self.start()
+        self._start_watchdog()
 
         try:
             if hasattr(self.root, "protocol"):
@@ -407,29 +425,45 @@ class App:
         try:
             yaml_path = normalize_path("core/object_detection/object_detection.yaml")
             self.od_engine = ObjectDetectionEngine.from_yaml(yaml_path)
-
             try:
                 det_cfg = getattr(self.od_engine, "detector_cfg", None)
                 if isinstance(det_cfg, dict):
                     normalize_inplace(det_cfg)
             except Exception:
                 pass
-
             per = getattr(getattr(self.od_engine, "detector_cfg", object()), "period_ms", 250)
             self.od_period_ms = max(200, int(per))
-
             self.od_engine.start()
             logger.info(f"מנוע זיהוי אובייקטים הופעל (period={self.od_period_ms}ms)")
-
             try:
                 set_od_engine(self.od_engine)
                 logger.info("OD engine registered to admin_web.state")
             except Exception as e:
                 logger.warning(f"failed to register OD engine to state: {e}")
-
         except Exception as e:
             logger.error(f"שגיאה באתחול זיהוי אובייקטים: {e}")
             self.od_engine = None
+
+    # ---------- Watchdog ----------
+    def _start_watchdog(self) -> None:
+        if not WATCHDOG_ENABLED:
+            return
+        def _loop():
+            last_restart = 0.0
+            while self.running:
+                try:
+                    now = time.time()
+                    # אין פריימים זמן ממושך? או fps נמוך מאוד?
+                    no_frames = (self._last_tick is None) or ((now - (self._last_tick or now)) > WATCHDOG_IDLE_SEC)
+                    low_fps = (self._fps_ema is not None and self._fps_ema < 0.2)  # פחות מפריים ב-5 שניות
+                    if (no_frames or low_fps) and (now - last_restart > WATCHDOG_IDLE_SEC):
+                        logger.warning(f"[Watchdog] video stalled (no_frames={no_frames}, fps={self._fps_ema}); restarting…")
+                        video_restart(sleep_between=1.0)
+                        last_restart = now
+                except Exception as e:
+                    logger.warning(f"[Watchdog] loop error: {e}")
+                time.sleep(WATCHDOG_CHECK_EVERY)
+        threading.Thread(target=_loop, daemon=True, name="VideoWatchdog").start()
 
     # ---------- לולאה ראשית ----------
     def start(self) -> None:
@@ -437,6 +471,13 @@ class App:
         self._last_tick = self._time.time()
         self._fps_ema = None
         logger.info("Main loop started")
+        # ודא וידאו פעיל
+        try:
+            s = get_streamer()
+            if hasattr(s, "is_open") and not _safe_bool(s.is_open):
+                video_start()
+        except Exception:
+            pass
         self._loop_once()
 
     def quit(self) -> None:
@@ -453,6 +494,11 @@ class App:
                 logger.warning(f"שגיאה בסגירת מנוע זיהוי אובייקטים: {e}")
 
         try:
+            video_stop()
+        except Exception:
+            pass
+
+        try:
             self.root.quit(); self.root.destroy()
         except Exception:
             pass
@@ -463,16 +509,39 @@ class App:
 
         # ---- פריים מה-Streamer ----
         frame = None
+        got_frame = False
         try:
             s = get_streamer()
             ok, frm = s.read_frame()
-            if ok and frm is not None and (frm.size > 1):
+            if ok and frm is not None and (getattr(frm, "size", 2) > 1):
                 frame = frm
+                got_frame = True
         except Exception:
             frame = None
+            got_frame = False
+
+        now = self._time.time()
+        # עדכון FPS EMA (מבוסס על זמן בין קריאות מוצלחות)
+        if got_frame:
+            if self._last_tick:
+                dt = max(1e-6, now - self._last_tick)
+                inst_fps = 1.0 / dt
+                if self._fps_ema is None:
+                    self._fps_ema = inst_fps
+                else:
+                    self._fps_ema = (0.9 * self._fps_ema) + (0.1 * inst_fps)
+            self._last_tick = now
 
         if frame is None:
             import tkinter as tk  # מקומי
+            # דחוף payload עם FPS מעודכן גם כשאין פריים (כדי שה-UI יראה ירידה)
+            p = self._payload_get()
+            meta = dict(p.get("meta", {}))
+            meta["fps"] = float(self._fps_ema or 0.0)
+            p["meta"] = meta
+            self._payload_set(p)
+            try: set_payload(p)
+            except Exception: pass
             self.root.after(LOOP_INTERVAL_MS, self._loop_once)
             return
 
@@ -499,7 +568,7 @@ class App:
                 "view_mode": "error",
                 "metrics": {},
                 "visibility": {},
-                "meta": {"fps": 0, "warnings": [str(e)]}
+                "meta": {"fps": float(self._fps_ema or 0.0), "warnings": [str(e)]}
             }
 
         # ---- זיהוי אובייקטים ----
@@ -523,6 +592,11 @@ class App:
         payload = _ensure_detections_block(payload)
         payload = _sanitize_numbers(payload)
         payload.setdefault("ts_ms", int(time.time() * 1000))
+
+        # עדכון FPS לתוך המטה
+        meta = dict(payload.get("meta", {}))
+        meta["fps"] = float(self._fps_ema or 0.0)
+        payload["meta"] = meta
 
         # ---- דחיפת payload לזיכרון ----
         self._payload_set(payload)

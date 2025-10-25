@@ -77,7 +77,8 @@ def _safe_pct(score: Optional[float]) -> Optional[int]:
 
 def _as_float(x) -> Optional[float]:
     try:
-        if isinstance(x, bool):  # לא להמיר True/False ל-1.0
+        # bool יורש מ-int בפייתון; לא להמיר ל-1.0/0.0
+        if isinstance(x, bool):
             return None
         return float(x)
     except Exception:
@@ -88,20 +89,32 @@ def _as_float(x) -> Optional[float]:
 def sanitize_metrics_payload(obj: Any) -> Dict[str, Any]:
     """
     מסדר קלט גולמי ל-dict של metrics (מספרים סופיים בלבד + כמה מחרוזות מורשות).
+    ✅ שומר בוליאנים כבוליאנים (לא ממיר ל-1.0/0.0).
     """
     out: Dict[str, Any] = {}
     if not isinstance(obj, dict):
         logger.debug("sanitize_metrics_payload: non-dict payload ignored: %r", type(obj))
         return out
+
     for k, v in obj.items():
         try:
+            # ✅ קודם כל בוליאנים – כדי שלא יתפסו כ-int
+            if isinstance(v, bool):
+                out[k] = v
+                continue
+
+            # מספרים סופיים
             if isinstance(v, (int, float)) and math.isfinite(float(v)):
                 out[k] = float(v)
-            elif isinstance(v, str):
+                continue
+
+            # מחרוזות: true/false או מספרים כמחרוזת, או מזהים מורשים
+            if isinstance(v, str):
                 t = v.strip()
                 try:
-                    if t.lower() in ("true", "false"):
-                        out[k] = (t.lower() == "true")
+                    tl = t.lower()
+                    if tl in ("true", "false"):
+                        out[k] = (tl == "true")
                     else:
                         # מנסה להמיר למספר (שלם/צף)
                         fv = float(t) if "." in t else float(int(t))
@@ -111,10 +124,12 @@ def sanitize_metrics_payload(obj: Any) -> Dict[str, Any]:
                     # מחרוזות מורשות
                     if k in ("rep.phase", "view.mode", "view.primary", "exercise.id"):
                         out[k] = t
-            elif isinstance(v, bool):
-                out[k] = v
+                continue
+
+            # טיפוסים אחרים – מתעלמים בשקט
         except Exception as e:
             logger.warning("sanitize_metrics_payload: skip key=%r err=%s", k, e)
+
     return out
 
 # ============ Simulation ============
@@ -169,7 +184,6 @@ def simulate_exercise(
             reps_list: List[Dict[str, Any]] = []
             for i in range(reps):
                 # תנודה קטנה סביב הממוצע (דפוס + רעש רך)
-                # חיוב/שלילה מתחלפים כדי לתת גיוון יציב
                 sign = 1.0 if (i % 2 == 0) else -1.0
                 delta = sign * std * (0.9 + 0.2 * rng.random())
                 score = _clamp01(round(mean + delta, 3))
@@ -177,7 +191,6 @@ def simulate_exercise(
                     "rep": i + 1,
                     "score": score,
                     "score_pct": int(round(score * 100)),
-                    # ניתן להרחיב: criteria/criteria_breakdown_pct ל-rep בודד (כרגע משאירים לראוטר/אנלייזר מלא)
                     "notes": [
                         {"crit": "depth", "severity": "med", "text": "עמוק מעט יותר"},
                         {"crit": "knees", "severity": "low", "text": "שמור על ברכיים בקו האצבעות"},
