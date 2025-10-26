@@ -1,0 +1,10 @@
+{
+  "sanitized": {
+    "hip_left_deg": 120.0,
+    "hip_right_deg": 125.5,
+    "torso_vs_vertical_deg": 15.3,
+    "rep.phase": "eccentric",
+    "bool_true": true,
+    "bool_false": false
+  }
+}

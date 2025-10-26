@@ -1,0 +1,80 @@
+{
+  "exercise": {
+    "id": "squat.bodyweight"
+  },
+  "ui_ranges": {
+    "color_bar": [
+      {
+        "label": "red",
+        "from_pct": 0,
+        "to_pct": 60
+      },
+      {
+        "label": "orange",
+        "from_pct": 60,
+        "to_pct": 75
+      },
+      {
+        "label": "green",
+        "from_pct": 75,
+        "to_pct": 100
+      }
+    ]
+  },
+  "scoring": {
+    "score": 0.1,
+    "score_pct": 10,
+    "grade": "E",
+    "quality": "E",
+    "unscored_reason": null,
+    "criteria": [
+      {
+        "id": "depth",
+        "available": true,
+        "score": 0.5,
+        "score_pct": 50,
+        "reason": null
+      },
+      {
+        "id": "knees",
+        "available": true,
+        "score": 0.0,
+        "score_pct": 0,
+        "reason": "valgus"
+      },
+      {
+        "id": "torso_angle",
+        "available": true,
+        "score": 0.0,
+        "score_pct": 0,
+        "reason": null
+      },
+      {
+        "id": "stance_width",
+        "available": true,
+        "score": 0.0,
+        "score_pct": 0,
+        "reason": "stance_out_of_range"
+      },
+      {
+        "id": "tempo",
+        "available": true,
+        "score": 0.0,
+        "score_pct": 0,
+        "reason": null
+      }
+    ],
+    "criteria_breakdown_pct": {
+      "depth": 50,
+      "knees": 0,
+      "torso_angle": 0,
+      "stance_width": 0,
+      "tempo": 0
+    }
+  },
+  "hints": [
+    "שמור על ברכיים בקו האצבעות",
+    "שמור על גב זקוף יותר",
+    "כוון רוחב עמידה מעט"
+  ]
+}

@@ -1,0 +1,78 @@
+{
+  "exercise": {
+    "id": "squat.bodyweight"
+  },
+  "ui_ranges": {
+    "color_bar": [
+      {
+        "label": "red",
+        "from_pct": 0,
+        "to_pct": 60
+      },
+      {
+        "label": "orange",
+        "from_pct": 60,
+        "to_pct": 75
+      },
+      {
+        "label": "green",
+        "from_pct": 75,
+        "to_pct": 100
+      }
+    ]
+  },
+  "scoring": {
+    "score": 0.8329,
+    "score_pct": 83,
+    "grade": "B",
+    "quality": "B",
+    "unscored_reason": null,
+    "criteria": [
+      {
+        "id": "depth",
+        "available": true,
+        "score": 0.7895833333333333,
+        "score_pct": 79,
+        "reason": null
+      },
+      {
+        "id": "knees",
+        "available": true,
+        "score": 0.9,
+        "score_pct": 90,
+        "reason": null
+      },
+      {
+        "id": "torso_angle",
+        "available": true,
+        "score": 0.6,
+        "score_pct": 60,
+        "reason": null
+      },
+      {
+        "id": "stance_width",
+        "available": true,
+        "score": 0.8749999999999999,
+        "score_pct": 87,
+        "reason": null
+      },
+      {
+        "id": "tempo",
+        "available": true,
+        "score": 1.0,
+        "score_pct": 100,
+        "reason": null
+      }
+    ],
+    "criteria_breakdown_pct": {
+      "depth": 79,
+      "knees": 90,
+      "torso_angle": 60,
+      "stance_width": 87,
+      "tempo": 100
+    }
+  },
+  "hints": [
+    "שמור על גב זקוף יותר"
+  ]
+}

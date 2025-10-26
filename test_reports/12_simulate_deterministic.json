@@ -1,0 +1,206 @@
+{
+  "A": {
+    "ok": true,
+    "ui_ranges": {
+      "color_bar": [
+        {
+          "label": "red",
+          "from_pct": 0,
+          "to_pct": 60
+        },
+        {
+          "label": "orange",
+          "from_pct": 60,
+          "to_pct": 75
+        },
+        {
+          "label": "green",
+          "from_pct": 75,
+          "to_pct": 100
+        }
+      ]
+    },
+    "sets_total": 1,
+    "reps_total": 4,
+    "sets": [
+      {
+        "set": 1,
+        "exercise_id": "squat.bodyweight",
+        "set_score": 0.7,
+        "set_score_pct": 70,
+        "reps": [
+          {
+            "rep": 1,
+            "score": 0.803,
+            "score_pct": 80,
+            "notes": [
+              {
+                "crit": "depth",
+                "severity": "med",
+                "text": "עמוק מעט יותר"
+              },
+              {
+                "crit": "knees",
+                "severity": "low",
+                "text": "שמור על ברכיים בקו האצבעות"
+              }
+            ]
+          },
+          {
+            "rep": 2,
+            "score": 0.609,
+            "score_pct": 61,
+            "notes": [
+              {
+                "crit": "depth",
+                "severity": "med",
+                "text": "עמוק מעט יותר"
+              },
+              {
+                "crit": "knees",
+                "severity": "low",
+                "text": "שמור על ברכיים בקו האצבעות"
+              }
+            ]
+          },
+          {
+            "rep": 3,
+            "score": 0.796,
+            "score_pct": 80,
+            "notes": [
+              {
+                "crit": "depth",
+                "severity": "med",
+                "text": "עמוק מעט יותר"
+              },
+              {
+                "crit": "knees",
+                "severity": "low",
+                "text": "שמור על ברכיים בקו האצבעות"
+              }
+            ]
+          },
+          {
+            "rep": 4,
+            "score": 0.606,
+            "score_pct": 61,
+            "notes": [
+              {
+                "crit": "depth",
+                "severity": "med",
+                "text": "עמוק מעט יותר"
+              },
+              {
+                "crit": "knees",
+                "severity": "low",
+                "text": "שמור על ברכיים בקו האצבעות"
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "B": {
+    "ok": true,
+    "ui_ranges": {
+      "color_bar": [
+        {
+          "label": "red",
+          "from_pct": 0,
+          "to_pct": 60
+        },
+        {
+          "label": "orange",
+          "from_pct": 60,
+          "to_pct": 75
+        },
+        {
+          "label": "green",
+          "from_pct": 75,
+          "to_pct": 100
+        }
+      ]
+    },
+    "sets_total": 1,
+    "reps_total": 4,
+    "sets": [
+      {
+        "set": 1,
+        "exercise_id": "squat.bodyweight",
+        "set_score": 0.7,
+        "set_score_pct": 70,
+        "reps": [
+          {
+            "rep": 1,
+            "score": 0.803,
+            "score_pct": 80,
+            "notes": [
+              {
+                "crit": "depth",
+                "severity": "med",
+                "text": "עמוק מעט יותר"
+              },
+              {
+                "crit": "knees",
+                "severity": "low",
+                "text": "שמור על ברכיים בקו האצבעות"
+              }
+            ]
+          },
+          {
+            "rep": 2,
+            "score": 0.609,
+            "score_pct": 61,
+            "notes": [
+              {
+                "crit": "depth",
+                "severity": "med",
+                "text": "עמוק מעט יותר"
+              },
+              {
+                "crit": "knees",
+                "severity": "low",
+                "text": "שמור על ברכיים בקו האצבעות"
+              }
+            ]
+          },
+          {
+            "rep": 3,
+            "score": 0.796,
+            "score_pct": 80,
+            "notes": [
+              {
+                "crit": "depth",
+                "severity": "med",
+                "text": "עמוק מעט יותר"
+              },
+              {
+                "crit": "knees",
+                "severity": "low",
+                "text": "שמור על ברכיים בקו האצבעות"
+              }
+            ]
+          },
+          {
+            "rep": 4,
+            "score": 0.606,
+            "score_pct": 61,
+            "notes": [
+              {
+                "crit": "depth",
+                "severity": "med",
+                "text": "עמוק מעט יותר"
+              },
+              {
+                "crit": "knees",
+                "severity": "low",
+                "text": "שמור על ברכיים בקו האצבעות"
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

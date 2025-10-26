@@ -1,0 +1,5206 @@
+{
+  "ok": true,
+  "ui_ranges": {
+    "color_bar": [
+      {
+        "label": "red",
+        "from_pct": 0,
+        "to_pct": 60
+      },
+      {
+        "label": "orange",
+        "from_pct": 60,
+        "to_pct": 75
+      },
+      {
+        "label": "green",
+        "from_pct": 75,
+        "to_pct": 100
+      }
+    ]
+  },
+  "sets_total": 10,
+  "reps_total": 30,
+  "sets": [
+    {
+      "set": 1,
+      "exercise_id": "squat.bodyweight",
+      "set_score": 0.0,
+      "set_score_pct": 0,
+      "reps": [
+        {
+          "rep": 1,
+          "score": 0.514,
+          "score_pct": 51,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 2,
+          "score": 0.0,
+          "score_pct": 0,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 3,
+          "score": 0.478,
+          "score_pct": 48,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 4,
+          "score": 0.0,
+          "score_pct": 0,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 5,
+          "score": 0.524,
+          "score_pct": 52,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 6,
+          "score": 0.0,
+          "score_pct": 0,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 7,
+          "score": 0.539,
+          "score_pct": 54,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 8,
+          "score": 0.0,
+          "score_pct": 0,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 9,
+          "score": 0.492,
+          "score_pct": 49,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 10,
+          "score": 0.0,
+          "score_pct": 0,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 11,
+          "score": 0.472,
+          "score_pct": 47,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 12,
+          "score": 0.0,
+          "score_pct": 0,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 13,
+          "score": 0.453,
+          "score_pct": 45,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 14,
+          "score": 0.0,
+          "score_pct": 0,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 15,
+          "score": 0.515,
+          "score_pct": 52,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 16,
+          "score": 0.0,
+          "score_pct": 0,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 17,
+          "score": 0.472,
+          "score_pct": 47,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 18,
+          "score": 0.0,
+          "score_pct": 0,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 19,
+          "score": 0.531,
+          "score_pct": 53,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 20,
+          "score": 0.0,
+          "score_pct": 0,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 21,
+          "score": 0.531,
+          "score_pct": 53,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 22,
+          "score": 0.0,
+          "score_pct": 0,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 23,
+          "score": 0.484,
+          "score_pct": 48,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 24,
+          "score": 0.0,
+          "score_pct": 0,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 25,
+          "score": 0.546,
+          "score_pct": 55,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 26,
+          "score": 0.0,
+          "score_pct": 0,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 27,
+          "score": 0.459,
+          "score_pct": 46,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 28,
+          "score": 0.0,
+          "score_pct": 0,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 29,
+          "score": 0.535,
+          "score_pct": 54,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 30,
+          "score": 0.0,
+          "score_pct": 0,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "set": 2,
+      "exercise_id": "squat.bodyweight",
+      "set_score": 0.0,
+      "set_score_pct": 0,
+      "reps": [
+        {
+          "rep": 1,
+          "score": 0.531,
+          "score_pct": 53,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 2,
+          "score": 0.0,
+          "score_pct": 0,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 3,
+          "score": 0.504,
+          "score_pct": 50,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 4,
+          "score": 0.0,
+          "score_pct": 0,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 5,
+          "score": 0.488,
+          "score_pct": 49,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 6,
+          "score": 0.0,
+          "score_pct": 0,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 7,
+          "score": 0.533,
+          "score_pct": 53,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 8,
+          "score": 0.0,
+          "score_pct": 0,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 9,
+          "score": 0.536,
+          "score_pct": 54,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 10,
+          "score": 0.0,
+          "score_pct": 0,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 11,
+          "score": 0.52,
+          "score_pct": 52,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 12,
+          "score": 0.0,
+          "score_pct": 0,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 13,
+          "score": 0.473,
+          "score_pct": 47,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 14,
+          "score": 0.0,
+          "score_pct": 0,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 15,
+          "score": 0.458,
+          "score_pct": 46,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 16,
+          "score": 0.0,
+          "score_pct": 0,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 17,
+          "score": 0.46,
+          "score_pct": 46,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 18,
+          "score": 0.0,
+          "score_pct": 0,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 19,
+          "score": 0.514,
+          "score_pct": 51,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 20,
+          "score": 0.0,
+          "score_pct": 0,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 21,
+          "score": 0.487,
+          "score_pct": 49,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 22,
+          "score": 0.0,
+          "score_pct": 0,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 23,
+          "score": 0.477,
+          "score_pct": 48,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 24,
+          "score": 0.0,
+          "score_pct": 0,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 25,
+          "score": 0.515,
+          "score_pct": 52,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 26,
+          "score": 0.0,
+          "score_pct": 0,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 27,
+          "score": 0.467,
+          "score_pct": 47,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 28,
+          "score": 0.0,
+          "score_pct": 0,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 29,
+          "score": 0.466,
+          "score_pct": 47,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 30,
+          "score": 0.0,
+          "score_pct": 0,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "set": 3,
+      "exercise_id": "squat.bodyweight",
+      "set_score": 0.0,
+      "set_score_pct": 0,
+      "reps": [
+        {
+          "rep": 1,
+          "score": 0.549,
+          "score_pct": 55,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 2,
+          "score": 0.0,
+          "score_pct": 0,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 3,
+          "score": 0.506,
+          "score_pct": 51,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 4,
+          "score": 0.0,
+          "score_pct": 0,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 5,
+          "score": 0.534,
+          "score_pct": 53,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 6,
+          "score": 0.0,
+          "score_pct": 0,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 7,
+          "score": 0.473,
+          "score_pct": 47,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 8,
+          "score": 0.0,
+          "score_pct": 0,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 9,
+          "score": 0.482,
+          "score_pct": 48,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 10,
+          "score": 0.0,
+          "score_pct": 0,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 11,
+          "score": 0.471,
+          "score_pct": 47,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 12,
+          "score": 0.0,
+          "score_pct": 0,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 13,
+          "score": 0.538,
+          "score_pct": 54,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 14,
+          "score": 0.0,
+          "score_pct": 0,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 15,
+          "score": 0.516,
+          "score_pct": 52,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 16,
+          "score": 0.0,
+          "score_pct": 0,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 17,
+          "score": 0.541,
+          "score_pct": 54,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 18,
+          "score": 0.0,
+          "score_pct": 0,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 19,
+          "score": 0.476,
+          "score_pct": 48,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 20,
+          "score": 0.0,
+          "score_pct": 0,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 21,
+          "score": 0.506,
+          "score_pct": 51,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 22,
+          "score": 0.0,
+          "score_pct": 0,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 23,
+          "score": 0.508,
+          "score_pct": 51,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 24,
+          "score": 0.0,
+          "score_pct": 0,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 25,
+          "score": 0.49,
+          "score_pct": 49,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 26,
+          "score": 0.0,
+          "score_pct": 0,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 27,
+          "score": 0.55,
+          "score_pct": 55,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 28,
+          "score": 0.0,
+          "score_pct": 0,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 29,
+          "score": 0.459,
+          "score_pct": 46,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 30,
+          "score": 0.0,
+          "score_pct": 0,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "set": 4,
+      "exercise_id": "squat.bodyweight",
+      "set_score": 0.0,
+      "set_score_pct": 0,
+      "reps": [
+        {
+          "rep": 1,
+          "score": 0.461,
+          "score_pct": 46,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 2,
+          "score": 0.0,
+          "score_pct": 0,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 3,
+          "score": 0.529,
+          "score_pct": 53,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 4,
+          "score": 0.0,
+          "score_pct": 0,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 5,
+          "score": 0.456,
+          "score_pct": 46,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 6,
+          "score": 0.0,
+          "score_pct": 0,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 7,
+          "score": 0.55,
+          "score_pct": 55,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 8,
+          "score": 0.0,
+          "score_pct": 0,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 9,
+          "score": 0.547,
+          "score_pct": 55,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 10,
+          "score": 0.0,
+          "score_pct": 0,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 11,
+          "score": 0.451,
+          "score_pct": 45,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 12,
+          "score": 0.0,
+          "score_pct": 0,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 13,
+          "score": 0.518,
+          "score_pct": 52,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 14,
+          "score": 0.0,
+          "score_pct": 0,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 15,
+          "score": 0.477,
+          "score_pct": 48,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 16,
+          "score": 0.0,
+          "score_pct": 0,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 17,
+          "score": 0.461,
+          "score_pct": 46,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 18,
+          "score": 0.0,
+          "score_pct": 0,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 19,
+          "score": 0.495,
+          "score_pct": 50,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 20,
+          "score": 0.0,
+          "score_pct": 0,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 21,
+          "score": 0.538,
+          "score_pct": 54,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 22,
+          "score": 0.0,
+          "score_pct": 0,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 23,
+          "score": 0.5,
+          "score_pct": 50,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 24,
+          "score": 0.0,
+          "score_pct": 0,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 25,
+          "score": 0.541,
+          "score_pct": 54,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 26,
+          "score": 0.0,
+          "score_pct": 0,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 27,
+          "score": 0.48,
+          "score_pct": 48,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 28,
+          "score": 0.0,
+          "score_pct": 0,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 29,
+          "score": 0.511,
+          "score_pct": 51,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 30,
+          "score": 0.0,
+          "score_pct": 0,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "set": 5,
+      "exercise_id": "squat.bodyweight",
+      "set_score": 0.0,
+      "set_score_pct": 0,
+      "reps": [
+        {
+          "rep": 1,
+          "score": 0.526,
+          "score_pct": 53,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 2,
+          "score": 0.0,
+          "score_pct": 0,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 3,
+          "score": 0.528,
+          "score_pct": 53,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 4,
+          "score": 0.0,
+          "score_pct": 0,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 5,
+          "score": 0.45,
+          "score_pct": 45,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 6,
+          "score": 0.0,
+          "score_pct": 0,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 7,
+          "score": 0.452,
+          "score_pct": 45,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 8,
+          "score": 0.0,
+          "score_pct": 0,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 9,
+          "score": 0.538,
+          "score_pct": 54,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 10,
+          "score": 0.0,
+          "score_pct": 0,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 11,
+          "score": 0.481,
+          "score_pct": 48,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 12,
+          "score": 0.0,
+          "score_pct": 0,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 13,
+          "score": 0.538,
+          "score_pct": 54,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 14,
+          "score": 0.0,
+          "score_pct": 0,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 15,
+          "score": 0.459,
+          "score_pct": 46,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 16,
+          "score": 0.0,
+          "score_pct": 0,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 17,
+          "score": 0.457,
+          "score_pct": 46,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 18,
+          "score": 0.0,
+          "score_pct": 0,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 19,
+          "score": 0.527,
+          "score_pct": 53,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 20,
+          "score": 0.0,
+          "score_pct": 0,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 21,
+          "score": 0.498,
+          "score_pct": 50,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 22,
+          "score": 0.0,
+          "score_pct": 0,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 23,
+          "score": 0.477,
+          "score_pct": 48,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 24,
+          "score": 0.0,
+          "score_pct": 0,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 25,
+          "score": 0.492,
+          "score_pct": 49,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 26,
+          "score": 0.0,
+          "score_pct": 0,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 27,
+          "score": 0.504,
+          "score_pct": 50,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 28,
+          "score": 0.0,
+          "score_pct": 0,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 29,
+          "score": 0.47,
+          "score_pct": 47,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 30,
+          "score": 0.0,
+          "score_pct": 0,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "set": 6,
+      "exercise_id": "squat.bodyweight",
+      "set_score": 0.0,
+      "set_score_pct": 0,
+      "reps": [
+        {
+          "rep": 1,
+          "score": 0.55,
+          "score_pct": 55,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 2,
+          "score": 0.0,
+          "score_pct": 0,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 3,
+          "score": 0.494,
+          "score_pct": 49,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 4,
+          "score": 0.0,
+          "score_pct": 0,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 5,
+          "score": 0.462,
+          "score_pct": 46,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 6,
+          "score": 0.0,
+          "score_pct": 0,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 7,
+          "score": 0.484,
+          "score_pct": 48,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 8,
+          "score": 0.0,
+          "score_pct": 0,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 9,
+          "score": 0.473,
+          "score_pct": 47,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 10,
+          "score": 0.0,
+          "score_pct": 0,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 11,
+          "score": 0.457,
+          "score_pct": 46,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 12,
+          "score": 0.0,
+          "score_pct": 0,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 13,
+          "score": 0.473,
+          "score_pct": 47,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 14,
+          "score": 0.0,
+          "score_pct": 0,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 15,
+          "score": 0.536,
+          "score_pct": 54,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 16,
+          "score": 0.0,
+          "score_pct": 0,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 17,
+          "score": 0.474,
+          "score_pct": 47,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 18,
+          "score": 0.0,
+          "score_pct": 0,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 19,
+          "score": 0.471,
+          "score_pct": 47,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 20,
+          "score": 0.0,
+          "score_pct": 0,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 21,
+          "score": 0.544,
+          "score_pct": 54,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 22,
+          "score": 0.0,
+          "score_pct": 0,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 23,
+          "score": 0.497,
+          "score_pct": 50,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 24,
+          "score": 0.0,
+          "score_pct": 0,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 25,
+          "score": 0.531,
+          "score_pct": 53,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 26,
+          "score": 0.0,
+          "score_pct": 0,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 27,
+          "score": 0.46,
+          "score_pct": 46,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 28,
+          "score": 0.0,
+          "score_pct": 0,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 29,
+          "score": 0.492,
+          "score_pct": 49,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 30,
+          "score": 0.0,
+          "score_pct": 0,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "set": 7,
+      "exercise_id": "squat.bodyweight",
+      "set_score": 0.0,
+      "set_score_pct": 0,
+      "reps": [
+        {
+          "rep": 1,
+          "score": 0.523,
+          "score_pct": 52,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 2,
+          "score": 0.0,
+          "score_pct": 0,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 3,
+          "score": 0.548,
+          "score_pct": 55,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 4,
+          "score": 0.0,
+          "score_pct": 0,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 5,
+          "score": 0.49,
+          "score_pct": 49,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 6,
+          "score": 0.0,
+          "score_pct": 0,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 7,
+          "score": 0.536,
+          "score_pct": 54,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 8,
+          "score": 0.0,
+          "score_pct": 0,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 9,
+          "score": 0.469,
+          "score_pct": 47,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 10,
+          "score": 0.0,
+          "score_pct": 0,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 11,
+          "score": 0.492,
+          "score_pct": 49,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 12,
+          "score": 0.0,
+          "score_pct": 0,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 13,
+          "score": 0.475,
+          "score_pct": 48,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 14,
+          "score": 0.0,
+          "score_pct": 0,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 15,
+          "score": 0.494,
+          "score_pct": 49,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 16,
+          "score": 0.0,
+          "score_pct": 0,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 17,
+          "score": 0.505,
+          "score_pct": 50,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 18,
+          "score": 0.0,
+          "score_pct": 0,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 19,
+          "score": 0.55,
+          "score_pct": 55,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 20,
+          "score": 0.0,
+          "score_pct": 0,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 21,
+          "score": 0.547,
+          "score_pct": 55,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 22,
+          "score": 0.0,
+          "score_pct": 0,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 23,
+          "score": 0.535,
+          "score_pct": 54,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 24,
+          "score": 0.0,
+          "score_pct": 0,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 25,
+          "score": 0.499,
+          "score_pct": 50,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 26,
+          "score": 0.0,
+          "score_pct": 0,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 27,
+          "score": 0.49,
+          "score_pct": 49,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 28,
+          "score": 0.0,
+          "score_pct": 0,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 29,
+          "score": 0.488,
+          "score_pct": 49,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 30,
+          "score": 0.0,
+          "score_pct": 0,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "set": 8,
+      "exercise_id": "squat.bodyweight",
+      "set_score": 0.0,
+      "set_score_pct": 0,
+      "reps": [
+        {
+          "rep": 1,
+          "score": 0.477,
+          "score_pct": 48,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 2,
+          "score": 0.0,
+          "score_pct": 0,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 3,
+          "score": 0.496,
+          "score_pct": 50,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 4,
+          "score": 0.0,
+          "score_pct": 0,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 5,
+          "score": 0.546,
+          "score_pct": 55,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 6,
+          "score": 0.0,
+          "score_pct": 0,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 7,
+          "score": 0.506,
+          "score_pct": 51,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 8,
+          "score": 0.0,
+          "score_pct": 0,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 9,
+          "score": 0.465,
+          "score_pct": 46,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 10,
+          "score": 0.0,
+          "score_pct": 0,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 11,
+          "score": 0.547,
+          "score_pct": 55,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 12,
+          "score": 0.0,
+          "score_pct": 0,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 13,
+          "score": 0.504,
+          "score_pct": 50,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 14,
+          "score": 0.0,
+          "score_pct": 0,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 15,
+          "score": 0.456,
+          "score_pct": 46,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 16,
+          "score": 0.0,
+          "score_pct": 0,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 17,
+          "score": 0.5,
+          "score_pct": 50,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 18,
+          "score": 0.0,
+          "score_pct": 0,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 19,
+          "score": 0.466,
+          "score_pct": 47,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 20,
+          "score": 0.0,
+          "score_pct": 0,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 21,
+          "score": 0.458,
+          "score_pct": 46,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 22,
+          "score": 0.0,
+          "score_pct": 0,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 23,
+          "score": 0.51,
+          "score_pct": 51,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 24,
+          "score": 0.0,
+          "score_pct": 0,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 25,
+          "score": 0.474,
+          "score_pct": 47,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 26,
+          "score": 0.0,
+          "score_pct": 0,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 27,
+          "score": 0.539,
+          "score_pct": 54,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 28,
+          "score": 0.0,
+          "score_pct": 0,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 29,
+          "score": 0.509,
+          "score_pct": 51,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 30,
+          "score": 0.0,
+          "score_pct": 0,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "set": 9,
+      "exercise_id": "squat.bodyweight",
+      "set_score": 0.0,
+      "set_score_pct": 0,
+      "reps": [
+        {
+          "rep": 1,
+          "score": 0.492,
+          "score_pct": 49,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 2,
+          "score": 0.0,
+          "score_pct": 0,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 3,
+          "score": 0.502,
+          "score_pct": 50,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 4,
+          "score": 0.0,
+          "score_pct": 0,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 5,
+          "score": 0.47,
+          "score_pct": 47,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 6,
+          "score": 0.0,
+          "score_pct": 0,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 7,
+          "score": 0.474,
+          "score_pct": 47,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 8,
+          "score": 0.0,
+          "score_pct": 0,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 9,
+          "score": 0.517,
+          "score_pct": 52,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 10,
+          "score": 0.0,
+          "score_pct": 0,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 11,
+          "score": 0.482,
+          "score_pct": 48,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 12,
+          "score": 0.0,
+          "score_pct": 0,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 13,
+          "score": 0.457,
+          "score_pct": 46,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 14,
+          "score": 0.0,
+          "score_pct": 0,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 15,
+          "score": 0.55,
+          "score_pct": 55,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 16,
+          "score": 0.0,
+          "score_pct": 0,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 17,
+          "score": 0.457,
+          "score_pct": 46,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 18,
+          "score": 0.0,
+          "score_pct": 0,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 19,
+          "score": 0.477,
+          "score_pct": 48,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 20,
+          "score": 0.0,
+          "score_pct": 0,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 21,
+          "score": 0.538,
+          "score_pct": 54,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 22,
+          "score": 0.0,
+          "score_pct": 0,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 23,
+          "score": 0.487,
+          "score_pct": 49,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 24,
+          "score": 0.0,
+          "score_pct": 0,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 25,
+          "score": 0.533,
+          "score_pct": 53,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 26,
+          "score": 0.0,
+          "score_pct": 0,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 27,
+          "score": 0.511,
+          "score_pct": 51,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 28,
+          "score": 0.0,
+          "score_pct": 0,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 29,
+          "score": 0.515,
+          "score_pct": 52,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 30,
+          "score": 0.0,
+          "score_pct": 0,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "set": 10,
+      "exercise_id": "squat.bodyweight",
+      "set_score": 0.0,
+      "set_score_pct": 0,
+      "reps": [
+        {
+          "rep": 1,
+          "score": 0.532,
+          "score_pct": 53,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 2,
+          "score": 0.0,
+          "score_pct": 0,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 3,
+          "score": 0.516,
+          "score_pct": 52,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 4,
+          "score": 0.0,
+          "score_pct": 0,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 5,
+          "score": 0.463,
+          "score_pct": 46,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 6,
+          "score": 0.0,
+          "score_pct": 0,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 7,
+          "score": 0.461,
+          "score_pct": 46,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 8,
+          "score": 0.0,
+          "score_pct": 0,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 9,
+          "score": 0.477,
+          "score_pct": 48,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 10,
+          "score": 0.0,
+          "score_pct": 0,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 11,
+          "score": 0.522,
+          "score_pct": 52,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 12,
+          "score": 0.0,
+          "score_pct": 0,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 13,
+          "score": 0.513,
+          "score_pct": 51,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 14,
+          "score": 0.0,
+          "score_pct": 0,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 15,
+          "score": 0.499,
+          "score_pct": 50,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 16,
+          "score": 0.0,
+          "score_pct": 0,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 17,
+          "score": 0.535,
+          "score_pct": 54,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 18,
+          "score": 0.0,
+          "score_pct": 0,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 19,
+          "score": 0.492,
+          "score_pct": 49,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 20,
+          "score": 0.0,
+          "score_pct": 0,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 21,
+          "score": 0.45,
+          "score_pct": 45,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 22,
+          "score": 0.0,
+          "score_pct": 0,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 23,
+          "score": 0.514,
+          "score_pct": 51,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 24,
+          "score": 0.0,
+          "score_pct": 0,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 25,
+          "score": 0.524,
+          "score_pct": 52,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 26,
+          "score": 0.0,
+          "score_pct": 0,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 27,
+          "score": 0.493,
+          "score_pct": 49,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 28,
+          "score": 0.0,
+          "score_pct": 0,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 29,
+          "score": 0.458,
+          "score_pct": 46,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        },
+        {
+          "rep": 30,
+          "score": 0.0,
+          "score_pct": 0,
+          "notes": [
+            {
+              "crit": "depth",
+              "severity": "med",
+              "text": "עמוק מעט יותר"
+            },
+            {
+              "crit": "knees",
+              "severity": "low",
+              "text": "שמור על ברכיים בקו האצבעות"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

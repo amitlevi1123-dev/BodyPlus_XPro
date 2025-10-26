@@ -1,0 +1,153 @@
+{
+  "env": {
+    "Python": "3.11.9",
+    "Platform": "Windows-10-10.0.19045-SP0",
+    "Machine": "AMD64",
+    "CPU": "AMD64 Family 25 Model 80 Stepping 0, AuthenticAMD",
+    "WorkingDir": "C:\\Users\\Owner\\Desktop\\BodyPlus\\BodyPlus_XPro",
+    "Time": "2025-10-25 08:15:05",
+    "Venv": "C:\\Users\\Owner\\Desktop\\BodyPlus\\.venv"
+  },
+  "dirs": {
+    "core": {
+      "ok": true,
+      "note": "Exists=True Path=C:\\Users\\Owner\\Desktop\\BodyPlus\\BodyPlus_XPro\\core"
+    },
+    "app": {
+      "ok": true,
+      "note": "Exists=True Path=C:\\Users\\Owner\\Desktop\\BodyPlus\\BodyPlus_XPro\\app"
+    },
+    "admin_web": {
+      "ok": true,
+      "note": "Exists=True Path=C:\\Users\\Owner\\Desktop\\BodyPlus\\BodyPlus_XPro\\admin_web"
+    },
+    "exercise_engine": {
+      "ok": true,
+      "note": "Exists=True Path=C:\\Users\\Owner\\Desktop\\BodyPlus\\BodyPlus_XPro\\exercise_engine"
+    },
+    "exercise_library": {
+      "ok": true,
+      "note": "Exists=True Path=C:\\Users\\Owner\\Desktop\\BodyPlus\\BodyPlus_XPro\\exercise_library"
+    },
+    "tools": {
+      "ok": true,
+      "note": "Exists=True Path=C:\\Users\\Owner\\Desktop\\BodyPlus\\BodyPlus_XPro\\tools"
+    }
+  },
+  "modules": {
+    "core.logs": {
+      "ok": true,
+      "note": ""
+    },
+    "core.payload": {
+      "ok": true,
+      "note": ""
+    },
+    "app.ui.video": {
+      "ok": true,
+      "note": ""
+    },
+    "app.ui.video_metrics_worker": {
+      "ok": true,
+      "note": ""
+    },
+    "admin_web.server": {
+      "ok": true,
+      "note": ""
+    },
+    "admin_web.routes_video": {
+      "ok": true,
+      "note": ""
+    },
+    "exercise_engine.runtime.runtime": {
+      "ok": true,
+      "note": ""
+    },
+    "exercise_engine.runtime.engine_settings": {
+      "ok": true,
+      "note": ""
+    }
+  },
+  "api": {
+    "total_routes": {
+      "ok": true,
+      "note": "52 routes detected"
+    },
+    "routes_complete": {
+      "ok": true,
+      "note": "All essential routes OK"
+    },
+    "payload_response": {
+      "ok": true,
+      "note": "Status=200 Keys=['metrics', 'objdet', 'payload_version', 'pixels', 'ts']"
+    }
+  },
+  "files": {
+    "core/configs/object_detection.yaml": {
+      "ok": false,
+      "note": "Exists=False"
+    },
+    "core/configs/phrases.yaml": {
+      "ok": false,
+      "note": "Exists=False"
+    },
+    "exercise_library_yamls": {
+      "ok": true,
+      "note": "6 YAML found"
+    }
+  },
+  "libs": {
+    "flask": {
+      "ok": true,
+      "note": "3.0.3"
+    },
+    "mediapipe": {
+      "ok": true,
+      "note": "0.10.9"
+    },
+    "onnxruntime": {
+      "ok": true,
+      "note": "1.18.1"
+    },
+    "torch": {
+      "ok": true,
+      "note": "2.8.0+cpu"
+    },
+    "numpy": {
+      "ok": true,
+      "note": "1.26.4"
+    },
+    "pandas": {
+      "ok": true,
+      "note": "2.3.3"
+    },
+    "requests": {
+      "ok": true,
+      "note": "2.31.0"
+    }
+  },
+  "system": {
+    "port_5000": {
+      "ok": true,
+      "note": "Free"
+    },
+    "port_8080": {
+      "ok": true,
+      "note": "Free"
+    },
+    "port_80": {
+      "ok": true,
+      "note": "Free"
+    }
+  },
+  "hardware": {
+    "torch_cuda": {
+      "ok": false,
+      "note": "CPU only"
+    },
+    "onnx_providers": {
+      "ok": true,
+      "note": "['AzureExecutionProvider', 'CPUExecutionProvider']"
+    }
+  }
+}

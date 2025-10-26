@@ -1,0 +1,200 @@
+{
+  "simulate": {
+    "ok": true,
+    "ui_ranges": {
+      "color_bar": [
+        {
+          "label": "red",
+          "from_pct": 0,
+          "to_pct": 60
+        },
+        {
+          "label": "orange",
+          "from_pct": 60,
+          "to_pct": 75
+        },
+        {
+          "label": "green",
+          "from_pct": 75,
+          "to_pct": 100
+        }
+      ]
+    },
+    "sets_total": 1,
+    "reps_total": 6,
+    "sets": [
+      {
+        "set": 1,
+        "exercise_id": "squat.bodyweight",
+        "set_score": 0.75,
+        "set_score_pct": 75,
+        "reps": [
+          {
+            "rep": 1,
+            "score": 0.853,
+            "score_pct": 85,
+            "notes": [
+              {
+                "crit": "depth",
+                "severity": "med",
+                "text": "עמוק מעט יותר"
+              },
+              {
+                "crit": "knees",
+                "severity": "low",
+                "text": "שמור על ברכיים בקו האצבעות"
+              }
+            ]
+          },
+          {
+            "rep": 2,
+            "score": 0.659,
+            "score_pct": 66,
+            "notes": [
+              {
+                "crit": "depth",
+                "severity": "med",
+                "text": "עמוק מעט יותר"
+              },
+              {
+                "crit": "knees",
+                "severity": "low",
+                "text": "שמור על ברכיים בקו האצבעות"
+              }
+            ]
+          },
+          {
+            "rep": 3,
+            "score": 0.846,
+            "score_pct": 85,
+            "notes": [
+              {
+                "crit": "depth",
+                "severity": "med",
+                "text": "עמוק מעט יותר"
+              },
+              {
+                "crit": "knees",
+                "severity": "low",
+                "text": "שמור על ברכיים בקו האצבעות"
+              }
+            ]
+          },
+          {
+            "rep": 4,
+            "score": 0.656,
+            "score_pct": 66,
+            "notes": [
+              {
+                "crit": "depth",
+                "severity": "med",
+                "text": "עמוק מעט יותר"
+              },
+              {
+                "crit": "knees",
+                "severity": "low",
+                "text": "שמור על ברכיים בקו האצבעות"
+              }
+            ]
+          },
+          {
+            "rep": 5,
+            "score": 0.855,
+            "score_pct": 86,
+            "notes": [
+              {
+                "crit": "depth",
+                "severity": "med",
+                "text": "עמוק מעט יותר"
+              },
+              {
+                "crit": "knees",
+                "severity": "low",
+                "text": "שמור על ברכיים בקו האצבעות"
+              }
+            ]
+          },
+          {
+            "rep": 6,
+            "score": 0.646,
+            "score_pct": 65,
+            "notes": [
+              {
+                "crit": "depth",
+                "severity": "med",
+                "text": "עמוק מעט יותר"
+              },
+              {
+                "crit": "knees",
+                "severity": "low",
+                "text": "שמור על ברכיים בקו האצבעות"
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "analyze": {
+    "exercise": {
+      "id": "squat.bodyweight"
+    },
+    "ui_ranges": {
+      "color_bar": [
+        {
+          "label": "red",
+          "from_pct": 0,
+          "to_pct": 60
+        },
+        {
+          "label": "orange",
+          "from_pct": 60,
+          "to_pct": 75
+        },
+        {
+          "label": "green",
+          "from_pct": 75,
+          "to_pct": 100
+        }
+      ]
+    },
+    "scoring": {
+      "score": 0.67,
+      "score_pct": 67,
+      "grade": "C",
+      "quality": "C",
+      "unscored_reason": "missing_critical",
+      "criteria": [
+        {
+          "id": "depth",
+          "available": false,
+          "score": null,
+          "score_pct": null,
+          "reason": "missing_critical"
+        },
+        {
+          "id": "knees",
+          "available": false,
+          "score": null,
+          "score_pct": null,
+          "reason": "missing"
+        }
+      ],
+      "criteria_breakdown_pct": {
+        "depth": null,
+        "knees": null
+      }
+    },
+    "hints": [
+      "אין מספיק מידע לניקוד — ודא שמדדים מוזרמים"
+    ]
+  },
+  "sanitize": {
+    "a": 5.5
+  },
+  "indicators": {
+    "simulate_has_sets": true,
+    "analyze_has_scoring": true,
+    "sanitize_numeric_only_ok": true
+  }
+}
