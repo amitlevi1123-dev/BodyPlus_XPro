@@ -1,0 +1,151 @@
+# -------------------------------------------------------------------
+# squat_barbell.yaml — סקוואט עם מוט (Barbell Squat)
+# -------------------------------------------------------------------
+# קובץ תרגיל מבוסס ראיות: ספי עומק סביב 90°, טווחי זוויות רגליים
+# 8–20°, דגש בטיחותי כבד על עגילת גב/ולגוס/עיקום צדדי, ועקבים נעוצים.
+# יורש את מדיניות ה-scoring וה-Caps מ-squat.base.
+# -------------------------------------------------------------------
+
+id: squat.barbell
+family: squat
+extends: squat.base
+
+meta:
+  selectable: true
+  display_name: "סקוואט עם מוט"
+  description: "סקוואט עם מוט — עומק סביב 90°, עקבים נעוצים, קצב נשלט ובטיחות גב/ברכיים."
+  equipment: "מוט"
+
+# ────────────────────────────────
+# התאמות scoring ייעודיות לברבל
+# ────────────────────────────────
+scoring:
+  policy:
+    missing: skip
+    min_criteria_for_full_quality: 3
+
+  criteria:
+
+    # 🛡️ בטיחות — משקלים גבוהים (יורשים מה-base את השמות הלוגיים)
+    spine_rounding:
+      weight: 2.2
+      rule:
+        kind: linear_band
+        input: spine_flexion_deg
+        good_max: 10      # ≤10° מצוין
+        ok_max:   20      # 10–20° בינוני
+        bad_max:  35      # ≥35° גרוע
+
+    knee_valgus:
+      weight: 2.0
+      rule:
+        kind: symmetric_threshold
+        input: "max(abs(knee_foot_alignment_left_deg), abs(knee_foot_alignment_right_deg))"
+        ok:   5           # ≤5° טוב
+        warn: 10          # 5–10° בינוני
+        bad:  20          # ≥20° גרוע
+
+    spine_sidebend:
+      weight: 1.5
+      rule:
+        kind: symmetric_threshold
+        input: spine_curvature_side_deg
+        ok:   5
+        warn: 10
+        bad:  20
+
+    # ⚙️ טכניקה
+    depth:
+      weight: 1.2
+      rule:
+        kind: threshold_window
+        input: "min(knee_left_deg, knee_right_deg)"
+        target_max: 90    # ≤90° = 1.0
+        cutoff_max: 150   # ≥150° = 0.0
+        direction: lower_is_better
+
+    tempo:
+      weight: 0.6
+      rule:
+        kind: tempo_window
+        input: rep.timing_s
+        min: 0.8          # איטי ממשקל גוף/דאמבל לשמירת שליטה
+        max: 3.0
+        cutoff_min: 0.5
+        cutoff_max: 4.5
+
+    stance_width:
+      weight: 0.8
+      rule:
+        kind: band_center
+        input: features.stance_width_ratio
+        min_ok: 0.90      # ~רוחב כתפיים (0.9–1.2×)
+        max_ok: 1.20
+        cutoff_min: 0.70
+        cutoff_max: 1.50
+
+    foot_angle:
+      weight: 0.7
+      rule:
+        kind: band_center
+        input: "mean(abs(toe_angle_left_deg), abs(toe_angle_right_deg))"
+        min_ok: 8         # 8–20° החוצה
+        max_ok: 20
+        cutoff_min: 0
+        cutoff_max: 30
+
+    head_alignment:
+      weight: 0.8
+      rule:
+        kind: symmetric_threshold
+        input: "abs(head_pitch_deg - spine_flexion_deg)"
+        ok:   10          # צוואר בקו עם עמוד השדרה (±10°)
+        warn: 20
+        bad:  30
+
+    heels_grounded:
+      weight: 0.8
+      rule:
+        kind: boolean_flag
+        input: "max(heel_lift_left, heel_lift_right)"  # 0=נעוץ, 1=מורם
+        true_score: 0.5
+        false_score: 1.0
+
+  # תקרות בטיחות — נשמרות כמו במשפחה
+  safety_caps:
+    - { when: "spine_rounding <= 0.6", cap: 0.70 }
+    - { when: "knee_valgus   <= 0.6", cap: 0.75 }
+    - { when: "spine_sidebend<= 0.6", cap: 0.80 }
+
+  aggregate:
+    method: weighted_mean
+    weights_source: inline
+
+# ────────────────────────────────
+# רמזי זיהוי (Auto-Detection)
+# ────────────────────────────────
+match_hints:
+  must_have:     [pose.available, objdet.bar_present]
+  must_not_have: [objdet.dumbbell_present, objdet.kettlebell_present]
+  pose_view:     ["front", "front_left", "front_right"]
+  motion_pattern:["hip_down", "knee_flexion"]
+  joints_focus:  ["hips", "knees", "spine"]
+
+# ────────────────────────────────
+# ספירת חזרות (Rep Signal)
+# ────────────────────────────────
+rep_signal:
+  source: "value|min|hip_y_px"
+  thresholds:
+    min_rom_good: 60
+    min_rep_ms:   500
+    max_rep_ms:   7000
+
+# -------------------------------------------------------------------
+# הערות יישום (תמצית):
+# • עומק: ציון עולה ליניארית עד 90° ברך ונעצר שם (לא מתגמל מעבר לכך).
+# • בטיחות: spine/knee/sidebend עם משקל גבוה ותקרות cap במקרה גרוע.
+# • עקבים: דגל רך אך משמעותי; שמירה על מגע מלא עדיפה תחת עומס.
+# • צוואר: יישור עם עמוד השדרה מפחית עומסים גזעיים (±10° יעד).
+# • נטיית גו (torso_forward_deg): לפידבק בלבד — לא ענישה כשלעצמה.
+# -------------------------------------------------------------------

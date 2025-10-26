@@ -6,7 +6,7 @@ admin_web/exercise_analyzer.py
 
 מטרות:
 - סימולציה (sets/reps) לצורכי UI ובדיקות ➜ simulate_exercise()
-- דו״ח סימולציה מלא (כמו analyze_exercise) ➜ build_simulated_report()
+- דו״ח סימולציה מלא (בפורמט analyze_exercise) ➜ build_simulated_report()
 - ניקוד דו"ח בודד מתוך metrics (חי/מדומה) ➜ analyze_exercise()
 - סניטציה של metrics מהקליינט ➜ sanitize_metrics_payload()
 
@@ -52,16 +52,6 @@ def _ui_ranges() -> Dict[str, Any]:
 def _clamp01(x: float) -> float:
     return max(0.0, min(1.0, float(x)))
 
-def _grade_for_pct(pct: Optional[float]) -> str:
-    if pct is None:
-        return "—"
-    p = float(pct)
-    if p >= 90: return "A"
-    if p >= 80: return "B"
-    if p >= 70: return "C"
-    if p >= 60: return "D"
-    return "E"
-
 def _pct(v: Optional[float]) -> Optional[int]:
     if v is None:
         return None
@@ -86,6 +76,20 @@ def _as_float(x) -> Optional[float]:
         return float(x)
     except Exception:
         return None
+
+def _quality_from_score(score: Optional[float]) -> Optional[str]:
+    """
+    ממפה ציון כללי לאיכות טכנית – ללא Grade:
+      full >= 0.85, partial >= 0.70, אחרת poor.
+    """
+    if score is None:
+        return None
+    s = float(score)
+    if s >= 0.85:
+        return "full"
+    if s >= 0.70:
+        return "partial"
+    return "poor"
 
 # ============ Sanitization ============
 def sanitize_metrics_payload(obj: Any) -> Dict[str, Any]:
@@ -123,7 +127,7 @@ def sanitize_metrics_payload(obj: Any) -> Dict[str, Any]:
                         if math.isfinite(fv):
                             out[k] = fv
                 except Exception:
-                    # מחרוזות מורשות
+                    # מחרוזות מורשות (מזהי תצוגה/מצבים)
                     if k in ("rep.phase", "view.mode", "view.primary", "exercise.id"):
                         out[k] = t
                 continue
@@ -378,18 +382,17 @@ def _criteria_breakdown_pct(criteria: List[Dict[str, Any]]) -> Dict[str, Optiona
             pass
     return out
 
-def _overall_from_criteria(criteria: List[Dict[str, Any]]) -> Tuple[Optional[float], str, List[str], Optional[str]]:
+def _overall_from_criteria(criteria: List[Dict[str, Any]]) -> Tuple[Optional[float], Optional[str], List[str], Optional[str]]:
     """
-    מחזיר: (overall_score[0..1], grade[A..E], hints[list], unscored_reason[str|None])
+    מחזיר: (overall_score[0..1], quality[str], hints[list], unscored_reason[str|None])
     """
     avail = [c for c in criteria if c.get("available") and (c.get("score") is not None)]
     if not avail:
         logger.warning("overall: no available criteria -> missing_critical")
-        return None, "—", ["אין מספיק מדדים זמינים כדי לנקד"], "missing_critical"
+        return None, None, ["אין מספיק מדדים זמינים כדי לנקד"], "missing_critical"
 
     avg = sum(float(c["score"]) for c in avail) / max(1, len(avail))
-    pct = _pct(avg) or 0
-    grade = _grade_for_pct(pct)
+    quality = _quality_from_score(avg)
     hints: List[str] = []
 
     # קח 2–3 הכי חלשים לרמזים
@@ -417,12 +420,12 @@ def _overall_from_criteria(criteria: List[Dict[str, Any]]) -> Tuple[Optional[flo
         if len(uniq) >= 3:
             break
 
-    return _clamp01(avg), grade, uniq, None
+    return _clamp01(avg), quality, uniq, None
 
 def analyze_exercise(payload: Dict[str, Any]) -> Dict[str, Any]:
     """
     ניתוח דו"ח יחיד מתוך metrics. מחזיר מבנה דו"ח בפורמט שה-UI מצפה לו.
-    לא תלוי בספריות חיצוניות (מנוע אמיתי מטופל ב-/api/exercise/detect).
+    אין Grade במערכת — מחזירים only quality (full/partial/poor).
     """
     try:
         exercise_id = None
@@ -441,10 +444,9 @@ def analyze_exercise(payload: Dict[str, Any]) -> Dict[str, Any]:
                 "exercise": {"id": exercise_id},
                 "ui_ranges": _ui_ranges(),
                 "scoring": {
-                    "score": 0.67,
-                    "score_pct": 67,
-                    "grade": "C",
-                    "quality": "C",  # תאימות לאחור ל-UI ישן
+                    "score": None,
+                    "score_pct": None,
+                    "quality": None,
                     "unscored_reason": "missing_critical",
                     "criteria": [
                         {"id": "depth", "available": False, "score": None, "score_pct": None, "reason": "missing_critical"},
@@ -456,7 +458,7 @@ def analyze_exercise(payload: Dict[str, Any]) -> Dict[str, Any]:
             }
 
         criteria = _criteria_from_metrics(metrics)
-        overall, grade, hints, unscored_reason = _overall_from_criteria(criteria)
+        overall, quality, hints, unscored_reason = _overall_from_criteria(criteria)
 
         # breakdown ל-tooltip
         breakdown = _criteria_breakdown_pct(criteria)
@@ -469,8 +471,7 @@ def analyze_exercise(payload: Dict[str, Any]) -> Dict[str, Any]:
                 "scoring": {
                     "score": None,
                     "score_pct": None,
-                    "grade": grade,
-                    "quality": grade,  # תאימות לאחור (אם UI היסטורי צופה quality=Grade)
+                    "quality": quality,
                     "unscored_reason": unscored_reason or "missing_critical",
                     "criteria": criteria,
                     "criteria_breakdown_pct": breakdown,
@@ -485,8 +486,7 @@ def analyze_exercise(payload: Dict[str, Any]) -> Dict[str, Any]:
             "scoring": {
                 "score": round(float(overall), 4),
                 "score_pct": pct,
-                "grade": grade,
-                "quality": grade,  # תאימות לאחור (UI ישנים)
+                "quality": quality,
                 "unscored_reason": None,
                 "criteria": criteria,
                 "criteria_breakdown_pct": breakdown,
@@ -501,15 +501,14 @@ def analyze_exercise(payload: Dict[str, Any]) -> Dict[str, Any]:
             "exercise": {"id": "squat.bodyweight"},
             "ui_ranges": _ui_ranges(),
             "scoring": {
-                "score": 0.67, "score_pct": 67, "grade": "C", "quality": "C",
+                "score": None, "score_pct": None, "quality": None,
                 "unscored_reason": "analyzer_error",
-                "criteria": [],
-                "criteria_breakdown_pct": {},
+                "criteria": [], "criteria_breakdown_pct": {},
             },
             "hints": ["שגיאת ניתוח – ראה לוגים"],
         }
 
-# ==== דו"ח סימולציה מלא (תואם ל-analyze_exercise) ====
+# ==== דו"ח סימולציה מלא (תואם analyze_exercise, כולל sets/reps) ====
 def build_simulated_report(
     mode: str = "mixed",
     sets: int = 1,
@@ -520,8 +519,8 @@ def build_simulated_report(
 ) -> Dict[str, Any]:
     """
     מחזיר דו״ח סימולטיבי במבנה זהה ל-analyze_exercise:
-    scoring{ score, score_pct, grade, criteria, criteria_breakdown_pct } + ui_ranges + hints.
-    משתמש ב-simulate_exercise כדי לייצר חזרות/סטים בפועל.
+    scoring{ score, score_pct, quality, criteria, criteria_breakdown_pct } + ui_ranges + hints.
+    בנוסף מצרף תחת המפתח "simulation" את ה-sets/reps הגולמי.
     """
     try:
         if seed is None:
@@ -542,7 +541,7 @@ def build_simulated_report(
 
         overall = round(float(sum(all_scores) / max(1, len(all_scores))) if all_scores else 0.0, 4)
         pct = int(round(overall * 100))
-        grade = _grade_for_pct(pct)
+        quality = _quality_from_score(overall)
 
         # קריטריונים סימולטיביים עקביים (מעניקים breakdown וטיפים)
         rng = random.Random(seed)
@@ -585,13 +584,12 @@ def build_simulated_report(
             "scoring": {
                 "score": overall,
                 "score_pct": pct,
-                "grade": grade,
-                "quality": grade,  # תאימות לאחור
+                "quality": quality,
                 "unscored_reason": None,
                 "criteria": criteria,
                 "criteria_breakdown_pct": breakdown,
             },
-            "hints": hints_uniq or ["כל הכבוד! המשך כך"],
+            "hints": hints_uniq or ["המשך ככה!"],
             "simulation": sim,  # ה-sets/reps הגולמי למי שצריך
         }
     except Exception as e:
@@ -600,7 +598,7 @@ def build_simulated_report(
             "exercise": {"id": exercise_id},
             "ui_ranges": _ui_ranges(),
             "scoring": {
-                "score": None, "score_pct": None, "grade": "—", "quality": "—",
+                "score": None, "score_pct": None, "quality": None,
                 "unscored_reason": "simulate_failed",
                 "criteria": [], "criteria_breakdown_pct": {},
             },

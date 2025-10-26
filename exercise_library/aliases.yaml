@@ -22,9 +22,9 @@
 settings:
   normalizer:
     conflict_strategy:
-      numeric: mean     # ברירת מחדל נוכחית בקוד: ממוצע; אפשר לעבור ל-'first'
-      text: first       # מחרוזות: קח את הראשון
-      bool: first       # דגלים: קח את הראשון
+      numeric: mean
+      text: first
+      bool: first
     pass_through_prefixes: [rep., bar., pose., view., features., objdet.]
 
 canonical_keys:
@@ -68,7 +68,7 @@ canonical_keys:
     aliases: [pose.confidence, pose.average_confidence, confidence]
 
   # ────────────────────────────────────────────────────────────────────────────
-  # בר/אובייקטים (לפי סרגל/מוט)
+  # בר/אובייקטים (ציוד)
   # ────────────────────────────────────────────────────────────────────────────
   bar.y_px:
     unit: px
@@ -77,6 +77,14 @@ canonical_keys:
   objdet.bar_present:
     unit: bool
     aliases: [objdet.bar_present, bar.present]
+
+  objdet.dumbbell_present:
+    unit: bool
+    aliases: [objdet.dumbbell_present, dumbbell.present]
+
+  objdet.kettlebell_present:
+    unit: bool
+    aliases: [objdet.kettlebell_present, kettlebell.present]
 
   # ────────────────────────────────────────────────────────────────────────────
   # נקודות עוגן ביד/שורש כף היד (ל־reps auto-pick)
@@ -102,7 +110,11 @@ canonical_keys:
 
   spine_flexion_deg:
     unit: deg
-    aliases: [spine_flexion_deg, spine_curvature_side_deg]
+    aliases: [spine_flexion_deg]  # ⬅️ תיקון: הוסר alias שגוי של spine_curvature_side_deg
+
+  spine_curvature_side_deg:
+    unit: deg
+    aliases: [spine_curvature_side_deg]
 
   torso_forward_vel_deg_s:
     unit: deg_s
@@ -292,7 +304,7 @@ canonical_keys:
 
   rep.phase:
     unit: text
-    aliases: [rep.phase]  # אופציונלי; ממופה ע"י phase_map בתרגיל
+    aliases: [rep.phase]
 
   rep.dir:
     unit: text
@@ -381,64 +393,20 @@ canonical_keys:
     unit: bool
     aliases: [rep.warnings.auto_target_used]
 
-  # ────────────────────────────────────────────────────────────────────────────
-  # סטים: טריגרים/מצב/סיכומי סט (נכתב ע"י SetCounter)
-  # ────────────────────────────────────────────────────────────────────────────
-  set.begin:
-    unit: bool
-    aliases: [set.begin]
-
-  set.end:
-    unit: bool
-    aliases: [set.end]
-
-  set.index:
-    unit: count
-    aliases: [set.index]
-
-  rep.set_active:
-    unit: bool
-    aliases: [rep.set_active]
-
-  rep.set_index:
-    unit: count
-    aliases: [rep.set_index]
-
-  rep.set_reps:
-    unit: count
-    aliases: [rep.set_reps]
-
-  rep.set_total:
-    unit: count
-    aliases: [rep.set_total]
-
-  rep.set_last_ok:
-    unit: bool
-    aliases: [rep.set_last_ok]
-
-  rep.set_last_reps:
-    unit: count
-    aliases: [rep.set_last_reps]
-
-  rep.set_last_duration_s:
-    unit: s
-    aliases: [rep.set_last_duration_s]
-
 # =============================================================================
 # טולרנסים בין aliases של אותו מפתח קנוני
-# אם שני aliases של אותו מפתח מחזירים ערכים שונים מעבר לטולרנס — יופיע alias_conflict.
 # =============================================================================
 tolerances:
-  deg:     0.5      # מעלות
-  deg_s:   1.0      # מעלות/שנייה
-  deg_s2:  10.0     # מעלות/שנייה^2
-  ratio:   0.02     # יחס חסר יחידות
-  s:       0.05     # שניות
-  px:      2.0      # פיקסלים
-  ms:      30.0     # מילישניות (dt_ms וכו')
-  count:   0        # מזהים/מונה — לא ממוצעים
-  text:    0        # לא רלוונטי (תיעוד/אינבנטורי)
-  bool:    0        # לא רלוונטי (דגלים)
+  deg:     0.5
+  deg_s:   1.0
+  deg_s2:  10.0
+  ratio:   0.02
+  s:       0.05
+  px:      2.0
+  ms:      30.0
+  count:   0
+  text:    0
+  bool:    0
 
 # =============================================================================
 # 🛠️ רעיונות עתידיים (תיעוד בלבד)
