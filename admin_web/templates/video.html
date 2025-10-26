@@ -34,9 +34,9 @@
 
     <!-- פרופילים מהירים -->
     <div class="flex flex-wrap gap-2 mb-4">
-      <button type="button" class="px-3 py-2 rounded-lg bg-gray-100 hover:bg-gray-200 text-sm" data-profile="Eco">Eco (חסכוני)</button>
-      <button type="button" class="px-3 py-2 rounded-lg bg-gray-100 hover:bg-gray-200 text-sm" data-profile="Balanced">Balanced (ברירת מחדל)</button>
-      <button type="button" class="px-3 py-2 rounded-lg bg-gray-100 hover:bg-gray-200 text-sm" data-profile="Quality">Quality (איכות)</button>
+      <button type="button" class="px-3 py-2 rounded-lg bg-gray-100 hover:bg-gray-200 text-sm" data-profile="eco">Eco (חסכוני)</button>
+      <button type="button" class="px-3 py-2 rounded-lg bg-gray-100 hover:bg-gray-200 text-sm" data-profile="balanced">Balanced (ברירת מחדל)</button>
+      <button type="button" class="px-3 py-2 rounded-lg bg-gray-100 hover:bg-gray-200 text-sm" data-profile="quality">Quality (איכות)</button>
     </div>
 
     <!-- פרמטרים ידניים -->
@@ -112,14 +112,14 @@
       <dl class="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
         <dt class="text-gray-500">מצב:</dt>                <dd id="v-state" class="font-medium">—</dd>
         <dt class="text-gray-500">פתוח (opened):</dt>      <dd id="v-opened">—</dd>
-        <dt class="text-gray-500">רץ (running):</dt>       <dd id="v-running">—</dd>
-        <dt class="text-gray-500">FPS:</dt>                <dd id="v-fps">—</dd>
-        <dt class="text-gray-500">גודל פריים:</dt>        <dd id="v-size">—</dd>
-        <dt class="text-gray-500">מקור:</dt>              <dd id="v-source">—</dd>
-        <dt class="text-gray-500">מצב תאורה:</dt>         <dd id="v-light">—</dd>
-        <dt class="text-gray-500">חלון Preview פתוח:</dt> <dd id="v-preview">—</dd>
-        <dt class="text-gray-500">שגיאה אחרונה:</dt>      <dd id="v-error" class="text-red-600">—</dd>
-        <dt class="text-gray-500">עודכן:</dt>              <dd id="v-updated">—</dd>
+        <dt class="text-gray-500">רץ (running):</dd>       <dd id="v-running">—</dd>
+        <dt class="text-gray-500">FPS:</dd>                <dd id="v-fps">—</dd>
+        <dt class="text-gray-500">גודל פריים:</dd>        <dd id="v-size">—</dd>
+        <dt class="text-gray-500">מקור:</dd>              <dd id="v-source">—</dd>
+        <dt class="text-gray-500">מצב תאורה:</dd>         <dd id="v-light">—</dd>
+        <dt class="text-gray-500">חלון Preview פתוח:</dd> <dd id="v-preview">—</dd>
+        <dt class="text-gray-500">שגיאה אחרונה:</dd>      <dd id="v-error" class="text-red-600">—</dd>
+        <dt class="text-gray-500">עודכן:</dd>              <dd id="v-updated">—</dd>
       </dl>
     </div>
 
@@ -154,50 +154,13 @@
 {% endblock %}
 
 {% block scripts %}
-  <!-- קבצי שליטה/זרימה -->
+  <!-- ה־IMG שמתחבר ל־/video/stream.mjpg ומתחבר מחדש במקרה של ניתוק -->
   <script defer src="{{ url_for('static', filename='js/video_stream.js') }}?v={{ app_version|default('dev', true) }}"></script>
+
+  <!-- שליטה בפרופילים/פרמטרים/רזולוציה (נכתב למטה) -->
   <script defer src="{{ url_for('static', filename='js/video_controls.js') }}?v={{ app_version|default('dev', true) }}"></script>
 
-  <!-- חיבור ה־IMG ל־/video/stream.mjpg + אינדיקציית חיבור -->
-  <script>
-  (function(){
-    'use strict';
-    var img = document.getElementById('video-stream');
-    var ph  = document.getElementById('video-placeholder');
-    var dot = document.getElementById('dotConnected');
-    var txt = document.getElementById('txtConnected');
-
-    function setConn(on){
-      dot.classList.toggle('bg-green-500', !!on);
-      dot.classList.toggle('bg-gray-300', !on);
-      txt.textContent = on ? 'זרם פעיל' : 'אין זרם פעיל';
-    }
-
-    function setSrc(){
-      // cache-buster כדי למנוע קאש/באפרינג של דפדפן/פרוקסי
-      var url = '/video/stream.mjpg?_=' + Date.now();
-      img.src = url;
-    }
-
-    img.addEventListener('load', function(){
-      // ב־IMG של MJPEG load מתקבל מיידית (לא כל פריים) — מספיק לנו לאינדיקציה
-      if (ph) ph.classList.add('hidden');
-      setConn(true);
-    });
-
-    img.addEventListener('error', function(){
-      if (ph) ph.classList.remove('hidden');
-      setConn(false);
-      // נסה להתחבר שוב אחרי רגע
-      setTimeout(setSrc, 1200);
-    });
-
-    // התחל
-    setSrc();
-  })();
-  </script>
-
-  <!-- אינדיקציות כלליות (סטטוס/health/payload) -->
+  <!-- אינדיקציות סטטוס/health/payload -->
   <script>
   (function(){
     'use strict';
@@ -227,8 +190,8 @@
     function setHealth(h){
       $('h-ok').textContent  = (h && (h.ok === true || h.ok === 'true')) ? 'OK' : 'NOT OK';
       $('h-ver').textContent = (h && (h.ver || h.version)) || '{{ app_version|default("dev", true) }}';
-      $('h-now').textContent = h && h.now ? new Date(h.now*1000).toLocaleTimeString() : new Date().toLocaleTimeString();
-      var up = h && h.uptime_sec;
+      $('h-now').textContent = h && h.now ? new Date((h.now*1000) || Date.now()).toLocaleTimeString() : new Date().toLocaleTimeString();
+      var up = h && (h.uptime_sec ?? h.uptime);
       $('h-uptime').textContent = (Number.isFinite(up) ? String(up) : '—');
     }
 
@@ -263,7 +226,7 @@
       var st = await fetchJson('/api/video/status', 3000);
       if (st) setVideoState(st);
       var h  = await fetchJson('/healthz', 3000);
-      setHealth(h);
+      if (h) setHealth(h);
       var p  = await fetchJson('/payload', 3000);
       if (p) setPayload(p);
     }

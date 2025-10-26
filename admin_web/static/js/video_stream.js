@@ -1,6 +1,7 @@
 /* eslint-disable no-console */
-// static/js/video_stream.js — הזרמת MJPEG עם אפשרות החלפת מקור בזמן ריצה
+/* static/js/video_stream.js — הזרמת MJPEG עם החלפת מקור בזמן ריצה */
 (function () {
+  'use strict';
   const img = document.getElementById("video-stream");
   const placeholder = document.getElementById("video-placeholder");
   if (!img) return;
@@ -87,11 +88,12 @@
       if (d === 'use_file_stream')   window.useFileStream();
       if (d === 'use_camera_stream') window.useCameraStream();
     };
+    window.__bpVideoSourceChannel = ch;
   } catch (_) {}
 
   // 2) window.postMessage (fallback)
   window.addEventListener('message', (ev) => {
-    const d = ev && ev.data || {};
+    const d = (ev && ev.data) || {};
     if (d && d.type === 'use_file_stream')   window.useFileStream();
     if (d && d.type === 'use_camera_stream') window.useCameraStream();
   });
@@ -99,6 +101,5 @@
   // ========================
   // התחלה
   // ========================
-  // ברירת מחדל מצלמה, עד שיגיע טריגר מהטאב של “העלאת וידאו”
   window.useCameraStream();
 })();

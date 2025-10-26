@@ -65,6 +65,19 @@
           <span class="status-dot" id="exerciseStatusDot"></span>
           <div class="text-sm text-gray-600">חיבור API / מצב סטרים</div>
         </div>
+
+        <!-- חיווי בריאות מערכת -->
+        <div class="flex items-center gap-3">
+          <span class="status-dot" id="healthDot"></span>
+          <div class="text-sm text-gray-600">בריאות מערכת (healthz)</div>
+          <span class="text-xs text-gray-500" id="healthInfo">—</span>
+        </div>
+        <div class="flex items-center gap-3">
+          <span class="status-dot" id="readyDot"></span>
+          <div class="text-sm text-gray-600">מוכנות (readyz)</div>
+          <span class="text-xs text-gray-500" id="readyInfo">—</span>
+        </div>
+
         <div class="grid grid-cols-2 gap-4">
           <div class="flex flex-col items-center gap-1">
             <div id="gaugeRep" class="gauge" title=""></div>
@@ -119,6 +132,7 @@
         <button id="btnSimRun" class="px-4 py-2 rounded-lg text-white bg-primary hover:opacity-90">התחל סימולציה</button>
         <button id="btnSimClear" class="px-4 py-2 rounded-lg border border-gray-300 hover:bg-gray-50">נקה טבלה</button>
         <button id="btnServerScore" class="px-4 py-2 rounded-lg text-white bg-indigo-600 hover:opacity-90">דוח ניקוד (שרת)</button>
+        <button id="btnOpenLastJson" class="px-4 py-2 rounded-lg border border-gray-300 hover:bg-gray-50">פתח JSON אחרון</button>
       </div>
     </div>
 
@@ -133,11 +147,12 @@
             <th class="py-2 px-3 text-right">איכות</th>
             <th class="py-2 px-3 text-right">Unscored</th>
             <th class="py-2 px-3 text-right">הערה</th>
+            <th class="py-2 px-3 text-right">JSON</th>
             <th class="py-2 px-3 text-right">פירוט</th>
           </tr>
         </thead>
         <tbody id="simTbody">
-          <tr><td colspan="8" class="py-6 text-center text-gray-400">אין נתונים — הרץ סימולציה</td></tr>
+          <tr><td colspan="9" class="py-6 text-center text-gray-400">אין נתונים — הרץ סימולציה</td></tr>
         </tbody>
       </table>
     </div>

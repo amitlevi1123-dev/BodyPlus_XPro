@@ -6,16 +6,20 @@ admin_web/exercise_analyzer.py
 
 מטרות:
 - סימולציה (sets/reps) לצורכי UI ובדיקות ➜ simulate_exercise()
+- דו״ח סימולציה מלא (כמו analyze_exercise) ➜ build_simulated_report()
 - ניקוד דו"ח בודד מתוך metrics (חי/מדומה) ➜ analyze_exercise()
 - סניטציה של metrics מהקליינט ➜ sanitize_metrics_payload()
 
-שימוש מ-server.py:
-from admin_web.exercise_analyzer import analyze_exercise, simulate_exercise, sanitize_metrics_payload
+שימוש:
+from admin_web.exercise_analyzer import (
+    analyze_exercise, simulate_exercise, build_simulated_report, sanitize_metrics_payload
+)
 """
 
 from __future__ import annotations
 import math
 import random
+import time
 from typing import Any, Dict, List, Optional, Tuple
 
 # ===== Logging (נופל-בחסד אם core.logs לא קיים) =====
@@ -30,10 +34,10 @@ __all__ = [
     "sanitize_metrics_payload",
     "simulate_exercise",
     "analyze_exercise",
+    "build_simulated_report",
 ]
 
 # ============ UI constants ============
-
 _UI_COLOR_BAR = [
     {"label": "red",    "from_pct": 0,  "to_pct": 60},
     {"label": "orange", "from_pct": 60, "to_pct": 75},
@@ -45,7 +49,6 @@ def _ui_ranges() -> Dict[str, Any]:
     return {"color_bar": list(_UI_COLOR_BAR)}
 
 # ============ Utilities ============
-
 def _clamp01(x: float) -> float:
     return max(0.0, min(1.0, float(x)))
 
@@ -85,7 +88,6 @@ def _as_float(x) -> Optional[float]:
         return None
 
 # ============ Sanitization ============
-
 def sanitize_metrics_payload(obj: Any) -> Dict[str, Any]:
     """
     מסדר קלט גולמי ל-dict של metrics (מספרים סופיים בלבד + כמה מחרוזות מורשות).
@@ -133,7 +135,6 @@ def sanitize_metrics_payload(obj: Any) -> Dict[str, Any]:
     return out
 
 # ============ Simulation ============
-
 def _mode_to_mean_std(mode: Optional[str], default_mean: float, default_std: float, noise: Optional[float]) -> Tuple[float, float]:
     """
     מפה 'mode' (אם התקבל מהלקוח) לממוצע/סטיית תקן סימולציה.
@@ -220,7 +221,6 @@ def simulate_exercise(
         return {"ok": False, "error": "simulate_failed", "ui_ranges": _ui_ranges(), "sets": []}
 
 # ============ Analyzer (heuristics) ============
-
 # סט מפתחות עיקרי לציון "סקווט גוף"
 _EXPECTED_KEYS = {
     "torso_vs_vertical_deg",  # זווית גב מול אנך
@@ -507,4 +507,102 @@ def analyze_exercise(payload: Dict[str, Any]) -> Dict[str, Any]:
                 "criteria_breakdown_pct": {},
             },
             "hints": ["שגיאת ניתוח – ראה לוגים"],
+        }
+
+# ==== דו"ח סימולציה מלא (תואם ל-analyze_exercise) ====
+def build_simulated_report(
+    mode: str = "mixed",
+    sets: int = 1,
+    reps: int = 5,
+    noise: float = 0.12,
+    exercise_id: str = "squat.bodyweight",
+    seed: Optional[int] = None,   # אם None -> רנדומלי בכל קליק
+) -> Dict[str, Any]:
+    """
+    מחזיר דו״ח סימולטיבי במבנה זהה ל-analyze_exercise:
+    scoring{ score, score_pct, grade, criteria, criteria_breakdown_pct } + ui_ranges + hints.
+    משתמש ב-simulate_exercise כדי לייצר חזרות/סטים בפועל.
+    """
+    try:
+        if seed is None:
+            seed = int(time.time() * 1000) & 0xFFFFFFFF
+
+        sim = simulate_exercise(
+            sets=sets, reps=reps, mean_score=0.75, std=0.10,
+            mode=mode, noise=noise, seed=seed
+        )
+
+        # סיכום ציון כולל מכל החזרות
+        all_scores: List[float] = []
+        for s in sim.get("sets", []):
+            for r in s.get("reps", []):
+                sc = r.get("score")
+                if isinstance(sc, (int, float)):
+                    all_scores.append(float(sc))
+
+        overall = round(float(sum(all_scores) / max(1, len(all_scores))) if all_scores else 0.0, 4)
+        pct = int(round(overall * 100))
+        grade = _grade_for_pct(pct)
+
+        # קריטריונים סימולטיביים עקביים (מעניקים breakdown וטיפים)
+        rng = random.Random(seed)
+        def _jitter(base: float, amp: float = 0.15) -> float:
+            return _clamp01(base + (rng.random() - 0.5) * 2.0 * amp)
+
+        crit_map = [
+            ("depth",        _jitter(overall, 0.25)),
+            ("knees",        _jitter(overall, 0.20)),
+            ("torso_angle",  _jitter(overall, 0.18)),
+            ("stance_width", _jitter(overall, 0.20)),
+            ("tempo",        _jitter(overall, 0.15)),
+        ]
+        criteria = [{
+            "id": cid, "available": True,
+            "score": sc, "score_pct": _safe_pct(sc), "reason": None
+        } for cid, sc in crit_map]
+        breakdown = {c["id"]: c["score_pct"] for c in criteria}
+
+        # רמזים – 2–3 החלשים
+        weak = sorted(criteria, key=lambda c: (c.get("score") or 0.0))[:3]
+        hints: List[str] = []
+        for w in weak:
+            wid = w["id"]
+            if wid == "depth":          hints.append("העמק מעט בתחתית")
+            elif wid == "knees":        hints.append("שמור על ברכיים בקו האצבעות")
+            elif wid == "torso_angle":  hints.append("שמור על גב זקוף יותר")
+            elif wid == "stance_width": hints.append("כוון רוחב עמידה מעט")
+            elif wid == "tempo":        hints.append("ווסת את הקצב (1–2 שניות לחזרה)")
+        hints_uniq: List[str] = []
+        for h in hints:
+            if h not in hints_uniq:
+                hints_uniq.append(h)
+            if len(hints_uniq) >= 3:
+                break
+
+        return {
+            "exercise": {"id": exercise_id},
+            "ui_ranges": _ui_ranges(),
+            "scoring": {
+                "score": overall,
+                "score_pct": pct,
+                "grade": grade,
+                "quality": grade,  # תאימות לאחור
+                "unscored_reason": None,
+                "criteria": criteria,
+                "criteria_breakdown_pct": breakdown,
+            },
+            "hints": hints_uniq or ["כל הכבוד! המשך כך"],
+            "simulation": sim,  # ה-sets/reps הגולמי למי שצריך
+        }
+    except Exception as e:
+        logger.error("build_simulated_report failed: %s", e, exc_info=True)
+        return {
+            "exercise": {"id": exercise_id},
+            "ui_ranges": _ui_ranges(),
+            "scoring": {
+                "score": None, "score_pct": None, "grade": "—", "quality": "—",
+                "unscored_reason": "simulate_failed",
+                "criteria": [], "criteria_breakdown_pct": {},
+            },
+            "hints": ["שגיאת סימולציה – ראה לוגים"],
         }

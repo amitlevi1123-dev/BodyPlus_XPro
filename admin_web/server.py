@@ -1,20 +1,23 @@
 # -*- coding: utf-8 -*-
 """
-server.py — Admin UI + API (גרסה רזה, בלי video_manager)
+server.py — Admin UI + API (גרסה רזה, ללא video_manager)
 --------------------------------------------------------
 • Flask (דשבורד, לוגים, וידאו) — /video/stream.mjpg
 • /payload מעדיף admin_web.state; אחרת LAST_PAYLOAD המקומי
-• סטרימר ל-MJPEG דרך routes_video (אם נטען) או ישירות מ-app.ui.video
+• סטרים MJPEG מגיע דרך admin_web.routes_video (ingest/streamer)
 • ObjDet ב-blueprint נפרד (routes_objdet.py)
 • תרגילים: /api/exercise/*
 
-תיקון חשוב:
-- אם יש קבצי UI דחוסים מראש (*.html.gz / .js.gz / .css.gz) – נוספו ראוטים שמחזירים אותם
-  עם Content-Encoding: gzip כדי שהדפדפן יציג נכון ולא "ג'יבריש".
+כולל:
+- ProxyFix (לעבודה תקינה מאחורי Reverse Proxy)
+- /capture (דף לפתיחת מצלמה בדפדפן ושידור ל-ingest)
+- /version, /healthz, /readyz
+- הגשה דחוסה מראש לקבצי UI (html/js/css.gz)
 
-הרחבות קריטיות:
-- /version  • /healthz (משודרג)  • /readyz
-- Rate-limit לפרוצדורות start/stop וידאו (429 אם מהר מדי)
+שימו לב:
+- /api/exercise/simulate תומך בשני מצבים:
+  1) ברירת מחדל: מחזיר sets/reps (תואם בדיקות).
+  2) אם as="report" או full_report=true: מחזיר דו״ח מלא (build_simulated_report).
 """
 
 from __future__ import annotations
@@ -28,17 +31,25 @@ from flask import (
     Flask, Response, jsonify, render_template, request, send_from_directory,
     stream_with_context, redirect, url_for, send_file, make_response
 )
+from werkzeug.middleware.proxy_fix import ProxyFix
 
-# === וידאו — חובה שה-BP ייטען; אם יש שגיאה, שנדע עליה ===
-from admin_web.routes_video import video_bp  # אל תעטוף ב-try/except
+# === וידאו — חובה שה-BP ייטען (ingest/MJPEG/HUD) ===
+from admin_web.routes_video import video_bp  # וידאו בנתיב שביקשת
 
-# === חדש: Blueprint לטאב "העלאת וידאו" ===
-from admin_web.routes_upload_video import upload_video_bp
+# === Blueprint לטאב "העלאת וידאו" (אם קיים בפרויקט) ===
+try:
+    from admin_web.routes_upload_video import upload_video_bp
+except Exception:
+    upload_video_bp = None  # type: ignore
 
-# === חדש: Action Bus + Video State ===
-from admin_web.routes_actions import actions_bp, state_bp
+# === Action Bus + State (אם קיימים) ===
+try:
+    from admin_web.routes_actions import actions_bp, state_bp
+except Exception:
+    actions_bp = None  # type: ignore
+    state_bp = None  # type: ignore
 
-# (אופציונלי) worker שמחבר את הווידאו למדידות בזמן אמת
+# (אופציונלי) worker למדידות וידאו
 try:
     from app.ui.video_metrics_worker import start_video_metrics_worker
 except Exception:
@@ -60,21 +71,23 @@ try:
 except Exception:
     PAYLOAD_VERSION = "1.2.0"
 
-# ===== payload משותף (מה-main.py) =====
+# ===== payload משותף (אם יש main/state) =====
 try:
     from admin_web.state import get_payload as get_shared_payload  # type: ignore
 except Exception:
     def get_shared_payload() -> Dict[str, Any]:
         return {}
 
-# ===== ObjDet status (נפילת-חסד אם ה-BP לא קיים) =====
+# ===== ObjDet status (אם יש) =====
 try:
     from admin_web.routes_objdet import OBJDET_STATUS, OBJDET_STATUS_LOCK  # type: ignore
 except Exception:
+    import threading as _th
     OBJDET_STATUS = {"ok": False, "note": "objdet_status_unavailable"}
-    OBJDET_STATUS_LOCK = threading.Lock()
+    OBJDET_STATUS_LOCK = _th.Lock()
 
 def _import_get_streamer():
+    # נסה קודם app.ui.video, ואם לא — מה-BP של הווידאו
     try:
         from app.ui.video import get_streamer as f  # type: ignore
         return f
@@ -98,12 +111,14 @@ except Exception:
 try:
     from admin_web.exercise_analyzer import (
         analyze_exercise, simulate_exercise, sanitize_metrics_payload,
+        build_simulated_report,  # ← חדש: דו״ח סימולציה מלא
     )  # type: ignore
 except Exception as _e:
     logger.warning(f"[EXR] analyzer import failed: {_e}")
     analyze_exercise = None  # type: ignore
     simulate_exercise = None  # type: ignore
     sanitize_metrics_payload = None  # type: ignore
+    build_simulated_report = None  # type: ignore
 
 # ===== Exercise Engine (אופציונלי) =====
 try:
@@ -144,7 +159,7 @@ LEGACY_IMAGES = BASE_DIR / "images"
 
 _now_ms = lambda: int(time.time() * 1000)
 
-# ===== מחסן payload מקומי (אם אין main) =====
+# ===== מחסן payload מקומי (אם אין main/state) =====
 LAST_PAYLOAD_LOCK = threading.Lock()
 LAST_PAYLOAD: Optional[Dict[str, Any]] = None
 
@@ -162,7 +177,7 @@ def _get_engine_library():
             return ENGINE_LIB["lib"]
         lib_dir = Path(ENGINE_LIB["root"])
         lib = exr_load_library(lib_dir)
-        logger.info(f"[EXR] library loaded @ {lib_dir} (version: {lib.version})")
+        logger.info(f"[EXR] library loaded @ {lib_dir} (version: {getattr(lib, 'version', 'unknown')})")
         ENGINE_LIB["lib"] = lib
         return lib
 
@@ -219,7 +234,6 @@ def _get_empty_objdet_payload() -> Dict[str, Any]:
     }
 
 def normalize_payload(raw: Dict[str, Any]) -> Dict[str, Any]:
-    """נרמול פיילוד להצגה בדף metrics."""
     res: Dict[str, Any] = {"metrics": [], "ts": time.time()}
     m = raw.get("metrics")
     metrics_list: List[Dict[str, Any]] = []
@@ -382,6 +396,9 @@ def create_app() -> Flask:
         static_url_path="/static",
     )
 
+    # מאחורי פרוקסי (HTTPS/Host/Prefix)
+    app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1)
+
     if ENABLE_HEARTBEAT:
         threading.Thread(target=_background_log_heartbeat, daemon=True).start()
 
@@ -389,14 +406,17 @@ def create_app() -> Flask:
     app.register_blueprint(video_bp)
     logger.info("[Server] Registered video_bp blueprint")
 
-    app.register_blueprint(upload_video_bp)
-    logger.info("[Server] Registered upload_video_bp blueprint")
+    if upload_video_bp is not None:
+        app.register_blueprint(upload_video_bp)
+        logger.info("[Server] Registered upload_video_bp blueprint")
 
-    app.register_blueprint(actions_bp)
-    logger.info("[Server] Registered actions_bp (/api/action)")
+    if actions_bp is not None:
+        app.register_blueprint(actions_bp)
+        logger.info("[Server] Registered actions_bp (/api/action)")
 
-    app.register_blueprint(state_bp)
-    logger.info("[Server] Registered state_bp (/api/video/state)")
+    if state_bp is not None:
+        app.register_blueprint(state_bp)
+        logger.info("[Server] Registered state_bp (/api/video/state)")
 
     try:
         from admin_web.routes_objdet import objdet_bp
@@ -461,7 +481,7 @@ def create_app() -> Flask:
             "app_version": APP_VERSION,
         }
 
-    # ---------------- UI: עדיפות להגשת SPA מ-static (כולל קבצים דחוסים) ----------------
+    # ---------------- UI: עדיפות להגשת SPA מ-static (כולל קבצים דחוסים מראש) ----------------
     def _serve_gz_or_plain(path_no_gz: Path, default_mime: str) -> Response:
         gz = path_no_gz.with_suffix(path_no_gz.suffix + ".gz")
         if gz.exists():
@@ -553,6 +573,11 @@ def create_app() -> Flask:
     def system_page():
         return render_template("system.html", active_page="system_page", app_version=APP_VERSION)
 
+    # ---- דף פתיחת מצלמה בדפדפן (ingest) ----
+    @app.get("/capture")
+    def capture_page():
+        return render_template("capture.html")
+
     @app.route("/static/", methods=["GET"])
     def static_index():
         return Response("", status=204)
@@ -562,7 +587,7 @@ def create_app() -> Flask:
         def legacy_images(filename: str):
             return send_from_directory(str(LEGACY_IMAGES), filename)
 
-    # ---- בריאות/מערכת (משודרג) ----
+    # ---- בריאות/מערכת ----
     @app.get("/version")
     def version():
         up = max(0.0, time.time() - START_TS)
@@ -583,7 +608,6 @@ def create_app() -> Flask:
             except Exception:
                 snap = {}
 
-            # payload + גיל
             payload = {}
             try:
                 payload = get_shared_payload() or {}
@@ -603,10 +627,8 @@ def create_app() -> Flask:
                 opened = bool(getattr(s, "is_open", lambda: False)())
                 running = bool(getattr(s, "is_running", lambda: False)())
 
-            # GPU קיים?
             gpu_av = bool((snap.get("gpu") or {}).get("available", False))
-
-            ok = (age < 3.0)  # קריטריון פשוט וברור
+            ok = (age < 3.0)  # קריטריון פשוט
             return jsonify({
                 "ok": ok,
                 "payload": {"age_sec": round(age, 3), "present": bool(payload)},
@@ -621,7 +643,6 @@ def create_app() -> Flask:
     @app.get("/readyz")
     def readyz():
         try:
-            # מוכנות בסיסית: תבניות/סטטיק קיימים, snapshot לא נכשל חזק, וידאו לא שבור
             t_ok = TPL_DIR.exists()
             s_ok = STATIC_DIR.exists()
             snap_ok = True
@@ -820,14 +841,34 @@ def create_app() -> Flask:
 
     @app.post("/api/exercise/simulate")
     def api_exercise_simulate():
+        """
+        תומך בשני מצבים:
+          • default -> schema של sets/reps (לבדיקות/תרשימי חזרות)
+          • as="report" או full_report=true -> דו״ח מלא רנדומלי (build_simulated_report)
+        פרמטרים שימושיים: mode [good|shallow|missing|mixed], sets, reps, noise, seed
+        """
+        j = request.get_json(silent=True) or {}
+        mode = j.get("mode")
+        # דו״ח מלא?
+        want_report = (str(j.get("as") or "").lower() in ("report", "full", "full_report")) or bool(j.get("full_report"))
+        if want_report and callable(build_simulated_report):
+            sets = int(j.get("sets", 1))
+            reps = int(j.get("reps", 5))
+            noise = float(j.get("noise", 0.12))
+            seed = j.get("seed")  # אם None -> רנדומלי בכל קליק
+            report = build_simulated_report(mode=mode or "mixed", sets=sets, reps=reps, noise=noise, seed=seed)
+            return jsonify(report), 200
+
+        # אחרת — סכימת sets/reps (שומר תאימות)
         if simulate_exercise is None:
             return jsonify(ok=False, error="simulate_unavailable"), 501
-        j = request.get_json(silent=True) or {}
         sets = int(j.get("sets", 1))
         reps = int(j.get("reps", 6))
         mean = float(j.get("mean_score", 0.75))
         std  = float(j.get("std", 0.1))
-        return jsonify(simulate_exercise(sets, reps, mean, std)), 200
+        seed = j.get("seed", 42)
+        out = simulate_exercise(sets, reps, mean, std, mode=mode, noise=j.get("noise"), seed=seed)
+        return jsonify(out), 200
 
     @app.post("/api/exercise/score")
     def api_exercise_score():
@@ -837,7 +878,7 @@ def create_app() -> Flask:
         j = request.get_json(silent=True) or {}
         metrics = j.get("metrics")
         if metrics and analyze_exercise:
-            result = analyze_exercise({"metrics": metrics})
+            result = analyze_exercise({"metrics": metrics, "exercise": j.get("exercise") or {}})
             with LAST_EXERCISE_REPORT_LOCK:
                 globals()["LAST_EXERCISE_REPORT"] = result
             return jsonify(result), 200
@@ -935,6 +976,74 @@ def create_app() -> Flask:
         with LAST_EXERCISE_REPORT_LOCK:
             rep = LAST_EXERCISE_REPORT.copy() if isinstance(LAST_EXERCISE_REPORT, dict) else None
         return jsonify(ok=bool(rep), report=rep)
+
+    # ---------- Session Status (וידאו/סטרימר) ----------
+    @app.get("/api/session/status")
+    def api_session_status():
+        import time as _t
+        fps = 0.0
+        size = (0, 0)
+        source = "unknown"
+        opened = False
+        running = False
+        try:
+            gs = _import_get_streamer()
+            if callable(gs):
+                s = gs()
+                try:  fps = float(getattr(s, "last_fps", lambda: 0.0)() or 0.0)
+                except Exception: pass
+                try:  size = getattr(s, "last_frame_size", lambda: (0, 0))() or (0, 0)
+                except Exception: pass
+                try:  source = getattr(s, "source_name", lambda: "camera")() or "camera"
+                except Exception: pass
+                try:  opened = bool(getattr(s, "is_open", lambda: getattr(s, "opened", False))())
+                except Exception: opened = bool(getattr(s, "opened", False))
+                try:  running = bool(getattr(s, "is_running", lambda: getattr(s, "running", False))())
+                except Exception: running = bool(getattr(s, "running", False))
+        except Exception:
+            pass
+        w, h = (int(size[0]), int(size[1])) if isinstance(size, (tuple, list)) and len(size) >= 2 else (0, 0)
+        return jsonify({
+            "opened": opened,
+            "running": running,
+            "fps": float(fps),
+            "size": [w, h],
+            "source": source,
+            "ts": _t.time(),
+        }), 200
+
+    # ---------- Exercise Diagnostics Snapshot ----------
+    @app.get("/api/exercise/diag")
+    def api_exercise_diag_snapshot():
+        import time as _t
+        snap: Dict[str, Any] = {}
+        try:
+            snap = get_shared_payload() or {}
+        except Exception:
+            snap = {}
+        if not snap:
+            with LAST_PAYLOAD_LOCK:
+                if isinstance(LAST_PAYLOAD, dict):
+                    snap = dict(LAST_PAYLOAD)
+
+        metrics = snap.get("metrics") or {}
+        metrics_keys = []
+        try:
+            if isinstance(metrics, dict):
+                metrics_keys = list(metrics.keys())
+            elif isinstance(metrics, list):
+                metrics_keys = [m.get("name") for m in metrics if isinstance(m, dict) and "name" in m]
+        except Exception:
+            metrics_keys = []
+
+        out = {
+            "ok": True,
+            "ts": _t.time(),
+            "view_mode": snap.get("view_mode"),
+            "meta": snap.get("meta", {}),
+            "metrics_keys": metrics_keys[:50],
+        }
+        return jsonify(out), 200
 
     # ---- לוגים כלליים ----
     @app.route("/api/logs", methods=["GET"])
@@ -1038,9 +1147,10 @@ def create_app() -> Flask:
 
     return app
 
+
 # =================== Main ===================
 if __name__ == "__main__":
     port = int(os.getenv("PORT", "5000"))
     app = create_app()
-    logger.info("Server ready. אם main.py רץ – /payload ו-/video עובדים מהתהליך הראשי.")
-    app.run(host="127.0.0.1", port=port, debug=False, use_reloader=False, threaded=True)
+    logger.info("Server ready. /payload ו-/video זמינים. /capture לפתיחת מצלמה בדפדפן לשידור ingest.")
+    app.run(host="0.0.0.0", port=port, debug=False, use_reloader=False, threaded=True)

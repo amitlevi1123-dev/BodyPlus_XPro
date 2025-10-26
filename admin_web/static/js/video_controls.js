@@ -1,33 +1,58 @@
 /* ---------------------------------------------------------------------------
-video_controls.js — שליטה על מצלמה ורזולוציה
-מתחבר ל־/api/camera/settings ומאפשר לבחור פרופילים ורזולוציות קבועות.
+video_controls.js — שליטה על פרופילים/רזולוציה/קצבים
+מתאים לנתיבים:
+  - GET  /api/video/status
+  - POST /api/video/params       { profile } או { target_fps, encode_fps, jpeg_quality, decimation }
+  - POST /api/video/resolution   { preset: "low"|"medium"|"high" }
+(אופציונלי) כפתורי הפעלה/עצירה אם קיימים בדף:
+  - POST /api/video/start
+  - POST /api/video/stop
 --------------------------------------------------------------------------- */
-
 ;(function () {
   'use strict';
 
   // ===== עזר בסיסי =====
-  function _byId(id) { return document.getElementById(id); }
-  function isFiniteNumber(v) { return typeof v === 'number' && isFinite(v); }
-  function parseIntSafe(v) { if (v == null) return NaN; var n = parseInt(v, 10); return isFinite(n) ? n : NaN; }
+  var $ = function(id){ return document.getElementById(id); };
+  function isFiniteNumber(v){ return typeof v === 'number' && isFinite(v); }
+  function toInt(x, fallback){ var n = parseInt(x, 10); return isFinite(n) ? n : fallback; }
 
-  // ===== בקשות =====
+  // ===== אלמנטים בדף =====
+  var inTargetFps  = $('inTargetFps');
+  var btnApply     = $('btnApplyParams');
+  var applyStatus  = $('applyStatus');
+
+  var stEffSize    = $('stEffSize');
+  var stEffFps     = $('stEffFps');
+  var stUpdatedAt  = $('stUpdatedAt');
+
+  var btnResMenu   = $('btnResMenu');
+  var resMenu      = $('resMenu');
+  var profileButtons = document.querySelectorAll('[data-profile]');
+
+  // Start/Stop (רק אם קיימים בדף)
+  var btnStart = document.getElementById('btn-start');
+  var btnStop  = document.getElementById('btn-stop');
+
+  // ===== מפות עזר לתצוגה (לאחריות בצד השרת) =====
+  var RES_PRESETS = { low:'low', medium:'medium', high:'high' };
+
+  // ===== HTTP =====
   function postJson(url, body, timeoutMs) {
-    if (timeoutMs == null) timeoutMs = 5000;
-    var ctrl = new AbortController();
-    var t = setTimeout(function(){ try{ ctrl.abort(); }catch(_){ } }, timeoutMs);
+    if (timeoutMs == null) timeoutMs = 6000;
+    var ctl = new AbortController();
+    var t = setTimeout(function(){ try{ ctl.abort(); }catch(_){ } }, timeoutMs);
     return fetch(url, {
       method: 'POST',
       headers: { 'Content-Type':'application/json' },
       body: JSON.stringify(body || {}),
-      signal: ctrl.signal
+      signal: ctl.signal
     })
     .then(function(r){
       return r.text().then(function(text){
         var data = null;
         try { data = JSON.parse(text); } catch(_){}
         clearTimeout(t);
-        return { ok: r.ok, status: r.status, data: data || null, raw: text };
+        return { ok:r.ok, status:r.status, data:data || null, raw:text };
       });
     })
     .catch(function(e){
@@ -38,155 +63,142 @@ video_controls.js — שליטה על מצלמה ורזולוציה
 
   function getJson(url, timeoutMs) {
     if (timeoutMs == null) timeoutMs = 4000;
-    var ctrl = new AbortController();
-    var t = setTimeout(function(){ try{ ctrl.abort(); }catch(_){ } }, timeoutMs);
-    return fetch(url, { cache:'no-store', signal: ctrl.signal })
-      .then(function(r){
-        if (!r.ok) throw new Error('HTTP '+r.status);
-        return r.json();
-      })
-      .then(function(j){
-        clearTimeout(t);
-        return j;
-      })
-      .catch(function(){
-        clearTimeout(t);
-        return null;
-      });
+    var ctl = new AbortController();
+    var t = setTimeout(function(){ try{ ctl.abort(); }catch(_){ } }, timeoutMs);
+    return fetch(url, { cache:'no-store', signal: ctl.signal })
+      .then(function(r){ if(!r.ok) throw new Error('HTTP '+r.status); return r.json(); })
+      .then(function(j){ clearTimeout(t); return j; })
+      .catch(function(){ clearTimeout(t); return null; });
   }
 
-  // ===== התחלה =====
-  function init() {
-    var inTargetFps  = _byId('inTargetFps');
-    var btnApply     = _byId('btnApplyParams');
-    var applyStatus  = _byId('applyStatus');
+  // ===== תצוגה =====
+  function setApplyStatus(msg, ok){
+    if (!applyStatus) return;
+    applyStatus.textContent = msg || '—';
+    applyStatus.className = 'text-sm ' + (ok ? 'text-green-600' : 'text-gray-600');
+  }
 
-    var stEffSize    = _byId('stEffSize');
-    var stEffFps     = _byId('stEffFps');
-    var stUpdatedAt  = _byId('stUpdatedAt');
-
-    var btnResMenu   = _byId('btnResMenu');
-    var resMenu      = _byId('resMenu');
-    var profileButtons = document.querySelectorAll('[data-profile]');
-
-    var RES_PRESETS = {
-      low:    { width: 640,  height: 360  },
-      medium: { width: 1280, height: 720  },
-      high:   { width: 1920, height: 1080 }
-    };
-
-    var PROFILE_MAP = {
-      'eco':      { width: 640,  height: 360,  fps: 12 },
-      'balanced': { width: 1280, height: 720,  fps: 20 },
-      'quality':  { width: 1920, height: 1080, fps: 30 }
-    };
-
-    // ===== רענון מצב מצלמה =====
-    function renderStatus(s) {
-      if (!s || s.ok === false) return;
-      if (Array.isArray(s.size) && s.size.length === 2) {
-        stEffSize.textContent = s.size[0] + '×' + s.size[1];
-      } else {
-        stEffSize.textContent = '—';
-      }
-      stEffFps.textContent = s.fps != null ? s.fps : '—';
-      stUpdatedAt.textContent = new Date().toLocaleTimeString();
+  function renderStatus(s){
+    if (!s || s.ok === false) return;
+    if (Array.isArray(s.size) && s.size.length === 2) {
+      stEffSize && (stEffSize.textContent = s.size[0] + '×' + s.size[1]);
+    } else {
+      stEffSize && (stEffSize.textContent = '—');
     }
+    stEffFps && (stEffFps.textContent = (s.fps != null ? s.fps : '—'));
+    stUpdatedAt && (stUpdatedAt.textContent = new Date().toLocaleTimeString());
+  }
 
-    function refreshState() {
-      getJson('/api/video/status', 3000).then(function(s){
-        if (s && s.ok) renderStatus(s);
+  function refreshState(){
+    getJson('/api/video/status', 3000).then(function(s){
+      if (s && (s.ok || (typeof s.opened !== 'undefined'))) renderStatus(s);
+    });
+  }
+
+  // ===== פעולות =====
+  // פרופיל איכות/חסכון: /api/video/params {profile}
+  function applyProfile(name){
+    if (!name) return;
+    var profile = String(name).trim().toLowerCase();
+    setApplyStatus('מיישם פרופיל…', false);
+    postJson('/api/video/params', { profile: profile }).then(function(res){
+      if (res.ok && res.data && res.data.ok) setApplyStatus('פרופיל הוחל ✓', true);
+      else setApplyStatus('שגיאה בהחלת פרופיל', false);
+      setTimeout(refreshState, 500);
+    });
+  }
+
+  // ידני: target_fps → /api/video/params
+  function applyManual(){
+    var fps = toInt(inTargetFps ? inTargetFps.value : '', NaN);
+    var body = {};
+    if (isFiniteNumber(fps)) body.target_fps = fps;
+    if (!Object.keys(body).length){ setApplyStatus('אין מה להחיל', false); return; }
+
+    setApplyStatus('מיישם ידני…', false);
+    postJson('/api/video/params', body).then(function(res){
+      if (res.ok && res.data && res.data.ok) setApplyStatus('הוחל ✓', true);
+      else setApplyStatus('שגיאה בהחלה', false);
+      setTimeout(refreshState, 500);
+    });
+  }
+
+  // רזולוציה: /api/video/resolution {preset}
+  function applyResolutionPreset(key){
+    var preset = RES_PRESETS[String(key).toLowerCase()];
+    if (!preset) return;
+    setApplyStatus('מחליף רזולוציה…', false);
+    postJson('/api/video/resolution', { preset: preset }).then(function(res){
+      if (res.ok && res.data && res.data.ok) setApplyStatus('רזולוציה הוחלה ✓', true);
+      else setApplyStatus('שגיאה בהחלת רזולוציה', false);
+      hideResMenu();
+      setTimeout(refreshState, 700);
+    });
+  }
+
+  // Start/Stop (לא חובה; יעבוד רק אם יש כפתורים בדף)
+  function startCamera(){
+    setApplyStatus('מפעיל מצלמה…', false);
+    postJson('/api/video/start', { camera_index: 0, show_preview: false }).then(function(r){
+      setApplyStatus((r.ok ? 'מצלמה הופעלה ✓' : 'שגיאה בהפעלה'), r.ok);
+      setTimeout(refreshState, 700);
+    });
+  }
+  function stopCamera(){
+    setApplyStatus('מכבה מצלמה…', false);
+    postJson('/api/video/stop', {}).then(function(r){
+      setApplyStatus((r.ok ? 'מצלמה כובתה ✓' : 'שגיאה בכיבוי'), r.ok);
+      setTimeout(refreshState, 500);
+    });
+  }
+
+  // ===== תפריט רזולוציה =====
+  function showResMenu(){ if (resMenu) resMenu.classList.remove('hidden'); }
+  function hideResMenu(){ if (resMenu) resMenu.classList.add('hidden'); }
+  function toggleResMenu(){
+    if (!resMenu) return;
+    if (resMenu.classList.contains('hidden')) showResMenu(); else hideResMenu();
+  }
+
+  // ===== אירועים =====
+  // פרופילים
+  for (var i = 0; i < profileButtons.length; i++){
+    (function(btn){
+      btn.addEventListener('click', function(){
+        applyProfile(btn.getAttribute('data-profile'));
       });
-    }
+    })(profileButtons[i]);
+  }
 
-    // ===== פעולות =====
-    function applyProfile(name) {
-      var preset = PROFILE_MAP[name];
-      if (!preset) return;
-      applyStatus.textContent = 'מיישם פרופיל...';
-      postJson('/api/camera/settings', preset).then(function(res){
-        if (res.ok && res.data && res.data.ok) {
-          applyStatus.textContent = 'הוחל ✓';
-        } else {
-          applyStatus.textContent = 'שגיאה בהחלה';
-        }
-        setTimeout(refreshState, 500);
-      });
-    }
+  // ידני
+  if (btnApply) btnApply.addEventListener('click', applyManual);
 
-    function applyManual() {
-      var fps = parseIntSafe(inTargetFps ? inTargetFps.value : null);
-      var body = {};
-      if (isFiniteNumber(fps)) body.fps = fps;
-      if (!Object.keys(body).length) {
-        applyStatus.textContent = 'אין מה להחיל';
-        return;
-      }
-      applyStatus.textContent = 'מיישם ידני...';
-      postJson('/api/camera/settings', body).then(function(res){
-        if (res.ok && res.data && res.data.ok) {
-          applyStatus.textContent = 'הוחל ✓';
-        } else {
-          applyStatus.textContent = 'שגיאה בהחלה';
-        }
-        setTimeout(refreshState, 500);
-      });
-    }
-
-    function toggleResMenu(forceShow) {
-      if (!resMenu) return;
-      var show = (typeof forceShow === 'boolean') ? forceShow : resMenu.classList.contains('hidden');
-      if (show) resMenu.classList.remove('hidden');
-      else resMenu.classList.add('hidden');
-    }
-
-    function applyResolutionPreset(key) {
-      var preset = RES_PRESETS[key];
-      if (!preset) return;
-      applyStatus.textContent = 'מחליף רזולוציה ל-' + preset.width + '×' + preset.height + '...';
-      postJson('/api/camera/settings', preset).then(function(r){
-        if (r.ok && r.data && r.data.ok) {
-          applyStatus.textContent = 'רזולוציה הוחלה ✓';
-        } else {
-          applyStatus.textContent = 'שגיאה בהחלת רזולוציה';
-        }
-        toggleResMenu(false);
-        setTimeout(refreshState, 700);
-      });
-    }
-
-    // ===== אירועים =====
-    for (var i = 0; i < profileButtons.length; i++) {
-      (function(btn){
-        btn.addEventListener('click', function(){
-          applyProfile(btn.getAttribute('data-profile'));
+  // תפריט רזולוציה
+  if (btnResMenu) btnResMenu.addEventListener('click', function(e){ e.stopPropagation(); toggleResMenu(); });
+  if (resMenu){
+    var resBtns = resMenu.querySelectorAll('[data-res]');
+    for (var j = 0; j < resBtns.length; j++){
+      (function(b){
+        b.addEventListener('click', function(){
+          applyResolutionPreset(b.getAttribute('data-res'));
         });
-      })(profileButtons[i]);
+      })(resBtns[j]);
     }
+    document.addEventListener('click', function(e){
+      if (!resMenu.contains(e.target) && e.target !== btnResMenu) hideResMenu();
+    });
+  }
 
-    if (btnApply) btnApply.addEventListener('click', applyManual);
-    if (btnResMenu) btnResMenu.addEventListener('click', function(e){ e.stopPropagation(); toggleResMenu(); });
+  // Start/Stop אם קיימים בדף
+  if (btnStart) btnStart.addEventListener('click', startCamera);
+  if (btnStop)  btnStop .addEventListener('click', stopCamera);
 
-    if (resMenu) {
-      var resBtns = resMenu.querySelectorAll('[data-res]');
-      for (var j = 0; j < resBtns.length; j++) {
-        (function(b){
-          b.addEventListener('click', function(){
-            applyResolutionPreset(b.getAttribute('data-res'));
-          });
-        })(resBtns[j]);
-      }
-      document.addEventListener('click', function(e){
-        if (!resMenu.contains(e.target) && e.target !== btnResMenu) toggleResMenu(false);
-      });
-    }
-
-    // ===== התחלה =====
+  // ===== התחלה =====
+  function init(){
     refreshState();
     setInterval(refreshState, 2000);
   }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
+  else init();
 
-  // ===== מריץ רק אחרי טעינת DOM =====
-  document.addEventListener('DOMContentLoaded', init);
-
-})(); // ← סוגר ומריץ את הפונקציה
+})(); // ← IIFE

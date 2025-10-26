@@ -17,6 +17,11 @@
     vidFps:    $('#vidFps'),
     vidSize:   $('#vidSize'),
     dot:       $('#exerciseStatusDot'),
+    // health/ready
+    healthDot:  $('#healthDot'),
+    readyDot:   $('#readyDot'),
+    healthInfo: $('#healthInfo'),
+    readyInfo:  $('#readyInfo'),
     // gauges
     gaugeRep:  $('#gaugeRep'),
     gaugeSet:  $('#gaugeSet'),
@@ -28,6 +33,7 @@
     btnRun:    $('#btnSimRun'),
     btnClear:  $('#btnSimClear'),
     btnServerScore: $('#btnServerScore'),
+    btnOpenLastJson: $('#btnOpenLastJson'),
     simTB:     $('#simTbody'),
     // diag
     btnDiagStart: $('#btnDiagStart'),
@@ -46,8 +52,9 @@
   // ---------- State ----------
   const REP_STORE = new Map();   // rid -> report
   let REP_AUTO_ID = 1;
-  let LAST_COLOR_RANGES = null;  // ייקבע מדוחות השרת (ui_ranges.color_bar)
-  let simRunning = false;        // לנעילת הכפתור
+  let LAST_COLOR_RANGES = null;  // מהשרת (ui_ranges.color_bar)
+  let simRunning = false;
+  let LAST_REPORT = null;
 
   // ---------- Status Poll ----------
   async function pollStatus(){
@@ -65,6 +72,46 @@
   }
   pollStatus(); setInterval(pollStatus, 2000);
 
+  // ---------- Health/Ready Poll ----------
+  async function pollHealth(){
+    try{
+      const [h, r] = await Promise.all([
+        fetch('/healthz',{cache:'no-store'}).then(x=>x.ok?x.json():null).catch(()=>null),
+        fetch('/readyz',{cache:'no-store'}).then(x=>x.ok?x.json():null).catch(()=>null),
+      ]);
+
+      // healthz
+      if(h){
+        const ok = !!h.ok;
+        el.healthDot?.classList.toggle('connected', ok);
+        const age = h?.payload?.age_sec!=null ? `· גיל payload ${h.payload.age_sec}s` : '';
+        const vid = h?.video?.running ? 'וידאו רץ' : (h?.video?.opened ? 'וידאו פתוח' : 'וידאו כבוי');
+        el.healthInfo.textContent = `${ok?'OK':'NOT OK'} · ${vid} ${age}`;
+      }else{
+        el.healthDot?.classList.remove('connected');
+        el.healthInfo.textContent = '—';
+      }
+
+      // readyz
+      if(r){
+        const ok = !!r.ok;
+        el.readyDot?.classList.toggle('connected', ok);
+        const t = r.templates?'OK':'X';
+        const s = r.static?'OK':'X';
+        el.readyInfo.textContent = `${ok?'Ready':'Not ready'} · templates:${t} · static:${s}`;
+      }else{
+        el.readyDot?.classList.remove('connected');
+        el.readyInfo.textContent = '—';
+      }
+    }catch(_){
+      el.healthDot?.classList.remove('connected');
+      el.readyDot?.classList.remove('connected');
+      el.healthInfo.textContent = '—';
+      el.readyInfo.textContent = '—';
+    }
+  }
+  pollHealth(); setInterval(pollHealth, 4000);
+
   // ---------- Gauges (SVG donuts) ----------
   function makeGauge(root, label){
     const R = 52, C = 2*Math.PI*R;
@@ -80,7 +127,7 @@
   const gRep = makeGauge(el.gaugeRep, 'חזרה');
   const gSet = makeGauge(el.gaugeSet, 'סט');
 
-  // טווחי צבעים מהשרת (fallback לדיפולט: 0–60 אדום, 60–75 כתום, 75–100 ירוק)
+  // טווחי צבעים מהשרת (fallback לדיפולט)
   function colorFromRanges(pct, ranges) {
     if (pct == null) return '#9ca3af';
     if (Array.isArray(ranges) && ranges.length) {
@@ -228,6 +275,26 @@
   el.detailsModal?.addEventListener('click', (ev)=>{ if(ev.target===el.detailsModal) closeDetails(); });
   window.addEventListener('keydown', (e)=>{ if(e.key==='Escape') closeDetails(); });
 
+  // ---------- JSON Helpers ----------
+  function openJSONInNewTab(obj){
+    try{
+      const blob = new Blob([JSON.stringify(obj, null, 2)], { type: 'application/json' });
+      const url  = URL.createObjectURL(blob);
+      window.open(url, '_blank');
+      // URL.revokeObjectURL(url);
+    }catch(e){ alert('פתיחת JSON נכשלה: '+e); }
+  }
+  function downloadJSON(obj, filename='report.json'){
+    try{
+      const blob = new Blob([JSON.stringify(obj, null, 2)], { type: 'application/json' });
+      const url  = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = filename;
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(()=> URL.revokeObjectURL(url), 2000);
+    }catch(e){ alert('הורדת JSON נכשלה: '+e); }
+  }
+
   // ---------- Server endpoints ----------
   async function serverSimulate({sets, reps, mode, noise}) {
     const res = await fetch('/api/exercise/simulate', {
@@ -246,7 +313,7 @@
     return res.json();
   }
 
-  // ---------- Gauges setter (incl. tooltip) ----------
+  // ---------- Gauges setter ----------
   function setGaugesFromReport(rep){
     const pct = repScorePct(rep);
     const ranges = rep?.ui_ranges?.color_bar || null;
@@ -267,6 +334,7 @@
     const pct = repScorePct(rep);
     const rid = `r${REP_AUTO_ID++}`;
     REP_STORE.set(rid, rep);
+    LAST_REPORT = rep;
 
     tr.innerHTML = `<td class="py-2 px-3">${setIdx}</td>
       <td class="py-2 px-3">${repIdx}</td>
@@ -276,9 +344,23 @@
       <td class="py-2 px-3">${escapeHtml(rep?.scoring?.unscored_reason||'—')}</td>
       <td class="py-2 px-3 text-gray-500">${(rep?.hints && rep.hints[0])? escapeHtml(rep.hints[0]) : ''}</td>
       <td class="py-2 px-3">
+        <button class="px-2 py-1 rounded bg-gray-100 hover:bg-gray-200 text-sm" data-json="${rid}">JSON</button>
+      </td>
+      <td class="py-2 px-3">
         <button class="px-2 py-1 rounded bg-gray-100 hover:bg-gray-200 text-sm" data-rid="${rid}" data-set="${setIdx}" data-rep="${repIdx}">פירוט</button>
       </td>`;
-    tr.querySelector('button')?.addEventListener('click', (ev)=>{
+
+    // JSON button
+    tr.querySelector('button[data-json]')?.addEventListener('click', (ev)=>{
+      const id = ev.currentTarget.getAttribute('data-json');
+      const report = REP_STORE.get(id);
+      if(!report) return;
+      downloadJSON(report, `report_s${setIdx}_r${repIdx}.json`);
+      // לחלופין: openJSONInNewTab(report);
+    });
+
+    // Details button
+    tr.querySelector('button[data-rid]')?.addEventListener('click', (ev)=>{
       const btn = ev.currentTarget;
       const id  = btn.getAttribute('data-rid');
       const set = Number(btn.getAttribute('data-set'));
@@ -286,6 +368,7 @@
       const report = REP_STORE.get(id);
       openDetails(report, { setIdx:set, repIdx:rix });
     });
+
     el.simTB.appendChild(tr);
   }
 
@@ -295,7 +378,7 @@
     const summary = topBad.length ? ('מוקדים לשיפור: ' + topBad.join(', ')) : 'ביצוע נקי יחסית בסט זה.';
     const tr = document.createElement('tr');
     tr.className='bg-white';
-    tr.innerHTML = `<td colspan="8" class="py-2 px-3 text-sm text-gray-600">סט ${setIdx}: ${escapeHtml(summary)}</td>`;
+    tr.innerHTML = `<td colspan="9" class="py-2 px-3 text-sm text-gray-600">סט ${setIdx}: ${escapeHtml(summary)}</td>`;
     el.simTB.appendChild(tr);
   }
 
@@ -306,8 +389,8 @@
   function makeCriteria(mode){
     const base = [
       { id:'depth',        available:true,  score_pct: 85 },
-      { id:'knee_valgus',  available:true,  score_pct: 90 },
-      { id:'posture',      available:true,  score_pct: 88 },
+      { id:'knees',        available:true,  score_pct: 90 },
+      { id:'torso_angle',  available:true,  score_pct: 88 },
       { id:'stance_width', available:true,  score_pct: 92 },
       { id:'tempo',        available:true,  score_pct: 86 },
     ];
@@ -439,7 +522,7 @@
   el.btnRun?.addEventListener('click', runSimulation);
 
   el.btnClear?.addEventListener('click', ()=>{
-    el.simTB.innerHTML='<tr><td colspan="8" class="py-6 text-center text-gray-400">נוקה.</td></tr>';
+    el.simTB.innerHTML='<tr><td colspan="9" class="py-6 text-center text-gray-400">נוקה.</td></tr>';
     setGauge(gRep,null);
     setGauge(gSet,null);
     el.gaugeRep?.removeAttribute('title');
@@ -475,14 +558,21 @@
       const j = await serverScore({ demo:true });
       LAST_COLOR_RANGES = j?.ui_ranges?.color_bar || LAST_COLOR_RANGES;
       setGaugesFromReport(j);
+      LAST_REPORT = j;
 
-      const rep = j || {};
       const rid = `r${REP_AUTO_ID++}`;
-      REP_STORE.set(rid, rep);
-      pushRow(1, REP_AUTO_ID, rep);
+      REP_STORE.set(rid, j);
+      pushRow(1, REP_AUTO_ID, j);
     }catch(e){
       alert('קריאת score מהשרת נכשלה — ממשיכים מקומי. '+e);
     }
+  });
+
+  // ---------- Open last JSON ----------
+  el.btnOpenLastJson?.addEventListener('click', ()=>{
+    const rep = LAST_REPORT || [...REP_STORE.values()].slice(-1)[0];
+    if(!rep){ alert('אין דו״ח זמין עדיין. הרץ סימולציה או דוח שרת.'); return; }
+    openJSONInNewTab(rep);
   });
 
 })();
