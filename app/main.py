@@ -1,6 +1,6 @@
 # -------------------------------------------------------
 # 🖥️ ProCoach — מצלמה + דשבורד + זיהוי אובייקטים
-# תואם ענן (Gunicorn/App Runner) וגם ריצה מקומית (Tk + Flask פנימי)
+# תואם ענן (Gunicorn/App Runner/RunPod) וגם ריצה מקומית (Tk + Flask פנימי)
 # -------------------------------------------------------
 
 from __future__ import annotations
@@ -67,6 +67,13 @@ def normalize_inplace(obj):
         for i, v in enumerate(obj):
             obj[i] = normalize_path(v) if isinstance(v, str) else (normalize_inplace(v) or v)
 # =======================================================================
+
+# -------- מצב Cloud? (RunPod / Serverless / Gunicorn) --------
+IS_CLOUD = (
+    os.getenv("RUNPOD", "0") == "1"
+    or os.getenv("SERVERLESS", "0") == "1"
+    or bool(os.getenv("PORT"))
+)
 
 # ---------- לוגים ----------
 try:
@@ -179,6 +186,8 @@ def _init_logging_safe() -> None:
 
 def start_admin_ui_server(host: str = "127.0.0.1", port: int = 5000) -> None:
     """ריצה מקומית בלבד — Flask פנימי ב-thread נפרד."""
+    if IS_CLOUD:
+        return  # בענן לא מרימים שרת פנימי על 127.0.0.1
     def _run():
         local_app = create_app()
         logger.info(f"Admin UI starting on http://{host}:{port}")
@@ -380,7 +389,7 @@ class App:
         except Exception as e:
             logger.warning(f"streamer pacing init skipped: {e}")
 
-        # ריצה מקומית בלבד (בענן Gunicorn משרת את app הגלובלי)
+        # ריצה מקומית בלבד (בענן Gunicorn/RunPod משרתים את app הגלובלי)
         start_admin_ui_server(host="127.0.0.1", port=5000)
 
         # הפעלה + Watchdog
@@ -684,21 +693,29 @@ class App:
         return result
 
 
-# ---------- MAIN (רק להרצה מקומית) ----------
+# ---------- MAIN ----------
 if __name__ == "__main__":
-    cam_index = int(os.getenv("CAMERA_INDEX", "0"))
-    _global_app_instance: Optional[App] = None
+    port = int(os.getenv("PORT", "5000"))
 
-    app_local_runner = App(cam_index=cam_index)
-    _global_app_instance = app_local_runner
+    if IS_CLOUD:
+        # בענן מרימים את ה-Flask הראשי שחשוף ע"י RunPod/Load Balancer
+        logger.info(f"Cloud mode: serving Flask on 0.0.0.0:{port}")
+        app.run(host="0.0.0.0", port=port, debug=False, use_reloader=False, threaded=True)
+    else:
+        # מצב מקומי (עם Tk + לולאת וידאו)
+        cam_index = int(os.getenv("CAMERA_INDEX", "0"))
+        _global_app_instance: Optional[App] = None
 
-    try:
-        import signal
-        signal.signal(signal.SIGINT, lambda *_: app_local_runner.quit())
-    except Exception:
-        pass
+        app_local_runner = App(cam_index=cam_index)
+        _global_app_instance = app_local_runner
 
-    try:
-        app_local_runner.root.mainloop()
-    finally:
-        app_local_runner.quit()
+        try:
+            import signal
+            signal.signal(signal.SIGINT, lambda *_: app_local_runner.quit())
+        except Exception:
+            pass
+
+        try:
+            app_local_runner.root.mainloop()
+        finally:
+            app_local_runner.quit()

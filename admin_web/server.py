@@ -182,6 +182,7 @@ def _get_engine_library():
 LAST_EXERCISE_REPORT_LOCK = threading.Lock()
 LAST_EXERCISE_REPORT: Optional[Dict[str, Any]] = None
 
+# -------- לוגיקת אנטי-ספאם ללוגים --------
 _OD1502_STATE = {"sig": None, "count": 0, "last": 0.0}
 def _dedup_od1502(title: str, detail: Any = None, level: str = "debug"):
     try:
@@ -202,6 +203,7 @@ def _dedup_od1502(title: str, detail: Any = None, level: str = "debug"):
     except Exception:
         pass
 
+# -------- Utilities --------
 def _background_log_heartbeat() -> None:
     i = 0
     while True:
@@ -282,7 +284,6 @@ def _try_parse_non_json_body(raw: str):
     except Exception:
         pass
     try:
-        from urllib.parse import parse_qs
         q = parse_qs(raw, keep_blank_values=True, strict_parsing=False)
         if not q:
             return None
