@@ -1145,6 +1145,15 @@ def create_app() -> Flask:
         return Response("Server error:\n" + str(e), status=500,
                         mimetype="text/plain; charset=utf-8")
 
+    @app.get("/test_stream")
+    def test_stream():
+        return Response("""<!doctype html><meta charset="utf-8">
+        <title>MJPEG test</title>
+        <style>body{margin:0;background:#000;display:grid;place-items:center;height:100vh}</style>
+        <img src="/video/stream.mjpg?hud=1" style="max-width:100%;max-height:100vh;object-fit:contain">
+        """, mimetype="text/html")
+
+
     return app
 
 
