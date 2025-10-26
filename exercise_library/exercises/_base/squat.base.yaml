@@ -1,3 +1,7 @@
+# -------------------------------------------------------------------
+# squat.base.yaml — משפחת סקוואט (Base)
+# -------------------------------------------------------------------
+
 id: squat.base
 family: squat
 
@@ -5,89 +9,133 @@ meta:
   selectable: false
   display_name: "Squat (Base)"
 
-# ───── קריטריונים ונתוני קלט ─────
+# ───── נתוני קלט נדרשים לכל קריטריון ─────
 criteria:
-  spine_rounding: { requires: [spine_flexion_deg] }
-  knee_valgus:    { requires: [knee_foot_alignment_left_deg, knee_foot_alignment_right_deg] }
-  spine_sidebend: { requires: [spine_curvature_side_deg] }
-  depth:          { requires: [knee_left_deg, knee_right_deg] }
-  stance_width:   { requires: [features.stance_width_ratio] }
-  foot_angle:     { requires: [toe_angle_left_deg, toe_angle_right_deg] }
-  head_alignment: { requires: [head_pitch_deg, spine_flexion_deg] }
-  heels_grounded: { requires: [heel_lift_left, heel_lift_right] }
-  tempo:          { requires: [rep.timing_s] }
-  # מידע/פידבק בלבד
-  posture:        { requires: [torso_forward_deg] }
-  # אופציונלי לפידבק/דיווח
-  dorsiflexion:   { requires: [ankle_dorsi_left_deg, ankle_dorsi_right_deg] }
+  # בטיחות
+  spine_rounding:      { requires: [spine_flexion_deg] }
+  knee_valgus:         { requires: [knee_foot_alignment_left_deg, knee_foot_alignment_right_deg] }
+  spine_sidebend:      { requires: [spine_curvature_side_deg] }
 
-# קריטיים לבטיחות
+  # טכניקה
+  depth:               { requires: [knee_left_deg, knee_right_deg] }
+  stance_width:        { requires: [features.stance_width_ratio] }
+  foot_angle:          { requires: [toe_angle_left_deg, toe_angle_right_deg] }
+  head_alignment:      { requires: [head_pitch_deg, spine_flexion_deg] }
+  heels_grounded:      { requires: [heel_lift_left, heel_lift_right] }
+  tempo:               { requires: [rep.timing_s] }
+
+  # מידע/פידבק בלבד
+  posture:             { requires: [torso_forward_deg] }
+
+  # אופציונלי — לפידבק/דיווח (לא מוריד ציון)
+  dorsiflexion:        { requires: [ankle_dorsi_left_deg, ankle_dorsi_right_deg] }
+
+# קריטריונים שהיעדרם מונע ניקוד (בטיחות/עומק)
 critical: [spine_rounding, knee_valgus, depth]
 
+# ───── בלוק scoring ─────
 scoring:
+
   policy:
     missing: skip
-    min_criteria_for_full_quality: 3
+    min_criteria_for_full_quality: 3   # <3 קריטריונים זמינים → quality="partial"
 
   criteria:
 
+    # ── בטיחות ──
     spine_rounding:
       weight: 2.0
-      rule: { kind: linear_band, input: spine_flexion_deg, good_max: 10, ok_max: 20, bad_max: 35 }
+      rule:
+        kind: linear_band
+        input: spine_flexion_deg
+        good_max: 10       # ≤10° = 1.0
+        ok_max:   20       # 10–20° → דועך
+        bad_max:  35       # ≥35° = 0.0
 
     knee_valgus:
       weight: 2.0
-      rule: { kind: symmetric_threshold, input: "max(abs(knee_foot_alignment_left_deg), abs(knee_foot_alignment_right_deg))", ok: 5, warn: 10, bad: 20 }
+      rule:
+        kind: symmetric_threshold
+        input: "max(abs(knee_foot_alignment_left_deg), abs(knee_foot_alignment_right_deg))"
+        ok:   5            # ≤5° טוב
+        warn: 10
+        bad:  20
 
     spine_sidebend:
       weight: 1.5
-      rule: { kind: symmetric_threshold, input: "abs(spine_curvature_side_deg)", ok: 5, warn: 10, bad: 20 }
+      rule:
+        kind: symmetric_threshold
+        input: "abs(spine_curvature_side_deg)"
+        ok:   5
+        warn: 10
+        bad:  20
 
+    # ── טכניקה ──
     depth:
       weight: 1.2
       rule:
         kind: threshold_window
         input: "min(knee_left_deg, knee_right_deg)"
-        target_max: 90          # עד 90° = 1.0
-        cutoff_max: 150         # ≥150° = 0.0
+        target_max:  90     # עד 90° = ציון מלא
+        cutoff_max:  150    # ≥150° = 0.0
         direction: lower_is_better
 
     stance_width:
       weight: 0.8
-      rule: { kind: band_center, input: features.stance_width_ratio, min_ok: 0.90, max_ok: 1.20, cutoff_min: 0.70, cutoff_max: 1.50 }
+      rule:
+        kind: band_center
+        input: features.stance_width_ratio
+        min_ok:     0.90
+        max_ok:     1.20
+        cutoff_min: 0.70
+        cutoff_max: 1.50
 
     foot_angle:
       weight: 0.8
       rule:
         kind: band_center
         input: "mean(abs(toe_angle_left_deg), abs(toe_angle_right_deg))"
-        min_ok: 8
-        max_ok: 20
-        cutoff_min: 0
-        cutoff_max: 30
+        min_ok:      8      # 8–20° טוב
+        max_ok:      20
+        cutoff_min:  0      # <0° גרוע
+        cutoff_max:  30     # >30° גרוע
 
     head_alignment:
       weight: 0.8
       rule:
         kind: symmetric_threshold
         input: "abs(head_pitch_deg - spine_flexion_deg)"
-        ok: 10
+        ok:   10
         warn: 20
-        bad: 30
+        bad:  30
 
     heels_grounded:
       weight: 0.6
       rule:
-        kind: boolean_flag
-        input: "max(heel_lift_left, heel_lift_right)"  # 0/1
-        true_score: 0.4       # יש הרמת עקב → ענישה קלה
-        false_score: 1.0      # עקבים נעוצים → מצוין
+        kind: boolean_flag                # אם נתמך: True/False → ציון קבוע
+        input: "max(heel_lift_left, heel_lift_right)"   # 0/1
+        true_score: 0.4                   # זוהתה הרמת עקב → ענישה קלה
+        false_score: 1.0                  # עקבים נעוצים → מושלם
+
+      # אם אין תמיכה ב-boolean_flag, ניתן להחליף ל:
+      # rule:
+      #   kind: symmetric_threshold
+      #   input: "max(heel_lift_left, heel_lift_right)"   # 0 או 1
+      #   ok:   0     # אין הרמה
+      #   warn: 0.5   # ערך ביניים (אם המנוע מרכך דגלים)
+      #   bad:  1     # יש הרמה
 
     tempo:
       weight: 0.5
-      rule: { kind: tempo_window, input: rep.timing_s, min: 0.7, max: 2.5, cutoff_min: 0.4, cutoff_max: 4.0 }
+      rule:
+        kind: tempo_window
+        input: rep.timing_s
+        min: 0.7
+        max: 2.5
+        cutoff_min: 0.4
+        cutoff_max: 4.0
 
-    # אופציונלי: דורסיפלקשן משמש לפידבק בלבד (אפשר להשאיר weight=0 ולדווח חיצונית)
+    # אופציונלי: דורסיפלקשן — פידבק בלבד (לא משפיע על ציון)
     dorsiflexion:
       weight: 0.0
       rule:
@@ -97,44 +145,28 @@ scoring:
         cutoff_min: 15
         direction: higher_is_better
 
+  # שקלול כולל
   aggregate:
     method: weighted_mean
     weights_source: inline
 
+  # תקרות בטיחות (מגבילות ציון כולל)
   safety_caps:
-    - { when: "spine_rounding <= 0.6",   cap: 0.70 }
-    - { when: "knee_valgus <= 0.6",      cap: 0.75 }
-    - { when: "spine_sidebend <= 0.6",   cap: 0.80 }
+    - { when: "spine_rounding <= 0.6", cap: 0.70 }
+    - { when: "knee_valgus   <= 0.6", cap: 0.75 }
+    - { when: "spine_sidebend<= 0.6", cap: 0.80 }
 
-# רמזי התאמה
+# ───── רמזי התאמה למשפחה ─────
 match_hints:
   must_have: [pose.available]
   pose_view: ["front", "front_left", "front_right"]
   motion_pattern: ["hip_down", "knee_flexion"]
   joints_focus: ["hips", "knees", "spine"]
 
-# ספירת חזרות
+# ───── הגדרות ספירת חזרות ─────
 rep_signal:
   source: "value|max|hip_y_px"
-  thresholds: { min_rom_good: 60, min_rep_ms: 500, max_rep_ms: 7000 }
-
-# פידבק (דוגמאות קצרות)
-feedback_rules:
-  heels_grounded:
-    - when: "< 1.0"
-      text: "העקבים עולים — שמור עקב נעוץ; שקול לשפר דורסיפלקשן/נעל עם עקב."
-  foot_angle:
-    - when: "< 0.8"
-      text: "פתח מעט את כפות הרגליים (8–20°) ליציבות טובה יותר."
-  head_alignment:
-    - when: "< 0.8"
-      text: "מבט קדימה; שמור צוואר בקו הגב."
-  spine_rounding:
-    - when: "<= 0.6"
-      text: "שמור על גב נייטרלי — עצור לפני נקודת הקריסה בתחתית."
-  knee_valgus:
-    - when: "<= 0.7"
-      text: "דחוף את הברכיים החוצה לאורך הירידה והעלייה."
-  depth:
-    - when: ">= 0.9"
-      text: "עומק מצוין (≈90°) עם שליטה טובה."
+  thresholds:
+    min_rom_good: 60
+    min_rep_ms: 500
+    max_rep_ms: 7000
