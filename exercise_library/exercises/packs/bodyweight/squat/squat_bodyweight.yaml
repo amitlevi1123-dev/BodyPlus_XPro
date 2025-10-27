@@ -1,8 +1,8 @@
 # -------------------------------------------------------------------
 # squat_bodyweight.yaml — סקוואט משקל גוף (Bodyweight Squat)
 # -------------------------------------------------------------------
-# תרגיל זה מיועד לביצוע ללא ציוד. המזהה האוטומטי יבחר בו כאשר
-# לא מזוהה מוט/דאמבל/ציוד (ראו match_hints.must_not_have).
+# תרגיל זה מיועד לביצוע ללא ציוד. המסווג יבחר בו כאשר הציוד המשוער הוא "none".
+# (ההסקה מתבצעת ע"י _infer_equipment: אם אין objdet/bar.* → equipment="none")
 # -------------------------------------------------------------------
 
 id: squat.bodyweight
@@ -13,23 +13,23 @@ meta:
   selectable: true
   display_name: "סקוואט משקל גוף"
   description: "סקוואט קלאסי ללא ציוד — בודק שליטה, עומק ובטיחות בתנועה טבעית."
-  equipment: "ללא ציוד"   # שדה מידע לממשק/דוחות (לא מחייב את המנוע)
+  equipment: "none"   # חשוב: באנגלית. זה מה שהמסווג משתמש בו לסינון וריאנטים.
 
 # ───── התאמות ייחודיות לתרגיל (יורש את כל השאר מה־base) ─────
 scoring:
   criteria:
 
-    # עומק — במשקל גוף מותר לשאוף מעט עמוק יותר עד ~85° ברך לציון מלא
+    # עומק — במשקל גוף שואפים מעט עמוק יותר עד ~85° ברך לציון מלא
     depth:
       weight: 1.3
       rule:
         kind: threshold_window
         input: "min(knee_left_deg, knee_right_deg)"
-        target_max: 85          # ≤85° = 1.0
+        target_max: 85          # ≤85° = 1.0 (ציון מלא)
         cutoff_max: 150         # ≥150° = 0.0
         direction: lower_is_better
 
-    # קצב — חזרות נטו להיות מעט זריזות יותר
+    # קצב — חזרות נוטות להיות מעט זריזות יותר
     tempo:
       weight: 0.5
       rule:
@@ -56,28 +56,28 @@ scoring:
       weight: 0.8
       rule:
         kind: boolean_flag
-        input: "max(heel_lift_left, heel_lift_right)"  # 0=נעוץ, 1=מורם
-        true_score: 0.5        # אם יש הרמת עקב → ציון הקריטריון 0.5
-        false_score: 1.0       # אם אין → 1.0
+        input: "(heel_lift_left or heel_lift_right)"  # True אם יש הרמת עקב
+        good_when: false        # טוב כשהביטוי False (אין הרמה)
+        penalty: 0.50           # כשTrue → הורדה משמעותית של הקריטריון
 
-  # תקרות בטיחות — יורש/משמר מה־base (מצויין כאן לנוחות קריאה)
+  # תקרות בטיחות — יורש/משמר מה־base (מצוין כאן לנוחות קריאה)
   safety_caps:
     - { when: "spine_rounding <= 0.6", cap: 0.70 }
     - { when: "knee_valgus   <= 0.6", cap: 0.75 }
     - { when: "spine_sidebend<= 0.6", cap: 0.80 }
 
 # ───── רמזים לזיהוי תרגיל (Auto-Detection) ─────
-# חשוב: זיהוי "ללא ציוד" נעשה כאן — לא בקובץ המשפחה!
+# הערה: המסווג כבר מסנן לפי meta.equipment="none".
+# אין צורך ב-must_not_have כאן, כי _infer_equipment יקבע "none" בהיעדר objdet/bar.*
 match_hints:
   must_have: [pose.available]
-  must_not_have: [objdet.bar_present]   # אם אין מוט/ציוד מזוהה → זה Bodyweight
   pose_view: ["front", "front_left", "front_right"]
-  motion_pattern: ["hip_down", "knee_flexion"]
-  joints_focus: ["hips", "knees", "spine"]
+  weight: 1.0
 
 # ───── הגדרות ספירת חזרות ─────
+# שימוש בעוגני פרק-כף-יד (קיימים כקנוניים ב-aliases):
 rep_signal:
-  source: "value|min|hip_y_px"
+  source: "value|min|wrist_left_y_px,wrist_right_y_px"
   thresholds:
     min_rom_good: 60
     min_rep_ms: 400
@@ -85,11 +85,10 @@ rep_signal:
 
 # -------------------------------------------------------------------
 # הסבר למפתחים:
-# - התרגיל יורש מ־squat.base את כל מדדי הבטיחות (עגילת גב/ולגוס/עיקום צדדי)
-#   ואת לוגיקת הניקוד הכללית, ומבצע כאן עדינות לערכי עומק/קצב/רוחב/עקבים.
-# - "ללא ציוד" נאכף לוגית על־ידי match_hints.must_not_have: [objdet.bar_present].
-#   אם בעתיד יתווספו גלאים לדאמבלים/קטלבל, יש להרחיב רשימה זו בהתאם.
-# - עומק עד 85° בברך מקבל ציון מלא; עומק מעבר לכך לא מוסיף ציון נוסף.
-# - עקבים שטוחים על הקרקע מודגשים כאן במשקל 0.8, כיוון שיציבות כף רגל קריטית
-#   ללא עוגן של משקולת.
+# - הוריאנט יורש מ־squat.base את כל מדדי הבטיחות (עגילת גב/ולגוס/עיקום צדדי)
+#   ואת לוגיקת הניקוד הכללית, ומבצע כאן התאמות לעומק/קצב/רוחב/עקבים.
+# - זיהוי "ללא ציוד" בפועל: _infer_equipment בודק אם קיימים מפתחות objdet.* או bar.*
+#   אם לא נמצאו → equipment_inferred="none", ואז המסווג מסנן לוריאנטים עם meta.equipment="none".
+# - בגלל שהמסווג הנוכחי מנקד לפי must_have/ranges/pose_view/weight בלבד,
+#   אין שימוש ב-must_not_have/any_of/שדות דוקומנטריים אחרים בקובץ זה.
 # -------------------------------------------------------------------

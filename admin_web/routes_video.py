@@ -7,8 +7,12 @@
 # • להזרים /video/stream.mjpg (עם HUD) — ממקור מצלמה (streamer) או ingest (fallback)
 # • לחשוף /api/video/start|stop|status + /api/camera/settings + /api/video/params|resolution
 #
-# תלות: יש שימוש ב-get_streamer() מתוך app.ui.video. אם אין/לא פעיל — עובד עם ingest.
-# HUD: מצוייר עם Pillow אם זמין; אם לא, הסטרים עובד בלי HUD.
+# חיבור לפייפליין:
+# • בכל POST /api/ingest_frame אנחנו גם קוראים ל-s.ingest_jpeg(jpeg) (אם קיים) —
+#   כדי שהפייפליין (MediaPipe/OD/מדידות) ירוץ על הפריימים מהדפדפן, ו-/payload יתעדכן.
+#
+# תלות: get_streamer() מתוך app.ui.video (יש בו ingest_jpeg, push_bgr_frame, push_jpeg).
+# HUD: מצוייר עם Pillow אם זמין; אם לא — הסטרים עובד בלי HUD.
 # =============================================================================
 
 from __future__ import annotations
@@ -28,10 +32,9 @@ if not logger.handlers:
     logger.addHandler(_h)
 logger.setLevel(logging.INFO)
 
-# ---------- תלות פנימית: ה"סטרימר" הראשי (אם זמין) ----------
+# ---------- Video streamer (אם זמין) ----------
 try:
-    # חשוב: בפרויקט שלך זה הנתיב הנכון
-    from app.ui.video import get_streamer
+    from app.ui.video import get_streamer  # כולל ingest_jpeg(), push_jpeg(), get_jpeg_generator()
     _HAS_STREAMER = True
 except Exception:
     _HAS_STREAMER = False
@@ -115,29 +118,26 @@ def _overlay_hud(jpeg_bytes: bytes, *, label: str, extra: Dict[str, Any]) -> byt
     except Exception:
         return jpeg_bytes
 
-    W, H = im.size
     draw = ImageDraw.Draw(im)
     font = _HUD_FONT
 
-    lines = [
-        f"{label}",
-        f"time: {time.strftime('%H:%M:%S')}",
-    ]
+    lines = [f"{label}", f"time: {time.strftime('%H:%M:%S')}"]
     for k in ("ingest_fps", "encode_fps", "size", "lat_ms", "source", "state"):
         if k in extra:
             lines.append(f"{k}: {extra[k]}")
 
     pad = 8
     line_h = 22 if font else 18
-    w_calc = [draw.textlength(l, font=font) if (font and hasattr(draw, "textlength")) else len(l)*9 for l in lines]
+    try:
+        w_calc = [draw.textlength(l, font=font) for l in lines]
+    except Exception:
+        w_calc = [len(l)*9 for l in lines]
     box_w = int(10 + max(w_calc) + 2*pad)
     box_h = int(10 + line_h*len(lines) + 2*pad)
     x0, y0 = 10, 10
     x1, y1 = x0 + box_w, y0 + box_h
 
-    # רקע כהה
     draw.rectangle((x0, y0, x1, y1), fill=(0, 0, 0))
-
     y = y0 + pad
     for i, l in enumerate(lines):
         color = (180, 220, 255) if i == 0 else (255, 255, 255)
@@ -148,7 +148,7 @@ def _overlay_hud(jpeg_bytes: bytes, *, label: str, extra: Dict[str, Any]) -> byt
     im.save(out, format="JPEG", quality=int(extra.get("jpeg_quality", 80)))
     return out.getvalue()
 
-# ---------- מדדי FPS פשוטים ----------
+# ---------- FPS meters ----------
 class _FPSMeter:
     def __init__(self, window_sec: float = 2.0):
         self.window = window_sec
@@ -164,7 +164,7 @@ class _FPSMeter:
         dt = max(1e-6, self.ts[-1] - self.ts[0])
         return (len(self.ts) - 1) / dt
 
-# ---------- מצב ingest ----------
+# ---------- ingest state ----------
 class _IngestState:
     def __init__(self):
         self.jpeg: Optional[bytes] = None
@@ -175,7 +175,7 @@ class _IngestState:
 
 INGEST = _IngestState()
 
-# JPEG placeholder קטן לפתיחת סטרים גם כשאין פריימים
+# JPEG placeholder קטן (תקין מבחינת padding)
 _PLACEHOLDER_B64 = (
     b"/9j/4AAQSkZJRgABAQAAAQABAAD/2wCEAAkGBxISEhUTEhMVFRUVFRUVFRUVFRUVFRUWFxUVFRUY"
     b"HSggGBolGxUVITEhJSkrLi4uFx8zODMsNygtLisBCgoKDg0OGxAQGi0fHyUtLS0tLS0tLS0tLS0t"
@@ -189,13 +189,11 @@ _PLACEHOLDER_JPEG = base64.b64decode(_PLACEHOLDER_B64 + b'=' * (-len(_PLACEHOLDE
 
 def _read_jpeg_from_request() -> Tuple[Optional[bytes], Optional[str]]:
     ct = (request.headers.get("Content-Type") or "").lower()
-    # multipart/form-data
     if "multipart/form-data" in ct:
         f = request.files.get("frame")
         if not f:
             return None, "missing 'frame' file field"
         return f.read(), None
-    # raw image/jpeg
     if "image/jpeg" in ct or "image/jpg" in ct:
         data = request.get_data()
         if not data:
@@ -205,12 +203,17 @@ def _read_jpeg_from_request() -> Tuple[Optional[bytes], Optional[str]]:
 
 @video_bp.post("/api/ingest_frame")
 def api_ingest_frame():
+    """
+    קולט פריים בודד כ-JPEG (raw או multipart). בנוסף:
+    • מעדכן INGEST להצגה (fallback)
+    • מזריק ל-Streamer (ingest_jpeg) כדי שהפייפליין ירוץ ו-/payload יתעדכן
+    """
     try:
         jpeg, err = _read_jpeg_from_request()
         if err or not jpeg:
             return jsonify(ok=False, error=err or "bad frame"), 400
 
-        # עדכון גודל (סטטוס)
+        # עדכון גודל (סטטוס) — best-effort
         try:
             if _HAS_PIL:
                 im = Image.open(BytesIO(jpeg))
@@ -218,16 +221,33 @@ def api_ingest_frame():
         except Exception:
             pass
 
+        # שמירה ל-fallback MJPEG + מדדי ingest
         INGEST.jpeg = jpeg
         INGEST.ts_ms = _now_ms()
         INGEST.rx_fps.tick()
+
+        # >>> החיבור לפייפליין: להזרים ל-Streamer <<<
+        try:
+            if _HAS_STREAMER:
+                s = get_streamer()
+                ing = getattr(s, "ingest_jpeg", None)
+                if callable(ing):
+                    ing(jpeg)   # מפענח → push_bgr_frame → payload/OD רצים
+                else:
+                    # לפחות נציג במפלג ה-MJPEG:
+                    push = getattr(s, "push_jpeg", None)
+                    if callable(push):
+                        push(jpeg, size=INGEST.size)
+        except Exception:
+            logger.exception("ingest → streamer failed")
+
         return jsonify(ok=True, ts_ms=INGEST.ts_ms)
     except Exception as e:
         logger.error("api_ingest_frame failed", exc_info=True)
         return jsonify(ok=False, error=str(e)), 500
 
 def _ingest_mjpeg_generator(hud: bool = True, fps: int = 12) -> Iterator[bytes]:
-    """תמיד שולח משהו: פריים ingest אם יש, אחרת placeholder. שומר קצב קבוע."""
+    """שומר קצב קבוע; אם אין ingest — שולח placeholder כדי שהדפדפן לא ייחנק."""
     interval = 1.0 / max(1, min(60, fps))
     while True:
         t0 = time.time()
@@ -254,7 +274,7 @@ def _ingest_mjpeg_generator(hud: bool = True, fps: int = 12) -> Iterator[bytes]:
         elapsed = time.time() - t0
         time.sleep(max(0.0, interval - elapsed))
 
-# ---------- API: start/stop/status ----------
+# ---------- START / STOP / STATUS ----------
 @video_bp.post("/api/video/start")
 def api_video_start():
     j = request.get_json(silent=True) or {}
@@ -291,7 +311,7 @@ def api_video_start():
 @video_bp.post("/api/video/stop")
 def api_video_stop():
     if not _HAS_STREAMER:
-        return jsonify(ok=True)  # אין סטרימר — אין מה לעצור
+        return jsonify(ok=True)
     s = get_streamer()
     try:
         try: s.stop_auto_capture()
@@ -351,19 +371,17 @@ def api_video_status():
         state=state, ingest=ingest_state
     ), 200
 
-# ---------- סטרים ----------
+# ---------- STREAM ----------
 @video_bp.get("/video/stream.mjpg")
 def video_stream_mjpg():
     hud = request.args.get("hud", "1").strip() != "0"
 
-    # מצב 'file' → הפניה לזרם קובץ (אם קיים אצלך)
     try:
         if get_stream_mode() == "file":
             return redirect("/video/stream_file.mjpg", code=307)
     except Exception:
         pass
 
-    # אם יש סטרימר פעיל — נשתמש בו
     if _HAS_STREAMER:
         try:
             s = get_streamer()
@@ -408,14 +426,13 @@ def video_stream_mjpg():
         except Exception:
             logger.warning("streamer not available; falling back to ingest")
 
-    # Fallback: ingest (כולל placeholder כדי לא להיתקע)
     return _make_mjpeg_response(_ingest_mjpeg_generator(hud=hud))
 
 @video_bp.get("/video/stream")
 def video_stream_legacy():
     return redirect("/video/stream.mjpg", code=302)
 
-# ---------- פרמטרים/רזולוציה/הגדרות ----------
+# ---------- PARAMS / RESOLUTION ----------
 @video_bp.route("/api/video/params", methods=["GET", "POST"])
 def api_video_params():
     if request.method == "GET":

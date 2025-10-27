@@ -9,10 +9,15 @@ admin_web/exercise_analyzer.py
 - דו״ח סימולציה מלא (בפורמט analyze_exercise) ➜ build_simulated_report()
 - ניקוד דו"ח בודד מתוך metrics (חי/מדומה) ➜ analyze_exercise()
 - סניטציה של metrics מהקליינט ➜ sanitize_metrics_payload()
+- מעטפת הפעלה של מנוע הזיהוי ➜ detect_once()
+- חשיפת הגדרות מנוע ➜ settings_dump()
+- ניהול דו"ח אחרון ➜ set_last_report()/get_last_report()
 
 שימוש:
 from admin_web.exercise_analyzer import (
-    analyze_exercise, simulate_exercise, build_simulated_report, sanitize_metrics_payload
+    analyze_exercise, simulate_exercise, build_simulated_report,
+    sanitize_metrics_payload, detect_once, settings_dump,
+    get_last_report, configure_engine_root
 )
 """
 
@@ -20,7 +25,11 @@ from __future__ import annotations
 import math
 import random
 import time
-from typing import Any, Dict, List, Optional, Tuple
+import json
+import os
+import threading
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Tuple, Callable
 
 # ===== Logging (נופל-בחסד אם core.logs לא קיים) =====
 try:
@@ -35,6 +44,10 @@ __all__ = [
     "simulate_exercise",
     "analyze_exercise",
     "build_simulated_report",
+    "detect_once",
+    "settings_dump",
+    "get_last_report",
+    "configure_engine_root",
 ]
 
 # ============ UI constants ============
@@ -604,3 +617,123 @@ def build_simulated_report(
             },
             "hints": ["שגיאת סימולציה – ראה לוגים"],
         }
+
+# ===== Engine glue (מנוע/ספרייה) =====
+# יבוא רך כדי לא להפיל ריצה אם המנוע לא מותקן
+try:
+    from exercise_engine.runtime.runtime import run_once as exr_run_once
+    from exercise_engine.runtime.engine_settings import SETTINGS as EXR_SETTINGS
+    from exercise_engine.registry.loader import load_library as exr_load_library
+    _EXR_OK = True
+except Exception as _e:
+    logger.warning("[EXR] engine imports failed: %s", _e)
+    _EXR_OK = False
+    exr_run_once = None
+    EXR_SETTINGS = None
+    exr_load_library = None
+
+_ENGINE = {"lib": None, "root": None}
+_ENGINE_LOCK = threading.Lock()
+
+def configure_engine_root(root_dir: str | None) -> None:
+    """מאפשר לקבוע ספריית ספרייה חיצונית אם צריך (אופציונלי)."""
+    _ENGINE["root"] = root_dir
+
+def get_engine_library() -> Any:
+    """טוען/מחזיר את ספריית התרגילים עם cache+lock. מרים חריגה אם המנוע לא זמין."""
+    if not _EXR_OK:
+        raise RuntimeError("exercise engine not available")
+    if _ENGINE["lib"] is not None:
+        return _ENGINE["lib"]
+    with _ENGINE_LOCK:
+        if _ENGINE["lib"] is not None:
+            return _ENGINE["lib"]
+        # ברירת מחדל: ../exercise_library ביחס לתיקיית הפרויקט
+        default_root = Path(__file__).resolve().parent.parent / "exercise_library"
+        lib_dir = Path(_ENGINE["root"] or default_root)
+        lib = exr_load_library(lib_dir)
+        logger.info("[EXR] library loaded @ %s (version: %s)", lib_dir, getattr(lib, "version", "unknown"))
+        _ENGINE["lib"] = lib
+        return lib
+
+def settings_dump() -> Dict[str, Any]:
+    """חשיפת הגדרות המנוע ל-UI."""
+    if not _EXR_OK or EXR_SETTINGS is None:
+        return {"ok": False, "error": "engine_unavailable"}
+    try:
+        return {"ok": True, "settings": json.loads(EXR_SETTINGS.dump())}
+    except Exception as e:
+        logger.error("settings_dump failed: %s", e, exc_info=True)
+        return {"ok": False, "error": str(e)}
+
+# ===== Last report state =====
+_LAST_REPORT_LOCK = threading.Lock()
+_LAST_REPORT: Optional[Dict[str, Any]] = None
+
+def set_last_report(report: Dict[str, Any]) -> None:
+    with _LAST_REPORT_LOCK:
+        global _LAST_REPORT
+        _LAST_REPORT = dict(report)
+
+def get_last_report() -> Optional[Dict[str, Any]]:
+    with _LAST_REPORT_LOCK:
+        return _LAST_REPORT.copy() if isinstance(_LAST_REPORT, dict) else None
+
+# ===== Detect wrapper =====
+def detect_once(
+    raw_metrics: Dict[str, Any],
+    exercise_id: Optional[str] = None,
+    payload_version: str = "1.0",
+    persist_cb: Optional[Callable[[Dict[str, Any]], None]] = None,   # אופציונלי: שמירה למסד מבחוץ
+) -> Dict[str, Any]:
+    """
+    מריץ זיהוי יחיד (exr_run_once) אחרי סניטציה, מחשב score_pct/grade, ושומר דו"ח אחרון.
+    """
+    if not _EXR_OK or exr_run_once is None:
+        return {"ok": False, "error": "engine_unavailable"}
+
+    # סניטציה
+    metrics = sanitize_metrics_payload(raw_metrics or {})
+
+    # Exercise ID
+    ex_id = exercise_id if isinstance(exercise_id, str) else None
+
+    # טען ספרייה
+    try:
+        lib = get_engine_library()
+    except Exception as e:
+        logger.error("detect_once: library_load_failed: %s", e, exc_info=True)
+        return {"ok": False, "error": f"library_load_failed: {e}"}
+
+    # ריצה
+    t0 = time.time()
+    try:
+        report = exr_run_once(raw_metrics=metrics, library=lib, exercise_id=ex_id, payload_version=payload_version)
+    except Exception as e:
+        logger.error("detect_once: runtime failed: %s", e, exc_info=True)
+        return {"ok": False, "error": f"runtime_failed: {e}"}
+
+    # העשרה קלה של scoring
+    sc = report.get("scoring", {}) if isinstance(report, dict) else {}
+    if "score_pct" not in sc and isinstance(sc.get("score"), (int, float)):
+        try:
+            sc["score_pct"] = int(round(float(sc["score"]) * 100))
+        except Exception:
+            pass
+    q = sc.get("quality")
+    if not sc.get("grade") and isinstance(q, str) and q.strip().upper() in list("ABCDEF"):
+        sc["grade"] = q.strip().upper()
+    report["scoring"] = sc
+
+    # דו"ח אחרון
+    set_last_report(report)
+
+    # שמירה למסד אם ביקשו
+    if callable(persist_cb):
+        try:
+            persist_cb(report)
+        except Exception as _e:
+            logger.warning("[persist] failed: %s", _e)
+
+    took_ms = int((time.time() - t0) * 1000.0)
+    return {"ok": True, "took_ms": took_ms, "report": report}

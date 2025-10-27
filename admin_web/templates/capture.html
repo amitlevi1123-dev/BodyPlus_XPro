@@ -7,10 +7,7 @@
   <style>
     :root { --bg:#0f172a; --panel:#111827; --muted:#94a3b8; --ok:#22c55e; --warn:#f59e0b; --err:#ef4444; }
     * { box-sizing: border-box; }
-    body {
-      margin:0; font-family:system-ui,Segoe UI,Roboto,Arial; background:var(--bg); color:#e5e7eb;
-      line-height:1.45;
-    }
+    body { margin:0; font-family:system-ui,Segoe UI,Roboto,Arial; background:var(--bg); color:#e5e7eb; line-height:1.45; }
     header { padding:14px 18px; border-bottom:1px solid #1f2937; background:#0b1221; position:sticky; top:0; z-index:1; }
     header h1 { margin:0; font-size:18px; letter-spacing:.3px; }
     main { padding:18px; display:grid; gap:18px; grid-template-columns: 1.2fr .8fr; }
@@ -50,6 +47,15 @@
     .errbox { background:rgba(239,68,68,.08); border:1px solid rgba(239,68,68,.35); color:#fecaca; padding:10px; border-radius:10px; }
     .hint { color:#94a3b8; font-size:12px; }
     code { background:#0b1221; padding:.15rem .35rem; border-radius:6px; border:1px solid #263142; }
+
+    /* כותרות נושאיות */
+    .topic-title { font-weight:700; font-size:14px; margin-bottom:8px; color:#e5e7eb; }
+    details.topic { background:#0b1221; border:1px solid #273143; border-radius:12px; padding:10px 12px; }
+    details.topic + details.topic { margin-top:10px; }
+    details.topic summary { cursor:pointer; list-style:none; outline:none; display:flex; align-items:center; gap:8px; }
+    details.topic summary::-webkit-details-marker { display:none; }
+    .topic-body { margin-top:10px; display:grid; gap:10px; grid-template-columns: repeat(auto-fit,minmax(180px,1fr)); }
+    .topic-actions { display:flex; gap:10px; flex-wrap:wrap; }
   </style>
 </head>
 <body>
@@ -58,58 +64,74 @@
   </header>
 
   <main>
-    <!-- צד שמאל: וידאו / פריוויו -->
+    <!-- שמאל: פריוויו + בקרה נושאית -->
     <section>
+      <!-- בקרות מסודרות לפי נושאים -->
       <div class="card" style="border-bottom-left-radius:0;border-bottom-right-radius:0;">
-        <div class="row" style="gap:14px;">
-          <div>
-            <label>מצלמה</label><br />
-            <select id="cameraSelect"></select>
+        <!-- נושא: מקור מצלמה -->
+        <details class="topic" open>
+          <summary class="topic-title">📷 מקור מצלמה</summary>
+          <div class="topic-body">
+            <div>
+              <label for="cameraSelect">מצלמה</label><br />
+              <select id="cameraSelect"></select>
+            </div>
+            <div>
+              <label for="resSelect">רזולוציה</label><br />
+              <select id="resSelect">
+                <option value="640x360">640×360</option>
+                <option value="1280x720" selected>1280×720</option>
+                <option value="1920x1080">1920×1080</option>
+              </select>
+            </div>
+            <div class="row">
+              <input id="mirror" type="checkbox" checked />
+              <label for="mirror">מראה (Mirror)</label>
+            </div>
           </div>
+        </details>
 
-          <div>
-            <label>רזולוציה</label><br />
-            <select id="resSelect">
-              <option value="640x360">640×360</option>
-              <option value="1280x720" selected>1280×720</option>
-              <option value="1920x1080">1920×1080</option>
-            </select>
+        <!-- נושא: שידור ואיכות -->
+        <details class="topic" open>
+          <summary class="topic-title">📡 שידור ואיכות</summary>
+          <div class="topic-body">
+            <div>
+              <label for="fpsInput">FPS שידור</label><br />
+              <input id="fpsInput" type="number" min="1" max="60" value="15" />
+            </div>
+            <div>
+              <label for="jpgQ">איכות JPEG</label><br />
+              <input id="jpgQ" type="number" min="40" max="95" value="80" />
+            </div>
+            <div class="row">
+              <input id="hudToggle" type="checkbox" checked />
+              <label for="hudToggle">HUD בפריוויו</label>
+            </div>
           </div>
+        </details>
 
-          <div>
-            <label>FPS שידור</label><br />
-            <input id="fpsInput" type="number" min="1" max="60" value="15" />
+        <!-- נושא: אבטחה / טוקן -->
+        <details class="topic">
+          <summary class="topic-title">🔐 אבטחה / טוקן</summary>
+          <div class="topic-body" style="grid-template-columns:minmax(220px,1fr)">
+            <div>
+              <label for="token">Token (אופציונלי)</label><br />
+              <input id="token" type="text" placeholder="X-Ingest-Token" style="min-width:220px" />
+            </div>
           </div>
+        </details>
 
-          <div>
-            <label>איכות JPEG</label><br />
-            <input id="jpgQ" type="number" min="40" max="95" value="80" />
-          </div>
-
-          <div class="row">
-            <input id="mirror" type="checkbox" checked />
-            <label for="mirror">מראה (Mirror)</label>
-          </div>
-
-          <div style="flex:1"></div>
-
-          <div class="row">
-            <input id="hudToggle" type="checkbox" checked />
-            <label for="hudToggle">HUD בפריוויו</label>
-          </div>
-
-          <div class="row">
-            <label>Token (אופציונלי)</label>
-            <input id="token" type="text" placeholder="X-Ingest-Token" style="min-width:220px" />
-          </div>
-
-          <div class="row">
+        <!-- נושא: פעולות -->
+        <details class="topic" open>
+          <summary class="topic-title">▶️ פעולות</summary>
+          <div class="topic-actions">
             <button id="startBtn">התחל שידור</button>
             <button id="stopBtn" class="secondary" disabled>עצור</button>
           </div>
-        </div>
+        </details>
       </div>
 
+      <!-- פריוויו -->
       <div class="preview-wrap">
         <video id="video" autoplay playsinline muted></video>
         <canvas id="canvas" style="display:none"></canvas>
@@ -121,6 +143,7 @@
         </div>
       </div>
 
+      <!-- הודעות וטיפים -->
       <div class="card" style="border-top-left-radius:0;border-top-right-radius:0;">
         <div id="err" class="errbox" style="display:none"></div>
         <div class="hint">
@@ -129,14 +152,17 @@
       </div>
     </section>
 
-    <!-- צד ימין: מדדים / קישורים -->
+    <!-- ימין: סטטוס, מדדים, קיצורים -->
     <section class="card">
-      <div class="status">
+      <!-- נושא: סטטוס -->
+      <div class="status" aria-live="polite">
         <span class="dot" id="dot"></span>
         <span id="statusText">ממתין להתחלה…</span>
       </div>
 
-      <div class="metrics" style="margin-top:14px">
+      <!-- נושא: מדדים -->
+      <div style="margin-top:14px" class="topic-title">📊 מדדים</div>
+      <div class="metrics">
         <div class="metric">
           <div class="v" id="m_tx">0.0</div>
           <div class="k">Tx FPS (נשלח)</div>
@@ -157,8 +183,9 @@
 
       <hr style="border:0;border-top:1px solid #273143;margin:16px 0" />
 
+      <!-- נושא: קיצורי דרך -->
       <div class="card" style="background:#0b1221">
-        <div style="font-weight:700;margin-bottom:8px;">קיצורי דרך</div>
+        <div class="topic-title">🔗 קיצורי דרך</div>
         <div style="display:grid; gap:8px;">
           <a href="/video/stream.mjpg?hud=1" target="_blank">פתח סטרים /video/stream.mjpg?hud=1</a>
           <a href="/api/video/status" target="_blank">סטטוס וידאו (JSON)</a>
@@ -228,7 +255,6 @@
         o.textContent = d.label || `מצלמה ${i+1}`;
         cameraSelect.appendChild(o);
       });
-      // בחירת "אחורי" אם קיים (mobile)
       const back = cams.find(d => /back|rear/i.test(d.label));
       if (back) cameraSelect.value = back.deviceId;
     }
@@ -319,7 +345,6 @@
           const tok = tokenInp.value.trim();
           if (tok) headers['X-Ingest-Token'] = tok;
 
-          // keepalive חשוב בסגירות טאב/ניווט קצר, אך מוגבל בגודל (~64KB ב-Chrome)
           const r = await fetch(endpoint, {
             method: 'POST',
             headers,
@@ -328,7 +353,6 @@
           });
 
           if (!r.ok) {
-            // ננסה לפרט הודעת שגיאה
             let msg = `${r.status} ${r.statusText}`;
             try { const j = await r.json(); if (j && j.error) msg += ` | ${j.error}` } catch (_) {}
             throw new Error(msg);
@@ -355,13 +379,11 @@
           console.error('send error', e);
           setError('שליחת פריים נכשלה: ' + (e?.message || e));
           setDot('warn');
-          // המתן רגע קטן לפני ניסיון הבא
           await sleep(200);
         }
 
         const elapsed = performance.now() - tStart;
         const wait = Math.max(0, frameInterval - elapsed);
-        // לולאה רכה: אם טאב לא בפוקוס, ה־raf/טיימרים יאטו – זה בסדר
         if (wait > 0) await sleep(wait);
       }
 
@@ -396,32 +418,22 @@
       }
     }
 
+    // אירועים
     startBtn.addEventListener('click', start);
     stopBtn.addEventListener('click', stop);
     hudToggle.addEventListener('change', () => setHudVisible(hudToggle.checked));
+    resSelect.addEventListener('change', async () => { if (sending) await openCamera(); });
+    cameraSelect.addEventListener('change', async () => { if (sending) await openCamera(); });
 
-    resSelect.addEventListener('change', async () => {
-      if (!sending) return;
-      // פתיחה מחדש עם רזולוציה חדשה
-      await openCamera();
-    });
-
-    cameraSelect.addEventListener('change', async () => {
-      if (!sending) return;
-      await openCamera();
-    });
-
-    // טעינה ראשונית: דרישת הרשאה כדי שנוכל להציג רשימת מצלמות עם שמות
+    // אתחול
     (async () => {
-      try {
-        await navigator.mediaDevices.getUserMedia({video:true, audio:false});
-      } catch (_) { /* יתבקש שוב ב-start */ }
+      try { await navigator.mediaDevices.getUserMedia({video:true, audio:false}); } catch (_) {}
       try { await listCameras(); } catch(e){ console.warn(e); }
       setState('IDLE');
       setHudVisible(false);
     })();
 
-    // ניקוי משאבים בעת עזיבת הדף
+    // ניקוי
     window.addEventListener('beforeunload', () => {
       sending = false;
       if (stream) stream.getTracks().forEach(t => t.stop());

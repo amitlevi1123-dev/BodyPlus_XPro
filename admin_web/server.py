@@ -2,44 +2,63 @@
 """
 server.py — Admin UI + API (חיבור נקי למסד דרך db/persist)
 -----------------------------------------------------------
-• Flask (דשבורד, לוגים, וידאו) — /video/stream.mjpg
+• Flask (דשבורד, וידאו, לוגים כ-Blueprint) — /video/stream.mjpg
 • /payload מעדיף admin_web.state; אחרת LAST_PAYLOAD המקומי
 • סטרים MJPEG דרך admin_web.routes_video
-• תרגילים: /api/exercise/*
+• תרגילים: נרשמים דרך admin_web.routes_exercise (Blueprint)
 • Data API (אם קיים): /api/workouts, /api/workouts/<id>/sets, /api/sets/<id>/report
 
 חדש:
-- שימוש בשכבת Persist אחת: db/persist.py
-- אם ה-DB זמין: נשמר דו"ח אוטומטית אחרי detect(); אם לא — אין שינוי בהתנהגות.
+- שימוש בשכבת Persist אחת: db/persist.py (אתחול בלבד מהשרת)
+- ראוטי לוגים (‎/api/logs*‎) ב־admin_web/routes_logs.py
+- ראוטי exercise* ב־admin_web/routes_exercise.py
+- בריאות/דיאגנוסטיקה (version/healthz/readyz/…): admin_web/routes_system.py
 """
 
 from __future__ import annotations
 import os, json, math, time, threading, logging
 from pathlib import Path
 from typing import Dict, List, Any, Optional
-from queue import Empty
-from urllib.parse import parse_qs
 
 from flask import (
     Flask, Response, jsonify, render_template, request, send_from_directory,
-    stream_with_context, redirect, url_for, send_file, make_response
+    redirect, url_for, send_file, make_response
 )
 from werkzeug.middleware.proxy_fix import ProxyFix
 
-# וידאו (חובה)
-from admin_web.routes_video import video_bp
+# ===== Blueprints =====
+from admin_web.routes_video import video_bp  # חובה
 
-# Blueprints אופציונליים
+# העלאת וידאו (אופציונלי)
 try:
     from admin_web.routes_upload_video import upload_video_bp
 except Exception:
     upload_video_bp = None  # type: ignore
 
+# פעולות/סטייט (אופציונלי)
 try:
     from admin_web.routes_actions import actions_bp, state_bp
 except Exception:
     actions_bp = None  # type: ignore
     state_bp = None  # type: ignore
+
+# לוגים
+try:
+    from admin_web.routes_logs import bp_logs
+except Exception:
+    bp_logs = None  # type: ignore
+
+# Exercise API
+try:
+    from admin_web.routes_exercise import bp_exercise
+except Exception:
+    bp_exercise = None  # type: ignore
+
+# System/health/diagnostics
+try:
+    from admin_web.routes_system import bp_system
+except Exception:
+    bp_system = None  # type: ignore
 
 # וורקר מדידות וידאו (אופציונלי)
 try:
@@ -47,15 +66,12 @@ try:
 except Exception:
     start_video_metrics_worker = None  # type: ignore
 
-# לוגים
+# ===== Logging (init only) =====
 try:
-    from core.logs import setup_logging, logger, LOG_BUFFER, LOG_QUEUE
+    from core.logs import setup_logging, logger
 except Exception:
-    import collections, queue
     logging.basicConfig(level=logging.INFO, format="%(asctime)s | %(levelname)s | %(message)s")
     logger = logging.getLogger("server")
-    LOG_BUFFER = collections.deque(maxlen=2000)
-    LOG_QUEUE = queue.Queue()
 
 # Payload גרסה
 try:
@@ -70,140 +86,35 @@ except Exception:
     def get_shared_payload() -> Dict[str, Any]:
         return {}
 
-# ObjDet status
+# Persist (DB) — אתחול בלבד
 try:
-    from admin_web.routes_objdet import OBJDET_STATUS, OBJDET_STATUS_LOCK  # type: ignore
-except Exception:
-    import threading as _th
-    OBJDET_STATUS = {"ok": False, "note": "objdet_status_unavailable"}
-    OBJDET_STATUS_LOCK = _th.Lock()
-
-def _import_get_streamer():
-    try:
-        from app.ui.video import get_streamer as f  # type: ignore
-        return f
-    except Exception:
-        pass
-    try:
-        from admin_web.routes_video import get_streamer as f  # type: ignore
-        return f
-    except Exception:
-        pass
-    return lambda: None
-
-# ניטור מערכת
-try:
-    from core.system.monitor import get_snapshot
-except Exception:
-    def get_snapshot() -> Dict[str, Any]:
-        return {"ok": False, "error": "system_monitor_unavailable"}
-
-# Exercise Analyzer / Engine
-try:
-    from admin_web.exercise_analyzer import (
-        analyze_exercise, simulate_exercise, sanitize_metrics_payload,
-        build_simulated_report,
-    )  # type: ignore
-except Exception as _e:
-    logger.warning(f"[EXR] analyzer import failed: {_e}")
-    analyze_exercise = None  # type: ignore
-    simulate_exercise = None  # type: ignore
-    sanitize_metrics_payload = None  # type: ignore
-    build_simulated_report = None  # type: ignore
-
-try:
-    from exercise_engine.runtime.runtime import run_once as exr_run_once
-    from exercise_engine.runtime.engine_settings import SETTINGS as EXR_SETTINGS
-    from exercise_engine.registry.loader import load_library as exr_load_library
-    _EXR_OK = True
-except Exception as _e:
-    logger.warning(f"[EXR] engine imports failed: {_e}")
-    _EXR_OK = False
-
-try:
-    from exercise_engine.runtime import log as exlog
-    _EXLOG_OK = True
-except Exception:
-    _EXLOG_OK = False
-
-# חיבור שכבת Persist (DB)
-try:
-    from db.persist import AVAILABLE as DB_PERSIST_AVAILABLE, init as db_persist_init, persist_report
+    from db.persist import AVAILABLE as DB_PERSIST_AVAILABLE, init as db_persist_init
 except Exception as _e:
     DB_PERSIST_AVAILABLE = False
     def db_persist_init(*args, **kwargs):  # type: ignore
         logger.info(f"[persist] not available ({_e})")
-    def persist_report(_report):  # type: ignore
-        return None
 
-# קונפיג
+# ===== Config =====
 APP_VERSION = os.getenv("APP_VERSION", "dev")
 GIT_COMMIT  = os.getenv("GIT_COMMIT", "")[:12] or None
 DEFAULT_BACKEND = os.getenv("DEFAULT_BACKEND", "").strip()
+
 ENABLE_HEARTBEAT = os.getenv("ENABLE_HEARTBEAT", "1") == "1"
 HEARTBEAT_INTERVAL_SEC = float(os.getenv("HEARTBEAT_INTERVAL_SEC", "30"))
-
-LOGS_API_MAX_ITEMS   = int(os.getenv("LOGS_API_MAX_ITEMS", "400"))
-LOG_STREAM_INIT_MAX  = int(os.getenv("LOG_STREAM_INIT_MAX", "50"))
-LOG_STREAM_BURST_MAX = int(os.getenv("LOG_STREAM_BURST_MAX", "20"))
-LOG_STREAM_PING_MS   = int(os.getenv("LOG_STREAM_PING_MS", "15000"))
-
-EXR_DIAG_INIT_MAX  = int(os.getenv("EXR_DIAG_INIT_MAX", "100"))
-EXR_DIAG_BURST_MAX = int(os.getenv("EXR_DIAG_BURST_MAX", "20"))
-EXR_DIAG_PING_MS   = int(os.getenv("EXR_DIAG_PING_MS", "10000"))
 
 BASE_DIR      = Path(__file__).resolve().parent
 TPL_DIR       = BASE_DIR / "templates"
 STATIC_DIR    = BASE_DIR / "static"
 LEGACY_IMAGES = BASE_DIR / "images"
 
-_now_ms = lambda: int(time.time() * 1000)
+_NOW_MS = lambda: int(time.time() * 1000)
 
 LAST_PAYLOAD_LOCK = threading.Lock()
 LAST_PAYLOAD: Optional[Dict[str, Any]] = None
 
-ENGINE_LIB_LOCK = threading.Lock()
-ENGINE_LIB = {"lib": None, "root": str((Path(__file__).resolve().parent / "exercise_library"))}
+START_TS = time.time()
 
-def _get_engine_library():
-    if not _EXR_OK:
-        raise RuntimeError("exercise engine not available")
-    if ENGINE_LIB["lib"] is not None:
-        return ENGINE_LIB["lib"]
-    with ENGINE_LIB_LOCK:
-        if ENGINE_LIB["lib"] is not None:
-            return ENGINE_LIB["lib"]
-        lib_dir = Path(ENGINE_LIB["root"])
-        lib = exr_load_library(lib_dir)
-        logger.info(f"[EXR] library loaded @ {lib_dir} (version: {getattr(lib, 'version', 'unknown')})")
-        ENGINE_LIB["lib"] = lib
-        return lib
-
-LAST_EXERCISE_REPORT_LOCK = threading.Lock()
-LAST_EXERCISE_REPORT: Optional[Dict[str, Any]] = None
-
-# -------- לוגיקת אנטי-ספאם ללוגים --------
-_OD1502_STATE = {"sig": None, "count": 0, "last": 0.0}
-def _dedup_od1502(title: str, detail: Any = None, level: str = "debug"):
-    try:
-        now = time.time()
-        sig = (title, json.dumps(detail, sort_keys=True, ensure_ascii=False) if detail is not None else None)
-        if (_OD1502_STATE["sig"] != sig) or (now - _OD1502_STATE["last"] > 5.0):
-            cnt = _OD1502_STATE["count"]
-            _OD1502_STATE.update({"sig": sig, "count": 0, "last": now})
-            msg = f"OD1502 {title}"
-            if detail is not None:
-                msg += f" | detail={detail!r}"
-            if cnt:
-                msg += f" | suppressed={cnt}"
-            lf = {"debug": logger.debug, "warning": logger.warning, "error": logger.error}.get(level, logger.debug)
-            lf(msg)
-        else:
-            _OD1502_STATE["count"] += 1
-    except Exception:
-        pass
-
-# -------- Utilities --------
+# ===== Internals / Utils =====
 def _background_log_heartbeat() -> None:
     i = 0
     while True:
@@ -226,7 +137,7 @@ def _flatten_dict(d: Dict[str, Any], prefix: str = "") -> Dict[str, Any]:
 
 def _get_empty_objdet_payload() -> Dict[str, Any]:
     return {
-        "frame": {"w": 1280, "h": 720, "mirrored": False, "ts_ms": _now_ms()},
+        "frame": {"w": 1280, "h": 720, "mirrored": False, "ts_ms": _NOW_MS()},
         "objects": [], "tracks": [],
         "detector_state": {"ok": False, "err": "no_detection_engine", "provider": "none", "fps": 0.0},
     }
@@ -284,6 +195,7 @@ def _try_parse_non_json_body(raw: str):
     except Exception:
         pass
     try:
+        from urllib.parse import parse_qs
         q = parse_qs(raw, keep_blank_values=True, strict_parsing=False)
         if not q:
             return None
@@ -370,8 +282,7 @@ def _server_side_schema_fixups(d: Dict[str, Any]) -> Dict[str, Any]:
     _sanitize_numbers_inplace(d)
     return d
 
-START_TS = time.time()
-
+# ===== App factory =====
 def create_app() -> Flask:
     try:
         setup_logging()
@@ -395,7 +306,7 @@ def create_app() -> Flask:
     if ENABLE_HEARTBEAT:
         threading.Thread(target=_background_log_heartbeat, daemon=True).start()
 
-    # Blueprints
+    # ----- Register blueprints -----
     app.register_blueprint(video_bp)
     logger.info("[Server] Registered video_bp blueprint")
 
@@ -426,6 +337,22 @@ def create_app() -> Flask:
     except Exception as e:
         logger.info(f"[API] data_api not available ({e})")
 
+    # Logs API
+    if bp_logs is not None:
+        app.register_blueprint(bp_logs)
+        logger.info("[Server] Registered logs_bp blueprint (/api/logs*)")
+
+    # Exercise API
+    if bp_exercise is not None:
+        app.register_blueprint(bp_exercise)
+        logger.info("[Server] Registered exercise_bp blueprint (/api/exercise*)")
+
+    # System/health/diagnostics API
+    if bp_system is not None:
+        app.register_blueprint(bp_system)
+        logger.info("[Server] Registered system_bp blueprint (/version,/healthz,…)")
+
+    # וורקר מדידות וידאו (אם יש)
     if callable(start_video_metrics_worker):
         try:
             start_video_metrics_worker()
@@ -433,7 +360,7 @@ def create_app() -> Flask:
         except Exception as e:
             logger.warning(f"[VideoWorker] failed to start: {e}")
 
-    # אתחול שכבת Persist (DB) — no-op אם לא זמין
+    # אתחול Persist (DB) — no-op אם לא זמין
     try:
         db_persist_init(default_user_name=os.getenv("DEFAULT_USER_NAME", "Amit"))
         logger.info("DB persist layer: %s", "ON" if DB_PERSIST_AVAILABLE else "OFF")
@@ -443,28 +370,7 @@ def create_app() -> Flask:
     logger.info("=== Admin UI (Flask – Single server) ===")
     logger.info(f"APP_VERSION={APP_VERSION}  DEFAULT_BACKEND={DEFAULT_BACKEND or '(none)'}")
 
-    # -------- Rate-limit ל-start/stop וידאו --------
-    from time import time as _now
-    _RL_GAP = float(os.getenv("VIDEO_RATE_LIMIT_SEC", "3.0"))
-    _RL_PATHS = {"/api/video/start", "/api/video/stop"}
-    _RL_STATE: Dict[str, Dict[str, float]] = {p: {} for p in _RL_PATHS}
-
-    @app.before_request
-    def _throttle_video_start_stop():
-        try:
-            if request.path not in _RL_PATHS or request.method != "POST":
-                return None
-            ip = (request.headers.get("X-Forwarded-For", "") or request.remote_addr or "0.0.0.0").split(",")[0].strip()
-            now = _now()
-            last = _RL_STATE[request.path].get(ip, 0.0)
-            if (now - last) < _RL_GAP:
-                retry = max(0.0, _RL_GAP - (now - last))
-                return jsonify({"ok": False, "error": "too_fast", "retry_after_sec": round(retry, 2)}), 429
-            _RL_STATE[request.path][ip] = now
-        except Exception:
-            pass
-        return None
-
+    # ----- Global headers / CORS / cache bust -----
     @app.after_request
     def _no_cache(resp: Response):
         resp.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
@@ -476,6 +382,7 @@ def create_app() -> Flask:
         resp.headers["Access-Control-Allow-Headers"] = "Content-Type"
         return resp
 
+    # ----- Jinja helpers (FIX: has_endpoint/url_for_safe) -----
     @app.context_processor
     def _inject():
         def has_endpoint(name: str) -> bool:
@@ -489,7 +396,12 @@ def create_app() -> Flask:
             "app_version": APP_VERSION,
         }
 
-    # -------- Static/SPAs --------
+    # בנוסף, כגיבוי:
+    app.jinja_env.globals.setdefault("has_endpoint", lambda name: name in app.view_functions)
+    app.jinja_env.globals.setdefault("url_for_safe",
+                                     lambda name, **kw: url_for(name, **kw) if name in app.view_functions else "#")
+
+    # ----- Static/SPAs -----
     def _serve_gz_or_plain(path_no_gz: Path, default_mime: str) -> Response:
         gz = path_no_gz.with_suffix(path_no_gz.suffix + ".gz")
         if gz.exists():
@@ -530,7 +442,7 @@ def create_app() -> Flask:
                 return resp
         return send_from_directory(str(STATIC_DIR), filename)
 
-    # -------- Templates --------
+    # ----- Templates -----
     @app.route("/dashboard", methods=["GET"])
     def dashboard():
         return render_template("dashboard.html", active_page="dashboard", app_version=APP_VERSION)
@@ -594,96 +506,7 @@ def create_app() -> Flask:
         def legacy_images(filename: str):
             return send_from_directory(str(LEGACY_IMAGES), filename)
 
-    # ---- Health / Version ----
-    @app.get("/version")
-    def version():
-        up = max(0.0, time.time() - START_TS)
-        return jsonify({
-            "app_version": APP_VERSION,
-            "git_commit": GIT_COMMIT,
-            "payload_version": PAYLOAD_VERSION,
-            "uptime_sec": round(up, 1),
-            "env": {"runpod": bool(os.getenv("RUNPOD_BASE"))}
-        }), 200
-
-    @app.get("/healthz")
-    def healthz():
-        try:
-            snap = {}
-            try:
-                snap = get_snapshot() or {}
-            except Exception:
-                snap = {}
-
-            payload = {}
-            try:
-                payload = get_shared_payload() or {}
-            except Exception:
-                payload = {}
-            if not payload and isinstance(LAST_PAYLOAD, dict):
-                payload = LAST_PAYLOAD or {}
-            now = time.time()
-            ts = float(payload.get("ts", now))
-            age = max(0.0, now - ts)
-
-            opened = running = False
-            gs = _import_get_streamer()
-            if callable(gs):
-                s = gs()
-                opened = bool(getattr(s, "is_open", lambda: False)())
-                running = bool(getattr(s, "is_running", lambda: False)())
-
-            gpu_av = bool((snap.get("gpu") or {}).get("available", False))
-            ok = (age < 3.0)
-            return jsonify({
-                "ok": ok,
-                "payload": {"age_sec": round(age, 3), "present": bool(payload)},
-                "video": {"opened": opened, "running": running},
-                "gpu": {"available": gpu_av},
-                "system": {"ok": bool(snap.get("ok", True))},
-                "ts": int(now)
-            }), 200
-        except Exception as e:
-            return jsonify({"ok": False, "error": str(e)}), 200
-
-    @app.get("/readyz")
-    def readyz():
-        try:
-            t_ok = TPL_DIR.exists()
-            s_ok = STATIC_DIR.exists()
-            snap_ok = True
-            try:
-                s = get_snapshot()
-                if isinstance(s, dict) and s.get("error"):
-                    snap_ok = False
-            except Exception:
-                snap_ok = False
-
-            gs = _import_get_streamer()
-            streamer_ok = callable(gs)
-
-            ok = all([t_ok, s_ok, snap_ok, streamer_ok])
-            code = 200 if ok else 503
-            return jsonify({
-                "ok": ok, "templates": t_ok, "static": s_ok,
-                "system_monitor": snap_ok, "streamer_available": streamer_ok
-            }), code
-        except Exception as e:
-            return jsonify({"ok": False, "error": str(e)}), 503
-
-    @app.route("/api/health", methods=["GET"])
-    def api_health():
-        return jsonify(ok=True, version=APP_VERSION, uptime_sec=round(time.time() - START_TS, 1)), 200
-
-    @app.route("/api/system", methods=["GET"])
-    def api_system():
-        try:
-            return jsonify(get_snapshot())
-        except Exception:
-            logger.exception("Error in /api/system")
-            return jsonify({"ok": False, "error": "system_api failure"}), 500
-
-    # ---- Payload ----
+    # ----- Payload -----
     @app.route("/payload", methods=["GET"])
     def payload_route():
         try:
@@ -711,7 +534,7 @@ def create_app() -> Flask:
                             "objdet": _get_empty_objdet_payload(),
                             "payload_version": PAYLOAD_VERSION}), 500
 
-    # ---- OD ingest ----
+    # ----- OD ingest -----
     REQUIRED_KEYS = ("detections",)
     MAX_DETS = int(os.getenv("MAX_DETECTIONS", "500"))
 
@@ -753,7 +576,7 @@ def create_app() -> Flask:
         try:
             data = request.get_json(silent=False, force=("application/json" not in ctype))
         except Exception as e:
-            _dedup_od1502("invalid_json get_json()", {"ctype": ctype, "raw[:200]": raw[:200], "err": str(e)}, level="debug")
+            logger.debug("invalid_json get_json(): %s", e)
 
         if data is None:
             try:
@@ -765,13 +588,12 @@ def create_app() -> Flask:
                         except Exception:
                             pass
             except Exception as e:
-                _dedup_od1502("invalid_json form()", {"ctype": ctype, "err": str(e)}, level="debug")
+                logger.debug("invalid_json form(): %s", e)
 
         if data is None:
             data = _try_parse_non_json_body(raw)
 
         if data is None:
-            _dedup_od1502("invalid_json no_parse", {"ctype": ctype, "raw[:200]": raw[:200]}, level="warning")
             return jsonify(ok=False, err="invalid_json"), 400
 
         body = _server_side_schema_fixups(dict(data))
@@ -779,7 +601,6 @@ def create_app() -> Flask:
         if err:
             name, detail = err
             code = 413 if name == "too_many_detections" else 400
-            _dedup_od1502(name, {"detail": detail, "keys": list(body.keys()), "ctype": ctype}, level=("error" if code == 413 else "debug"))
             return jsonify(ok=False, err=name, detail=detail), code
 
         body.setdefault("payload_version", PAYLOAD_VERSION)
@@ -790,7 +611,7 @@ def create_app() -> Flask:
 
         return jsonify(ok=True, stored=True, ts=time.time()), 200
 
-    # ---- Metrics/Diagnostics ----
+    # ----- Metrics / Diagnostics (metrics בלבד נשאר כאן) -----
     @app.route("/api/metrics", methods=["GET"])
     def api_metrics():
         try:
@@ -804,337 +625,7 @@ def create_app() -> Flask:
             logger.exception("Error in /api/metrics")
             return jsonify(ok=False, error=str(e)), 500
 
-    @app.route("/api/diagnostics", methods=["GET"])
-    def api_diagnostics():
-        diag: Dict[str, Any] = {"ok": True, "errors": [], "warnings": []}
-        try:
-            shared = get_shared_payload()
-            local = None
-            if not shared:
-                with LAST_PAYLOAD_LOCK:
-                    local = LAST_PAYLOAD.copy() if isinstance(LAST_PAYLOAD, dict) else None
-            payload = shared or local or {}
-            diag["payload_ok"] = bool(payload)
-            diag["payload_version"] = payload.get("payload_version", PAYLOAD_VERSION)
-
-            opened = running = False
-            gs = _import_get_streamer()
-            if callable(gs):
-                s = gs()
-                opened = bool(getattr(s, "is_open", lambda: False)())
-                running = bool(getattr(s, "is_running", lambda: False)())
-            diag["video"] = {"opened": opened, "running": running}
-
-            with OBJDET_STATUS_LOCK:
-                st = dict(OBJDET_STATUS)
-            diag["objdet"] = st
-            diag["app_version"] = APP_VERSION
-            diag["ts"] = time.time()
-            return jsonify(diag), 200
-        except Exception as e:
-            return jsonify(ok=False, error=str(e)), 500
-
-    # ---- Exercise API ----
-    @app.route("/api/exercise/settings", methods=["GET"])
-    def api_exercise_settings():
-        if not _EXR_OK:
-            return jsonify(ok=False, error="engine_unavailable"), 503
-        try:
-            return jsonify(ok=True, settings=json.loads(EXR_SETTINGS.dump())), 200
-        except Exception as e:
-            logger.exception("exercise_settings failed")
-            return jsonify(ok=False, error=str(e)), 500
-
-    @app.post("/api/exercise/simulate")
-    def api_exercise_simulate():
-        j = request.get_json(silent=True) or {}
-        mode = j.get("mode")
-        want_report = (str(j.get("as") or "").lower() in ("report", "full", "full_report")) or bool(j.get("full_report"))
-        if want_report and callable(build_simulated_report):
-            sets = int(j.get("sets", 1))
-            reps = int(j.get("reps", 5))
-            noise = float(j.get("noise", 0.12))
-            seed = j.get("seed")
-            report = build_simulated_report(mode=mode or "mixed", sets=sets, reps=reps, noise=noise, seed=seed)
-            return jsonify(report), 200
-
-        if simulate_exercise is None:
-            return jsonify(ok=False, error="simulate_unavailable"), 501
-        sets = int(j.get("sets", 1))
-        reps = int(j.get("reps", 6))
-        mean = float(j.get("mean_score", 0.75))
-        std  = float(j.get("std", 0.1))
-        seed = j.get("seed", 42)
-        out = simulate_exercise(sets, reps, mean, std, mode=mode, noise=j.get("noise"), seed=seed)
-        return jsonify(out), 200
-
-    @app.post("/api/exercise/score")
-    def api_exercise_score():
-        if analyze_exercise is None and simulate_exercise is None:
-            return jsonify(ok=False, error="exercise_analyzer_unavailable"), 501
-
-        j = request.get_json(silent=True) or {}
-        metrics = j.get("metrics")
-        if metrics and analyze_exercise:
-            result = analyze_exercise({"metrics": metrics, "exercise": j.get("exercise") or {}})
-            with LAST_EXERCISE_REPORT_LOCK:
-                globals()["LAST_EXERCISE_REPORT"] = result
-            return jsonify(result), 200
-
-        payload = None
-        try:
-            payload = get_shared_payload()
-        except Exception:
-            pass
-        if not payload and isinstance(LAST_PAYLOAD, dict):
-            payload = dict(LAST_PAYLOAD)
-
-        if payload and analyze_exercise:
-            result = analyze_exercise(payload)
-            with LAST_EXERCISE_REPORT_LOCK:
-                globals()["LAST_EXERCISE_REPORT"] = result
-            return jsonify(result), 200
-
-        if simulate_exercise:
-            return jsonify(simulate_exercise()), 200
-        return jsonify(ok=False, error="no_metrics_and_no_sim"), 503
-
-    @app.route("/api/exercise/detect", methods=["POST"])
-    def api_exercise_detect():
-        if not _EXR_OK:
-            return jsonify(ok=False, error="engine_unavailable"), 503
-        t0 = time.time()
-        try:
-            body = request.get_json(force=True, silent=False) or {}
-        except Exception:
-            return jsonify(ok=False, error="bad_json"), 400
-
-        metrics_raw = body.get("metrics") if isinstance(body, dict) else None
-        if not isinstance(metrics_raw, dict):
-            return jsonify(ok=False, error="missing_metrics_object"), 400
-
-        def _fallback_sanitize(obj: Dict[str, Any]) -> Dict[str, Any]:
-            out = {}
-            for k, v in obj.items():
-                if isinstance(v, (int, float)) and math.isfinite(float(v)):
-                    out[k] = float(v)
-                elif isinstance(v, str):
-                    t = v.strip()
-                    try:
-                        if t.lower() in ("true", "false"):
-                            out[k] = (t.lower() == "true")
-                        else:
-                            fv = float(t) if "." in t else float(int(t))
-                            if math.isfinite(fv):
-                                out[k] = fv
-                    except Exception:
-                        if k in ("rep.phase", "view.mode", "view.primary"):
-                            out[k] = t
-                elif isinstance(v, bool):
-                    out[k] = v
-            return out
-
-        metrics = sanitize_metrics_payload(metrics_raw) if callable(sanitize_metrics_payload) else _fallback_sanitize(metrics_raw)
-        exercise_id = body.get("exercise_id")
-        if exercise_id is not None and not isinstance(exercise_id, str):
-            exercise_id = None
-
-        try:
-            lib = _get_engine_library()
-        except Exception as e:
-            logger.exception("failed to load exercise library")
-            return jsonify(ok=False, error=f"library_load_failed: {e}"), 500
-
-        try:
-            report = exr_run_once(raw_metrics=metrics, library=lib, exercise_id=exercise_id, payload_version="1.0")
-        except Exception as e:
-            logger.exception("runtime.run_once failed")
-            return jsonify(ok=False, error=f"runtime_failed: {e}"), 500
-
-        sc = report.get("scoring", {}) if isinstance(report, dict) else {}
-        if "score_pct" not in sc and isinstance(sc.get("score"), (int, float)):
-            try: sc["score_pct"] = int(round(float(sc["score"]) * 100))
-            except Exception: pass
-        q = sc.get("quality")
-        if not sc.get("grade") and isinstance(q, str) and q.strip().upper() in list("ABCDEF"):
-            sc["grade"] = q.strip().upper()
-        report["scoring"] = sc
-
-        # שמירה אוטומטית למסד דרך שכבת persist (אם זמינה)
-        if DB_PERSIST_AVAILABLE:
-            try:
-                persist_report(report)
-            except Exception as _e:
-                logger.warning(f"[persist] failed: {_e}")
-
-        with LAST_EXERCISE_REPORT_LOCK:
-            globals()["LAST_EXERCISE_REPORT"] = report
-
-        took_ms = int((time.time() - t0) * 1000.0)
-        logger.info(f"[EXR] detect done in {took_ms} ms | ex={report.get('exercise',{}).get('id')} | "
-                    f"score={report.get('scoring',{}).get('score_pct')} | "
-                    f"unscored={report.get('scoring',{}).get('unscored_reason') or '-'}")
-        return jsonify(ok=True, took_ms=took_ms, report=report), 200
-
-    @app.route("/api/exercise/last", methods=["GET"])
-    def api_exercise_last():
-        with LAST_EXERCISE_REPORT_LOCK:
-            rep = LAST_EXERCISE_REPORT.copy() if isinstance(LAST_EXERCISE_REPORT, dict) else None
-        return jsonify(ok=bool(rep), report=rep)
-
-    # ---- Session status ----
-    @app.get("/api/session/status")
-    def api_session_status():
-        import time as _t
-        fps = 0.0
-        size = (0, 0)
-        source = "unknown"
-        opened = False
-        running = False
-        try:
-            gs = _import_get_streamer()
-            if callable(gs):
-                s = gs()
-                try:  fps = float(getattr(s, "last_fps", lambda: 0.0)() or 0.0)
-                except Exception: pass
-                try:  size = getattr(s, "last_frame_size", lambda: (0, 0))() or (0, 0)
-                except Exception: pass
-                try:  source = getattr(s, "source_name", lambda: "camera")() or "camera"
-                except Exception: pass
-                try:  opened = bool(getattr(s, "is_open", lambda: getattr(s, "opened", False))())
-                except Exception: opened = bool(getattr(s, "opened", False))
-                try:  running = bool(getattr(s, "is_running", lambda: getattr(s, "running", False))())
-                except Exception: running = bool(getattr(s, "running", False))
-        except Exception:
-            pass
-        w, h = (int(size[0]), int(size[1])) if isinstance(size, (tuple, list)) and len(size) >= 2 else (0, 0)
-        return jsonify({
-            "opened": opened,
-            "running": running,
-            "fps": float(fps),
-            "size": [w, h],
-            "source": source,
-            "ts": _t.time(),
-        }), 200
-
-    # ---- Exercise diag snapshot ----
-    @app.get("/api/exercise/diag")
-    def api_exercise_diag_snapshot():
-        import time as _t
-        snap: Dict[str, Any] = {}
-        try:
-            snap = get_shared_payload() or {}
-        except Exception:
-            snap = {}
-        if not snap:
-            with LAST_PAYLOAD_LOCK:
-                if isinstance(LAST_PAYLOAD, dict):
-                    snap = dict(LAST_PAYLOAD)
-
-        metrics = snap.get("metrics") or {}
-        metrics_keys = []
-        try:
-            if isinstance(metrics, dict):
-                metrics_keys = list(metrics.keys())
-            elif isinstance(metrics, list):
-                metrics_keys = [m.get("name") for m in metrics if isinstance(m, dict) and "name" in m]
-        except Exception:
-            metrics_keys = []
-
-        out = {
-            "ok": True,
-            "ts": _t.time(),
-            "view_mode": snap.get("view_mode"),
-            "meta": snap.get("meta", {}),
-            "metrics_keys": metrics_keys[:50],
-        }
-        return jsonify(out), 200
-
-    # ---- Logs ----
-    @app.route("/api/logs", methods=["GET"])
-    def api_logs():
-        try:
-            since = float(request.args.get("since") or request.args.get("since_ts") or 0)
-        except ValueError:
-            since = 0.0
-        level = (request.args.get("level") or "").upper().strip()
-        limit = int(request.args.get("max") or request.args.get("limit") or LOGS_API_MAX_ITEMS)
-        limit = max(1, min(limit, LOGS_API_MAX_ITEMS))
-        buf_list = list(LOG_BUFFER)
-        items = [x for x in buf_list if x.get("ts", 0) > since and (not level or x.get("level") == level)]
-        if len(items) > limit:
-            items = items[-limit:]
-        return jsonify(items=items, total=len(buf_list), now=time.time())
-
-    @app.route("/api/logs/clear", methods=["POST"])
-    def logs_clear():
-        LOG_BUFFER.clear()
-        cleared = 0
-        while True:
-            try:
-                LOG_QUEUE.get_nowait()
-                cleared += 1
-            except Empty:
-                break
-        logger.info(f"LOGS CLEARED via /api/logs/clear (queue items cleared: {cleared})")
-        return jsonify(ok=True, cleared_queue=cleared)
-
-    @app.route("/api/logs/download", methods=["GET"])
-    def logs_download():
-        lines = []
-        for i in LOG_BUFFER:
-            t = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(i.get("ts", time.time())))
-            lines.append(f"[{t}] [{i.get('level','INFO')}] {i.get('msg','')}")
-        payload = "\n".join(lines).encode("utf-8")
-        return Response(
-            payload,
-            mimetype="text/plain; charset=utf-8",
-            headers={"Content-Disposition": 'attachment; filename="logs.txt"'}
-        )
-
-    @app.route("/api/logs/stream", methods=["GET"])
-    def logs_stream():
-        try:
-            init = int(request.args.get("init") or LOG_STREAM_INIT_MAX)
-            init = max(0, min(init, LOG_STREAM_INIT_MAX))
-        except Exception:
-            init = LOG_STREAM_INIT_MAX
-        try:
-            burst = int(request.args.get("burst") or LOG_STREAM_BURST_MAX)
-            burst = max(1, min(burst, LOG_STREAM_BURST_MAX))
-        except Exception:
-            burst = LOG_STREAM_BURST_MAX
-        try:
-            ping_ms = int(request.args.get("ping_ms") or LOG_STREAM_PING_MS)
-            ping_ms = max(1000, ping_ms)
-        except Exception:
-            ping_ms = LOG_STREAM_PING_MS
-
-        def gen():
-            if LOG_BUFFER:
-                for item in list(LOG_BUFFER)[-init:]:
-                    yield f"data: {json.dumps(item, ensure_ascii=False)}\n\n"
-            last_ping = time.time()
-            while True:
-                sent = 0
-                try:
-                    timeout = max(0.1, ping_ms / 1000.0)
-                    while sent < burst:
-                        item = LOG_QUEUE.get(timeout=timeout if sent == 0 else 0.001)
-                        yield f"data: {json.dumps(item, ensure_ascii=False)}\n\n"
-                        sent += 1
-                        last_ping = time.time()
-                except Empty:
-                    if (time.time() - last_ping) * 1000.0 >= ping_ms:
-                        yield ":ping\n\n"
-                        last_ping = time.time()
-                except GeneratorExit:
-                    break
-                except Exception:
-                    pass
-
-        return Response(stream_with_context(gen()), mimetype="text/event-stream")
-
+    # ----- Errors -----
     @app.errorhandler(404)
     def not_found(_e):
         msg = {"error": "Not Found",

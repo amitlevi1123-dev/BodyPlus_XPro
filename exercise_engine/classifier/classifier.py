@@ -1,10 +1,11 @@
 # -*- coding: utf-8 -*-
 # -----------------------------------------------------------------------------
 # מסווג תרגיל יציב עם היסטרזיס + דילוג בטוח על "קבצי בסיס" (selectable:false/_base/.base).
-# תוספת: Strong Switch Override:
-#   - אם הפער בין המועמד המוביל לשני ≥ STRONG_SWITCH_MARGIN:
-#       • אפשר להחליף גם בזמן Freeze אם STRONG_SWITCH_BYPASS_FREEZE=True
-#       • מסמן stability.strong_override=True (כדי שה-runtime ישקול לעקוף Grace)
+# תוספות עיקריות בגרסה זו:
+#   • _infer_equipment משופר: הבחנה בין barbell / dumbbell / kettlebell / none
+#   • Fallback תנוחתי להחזקת מוט כשזיהוי אובייקט לא יציב (אופציונלי)
+#   • _score_candidate משופר: truthy ב-must_have, פסילת must_not_have, תמיכת any_of
+#   • pose_view ו-ranges ממשיכים כרגיל
 #
 # הקובץ משתמש ב-SETTINGS מתוך exercise_engine.runtime.engine_settings
 # -----------------------------------------------------------------------------
@@ -105,7 +106,7 @@ def _is_selectable(ex) -> bool:
 def _exercise_meta(ex) -> Tuple[str, str]:  # (family, equipment)
     fam = getattr(ex, "family", None) or _meta(ex).get("family")
     eq  = getattr(ex, "equipment", None) or _meta(ex).get("equipment")
-    return fam or "unknown", eq or "none"
+    return fam or "unknown", (eq or "none")
 
 def _match_hints(ex) -> Dict[str, Any]:
     return getattr(ex, "match_hints", None) or _meta(ex).get("match_hints") or {}
@@ -120,49 +121,142 @@ def _criteria_requires_as_must_have(ex) -> List[str]:
                 out.append(k)
     return out
 
+# ----- Utilities -----
+
+def _truthy(v) -> bool:
+    if isinstance(v, bool): return v
+    if v is None: return False
+    if isinstance(v, (int, float)): return v != 0
+    if isinstance(v, str): return v.strip() != ""
+    return True
+
+def _get(canonical: Dict[str, Any], key: str, default=None):
+    # המפתחות אצלנו שטוחים וקנוניים; שומר התאמה לפורמטים שונים אם יעברו בעתיד
+    return canonical.get(key, default)
+
+def _get_setting(path: str, default):
+    """
+    Utility לקבלת ערך מ-SETTINGS לפי נתיב נקודות למשל:
+    'classifier.FALLBACK_BAR_ELBOW_MAX_DEG'
+    """
+    cur = SETTINGS
+    for part in path.split('.'):
+        if not hasattr(cur, part):
+            return default
+        cur = getattr(cur, part)
+    return cur
+
 # ----- אינדוקציית ציוד -----
 
 def _infer_equipment(canonical: Dict[str, Any]) -> str:
-    for k in canonical.keys():
-        if k.startswith("bar.") or k.startswith("objdet."):
+    """
+    קובע סוג ציוד לפי הדגלים הקנוניים:
+      - objdet.bar_present        → "barbell"
+      - objdet.dumbbell_present   → "dumbbell"
+      - objdet.kettlebell_present → "kettlebell"
+      אחרת                        → "none"
+
+    Fallback תנוחתי (לא חובה): אם אין ציוד מזוהה, אך תנוחת "אחיזת מוט"
+    מתקיימת (מרפקים<elbow_max & כתף>shoulder_min) — נחזיר "barbell".
+    הספים מגיעים מ-SETTINGS אם קיימים, אחרת ברירות־מחדל:
+      elbow_max=110°, shoulder_min=35°
+    """
+    bar = bool(_get(canonical, "objdet.bar_present"))
+    db  = bool(_get(canonical, "objdet.dumbbell_present"))
+    kb  = bool(_get(canonical, "objdet.kettlebell_present"))
+
+    if bar:
+        return "barbell"
+    if db:
+        return "dumbbell"
+    if kb:
+        return "kettlebell"
+
+    # Fallback (רשות): תנוחת אחיזת מוט
+    # משתמשים בזוויות מה-canonical (aliases.yaml):
+    el_l = _get(canonical, "elbow_left_deg")
+    el_r = _get(canonical, "elbow_right_deg")
+    sh_l = _get(canonical, "shoulder_left_deg")
+    sh_r = _get(canonical, "shoulder_right_deg")
+
+    # ספים (ניתן לכוונן בקובץ settings שיעבור בהמשך)
+    elbow_max = float(_get_setting("classifier.FALLBACK_BAR_ELBOW_MAX_DEG", 110.0))
+    shoulder_min = float(_get_setting("classifier.FALLBACK_BAR_SHOULDER_MIN_DEG", 35.0))
+
+    if all(v is not None for v in (el_l, el_r, sh_l, sh_r)) and bool(_get(canonical, "pose.available", False)):
+        elbow_ok = (el_l < elbow_max) and (el_r < elbow_max)
+        shoulder_ok = (sh_l > shoulder_min) or (sh_r > shoulder_min)
+        if elbow_ok and shoulder_ok:
             return "barbell"
+
     return "none"  # bodyweight/none
 
 # ----- ניקוד מועמד -----
 
 def _score_candidate(canonical: Dict[str, Any], ex) -> float:
+    """
+    ניקוד התאמה:
+      - פסילה מיידית אם אחד מ-must_not_have הוא truthy.
+      - must_have: כל המפתחות חייבים truthy כדי לקבל נק'.
+      - any_of: לפחות אחד truthy (אם הוגדר) → נק'.
+      - ranges: value בתוך [lo,hi] → נק'.
+      - pose_view: התאמת view.mode (או view_mode/view.primary) → נק'.
+      - נרמול לפי ספירת סעיפים והכפלה ב-weight (אם קיים).
+    """
     hints = _match_hints(ex)
-    must_have: List[str] = list(hints.get("must_have") or []) or _criteria_requires_as_must_have(ex)
-    ranges: Dict[str, List[float]] = hints.get("ranges") or {}
-    pose_view: List[str] = hints.get("pose_view") or []
-    weight: float = float(hints.get("weight", 1.0))
+    must_have  = list(hints.get("must_have") or []) or _criteria_requires_as_must_have(ex)
+    must_not   = list(hints.get("must_not_have") or [])
+    any_of     = list(hints.get("any_of") or [])
+    ranges     = hints.get("ranges") or {}
+    pose_view  = hints.get("pose_view") or []
+    weight     = float(hints.get("weight", 1.0))
+
+    # פסילה: must_not_have
+    for k in must_not:
+        if _truthy(_get(canonical, k)):
+            return 0.0
 
     score = 0.0
     total_w = 0.0
 
-    for key in must_have:
+    # must_have: כולם truthy
+    if must_have:
         total_w += 1.0
-        if key in canonical and canonical[key] is not None:
+        if all(_truthy(_get(canonical, k)) for k in must_have):
+            score += 1.0
+        else:
+            base = (score / total_w) if total_w > 0 else 0.0
+            return max(0.0, min(1.0, base * weight))
+
+    # any_of: לפחות אחד truthy
+    if any_of:
+        total_w += 1.0
+        if any(_truthy(_get(canonical, k)) for k in any_of):
             score += 1.0
 
+    # ranges: key בתוך טווח [lo, hi]
     for key, rng in ranges.items():
         total_w += 1.0
         try:
             lo, hi = float(rng[0]), float(rng[1])
-            val = float(canonical.get(key))
+            val = float(_get(canonical, key))
             if lo <= val <= hi:
                 score += 1.0
         except Exception:
             pass
 
+    # pose_view
     if pose_view:
         total_w += 1.0
-        vm = canonical.get("view_mode") or canonical.get("view.mode") or canonical.get("view.primary")
+        vm = (_get(canonical, "view.mode") or
+              _get(canonical, "view_mode") or
+              _get(canonical, "view.primary"))
         if isinstance(vm, str) and vm in pose_view:
             score += 1.0
 
     if total_w <= 0.0:
         return 0.0
+
     base = (score / total_w)
     return max(0.0, min(1.0, base * weight))
 
@@ -216,6 +310,7 @@ def pick(
             diagnostics=[{"type": "classifier_no_candidate", "severity": "warn", "message": "no selectable in library"}]
         )
 
+    # סינון לפי ציוד (meta.equipment חובה באנגלית: none/dumbbell/barbell/kettlebell)
     filtered = [ex for ex in selectable_all if (_exercise_meta(ex)[1] or "none") == eq]
     pool = filtered if filtered else selectable_all
 
@@ -271,7 +366,7 @@ def pick(
     kept_prev = False
     picked_id = top1.id
     strong_override = False
-    switch_happened_now = False  # NEW: נשתמש כדי להבטיח last_switch_ms
+    switch_happened_now = False  # נשתמש כדי להבטיח last_switch_ms
 
     if state.prev_exercise_id and top1.id != state.prev_exercise_id:
         # Strong override?
@@ -314,18 +409,18 @@ def pick(
 
     # 4) Confidence EMA + Low-confidence
     instant_conf = float(top1.score)
-    state.confidence_ema = _ema(state.confidence_ema, instant_conf, SETTINGS.classifier.CONF_EMA_ALPHA)
+    state.confidence_ema = _ema(state.confidence_ema, instant_conf, CONF_EMA_ALPHA)
 
-    if state.confidence_ema < SETTINGS.classifier.LOW_CONF_EPS:
+    if state.confidence_ema < LOW_CONF_EPS:
         state.low_conf_since_ms = state.low_conf_since_ms or now_ms
     else:
         state.low_conf_since_ms = None
 
-    if state.low_conf_since_ms and (now_ms - state.low_conf_since_ms) >= int(SETTINGS.classifier.LOW_CONF_T_SEC * 1000):
+    if state.low_conf_since_ms and (now_ms - state.low_conf_since_ms) >= int(LOW_CONF_T_SEC * 1000):
         _emit("classifier_low_confidence", "warn", "confidence EMA low over time",
               {"ema": state.confidence_ema})
 
-    # עדכון prev ובניית יציבות — נבטיח שה- Stability מחזיר last_switch_ms עדכני
+    # עדכון prev ובניית יציבות
     state.prev_exercise_id = picked_id
     reason = "kept_prev" if kept_prev else ("strong_override" if strong_override else "best_match_rules")
 
