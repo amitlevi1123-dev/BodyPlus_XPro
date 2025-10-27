@@ -14,7 +14,7 @@ Endpoints:
 """
 
 from __future__ import annotations
-import os, time, glob, math, shutil, threading, subprocess, json, random
+import os, time, glob, math, shutil, threading, subprocess, json, tempfile
 from collections import deque
 from pathlib import Path
 from typing import Dict, Any, Optional, List
@@ -114,14 +114,18 @@ logger.info(f"[FFMPEG] resolved path: {FFMPEG_BIN!r}")
 # ================================ Config/State ================================
 
 SERVER_BASE_URL = os.getenv("SERVER_BASE_URL", "http://127.0.0.1:5000").rstrip("/")
-UPLOAD_DIR = Path(os.getenv("UPLOAD_DIR", "admin_web/uploads")).resolve()
-UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
+# ✨ לא שומרים בפרויקט. קובץ אחרון נשמר זמנית ב-/tmp ונמחק כשמחליפים/עוצרים
 ALLOWED_EXT = {".mp4", ".mov", ".avi", ".mkv", ".mjpg", ".mjpeg", ".webm"}
 MAX_UPLOAD_MB = int(os.getenv("MAX_UPLOAD_MB", "500"))
 
 _LAST_UPLOAD: Dict[str, Any] = {
-    "path": None, "file_name": None, "size": 0, "ts": 0.0, "last_ok": False, "last_err": None,
+    "path": None,             # נתיב זמני (ב-/tmp)
+    "file_name": None,
+    "size": 0,
+    "ts": 0.0,
+    "last_ok": False,
+    "last_err": None,
 }
 
 _FILE_STREAM = {
@@ -220,28 +224,66 @@ def _mjpeg_from_pipe(p: subprocess.Popen, boundary: str = "frame", chunk_size: i
     finally:
         _stop_ffmpeg()
 
+def _cleanup_last_upload():
+    """מוחק את הקובץ הזמני הקודם אם קיים."""
+    try:
+        p = _LAST_UPLOAD.get("path")
+        if p and Path(p).exists():
+            Path(p).unlink(missing_ok=True)
+    except Exception as e:
+        logger.debug(f"[upload] cleanup previous failed: {e!r}")
+
 def _save_upload(file_storage) -> Dict[str, Any]:
+    """
+    לא שומר בפרויקט! כותב לקובץ זמני ב-/tmp ומחליף את הקודם.
+    """
     name = file_storage.filename or "video.bin"
     ext = Path(name).suffix.lower()
     if ext not in ALLOWED_EXT:
         return {"ok": False, "error": f"extension_not_allowed: {ext}"}
-    target = UPLOAD_DIR / f"{int(time.time())}_{name}"
+
+    # כתיבה לקובץ זמני ב-/tmp עם סיומת הקובץ
     size = 0
-    with target.open("wb") as f:
-        for chunk in file_storage.stream:
-            if not chunk: continue
-            size += len(chunk)
-            if size > MAX_UPLOAD_MB * 1024 * 1024:
-                try: f.close(); target.unlink(missing_ok=True)
-                except Exception: pass
-                return {"ok": False, "error": "file_too_large"}
-            f.write(chunk)
+    try:
+        tmp = tempfile.NamedTemporaryFile(prefix="upload_", suffix=ext, delete=False)
+        tmp_path = tmp.name
+        with tmp:
+            # כתיבה בזרם + בדיקת גודל
+            for chunk in file_storage.stream:
+                if not chunk:
+                    continue
+                size += len(chunk)
+                if size > MAX_UPLOAD_MB * 1024 * 1024:
+                    raise RuntimeError("file_too_large")
+                tmp.write(chunk)
+    except RuntimeError as e:
+        # אם חריגה בגלל גודל — מחק את הקובץ שנוצר
+        try:
+            if 'tmp_path' in locals():
+                Path(tmp_path).unlink(missing_ok=True)
+        except Exception:
+            pass
+        return {"ok": False, "error": str(e)}
+    except Exception as e:
+        try:
+            if 'tmp_path' in locals():
+                Path(tmp_path).unlink(missing_ok=True)
+        except Exception:
+            pass
+        return {"ok": False, "error": f"save_failed:{e!r}"}
+
+    # מחליפים את הקודם ומנקים
+    _cleanup_last_upload()
     _LAST_UPLOAD.update({
-        "path": str(target), "file_name": name, "size": size,
-        "ts": time.time(), "last_ok": True, "last_err": None,
+        "path": str(tmp_path),
+        "file_name": name,
+        "size": size,
+        "ts": time.time(),
+        "last_ok": True,
+        "last_err": None,
     })
-    logger.info(f"[upload] saved | {name} | {size} bytes | {target}")
-    return {"ok": True, "path": str(target), "file_name": name, "size": size}
+    logger.info(f"[upload] saved (temp) | {name} | {size} bytes | {tmp_path}")
+    return {"ok": True, "path": str(tmp_path), "file_name": name, "size": size}
 
 # =========================== Payload Emitter (CAM SIM) ========================
 
@@ -261,6 +303,7 @@ def _post_payload(payload: Dict[str, Any]) -> bool:
 
 def _synthetic_measurements(t: float) -> Dict[str, float]:
     # תנועה חלקה (סינוס/קוסינוס) כדי לראות ערכים משתנים בלייב
+    import math
     sh_l = 25 + 15*math.sin(t*0.9)
     sh_r = 28 + 12*math.cos(t*1.1)
     el_l = 45 + 20*math.sin(t*1.3+0.7)
@@ -295,16 +338,11 @@ def _emit_payload_loop():
         meas = _synthetic_measurements(t)
 
         payload = {
-            # frame + סימון זמן
             "frame": {"w": 1280, "h": 720, "mirrored": False, "ts_ms": int(now*1000)},
             "frame_id": _PAY_EMIT["last_frame_id"],
-            # mp: אפשר להשאיר landmarks ריקים (הווידג'ט שלך יודע לעבוד עם זה)
             "mp": {"landmarks": [], "mirror_x": False},
-            # metrics: נתוני מדידות כלליים (normalize_payload יתמוך)
             "metrics": dict(meas),
-            # detections: ריק (או תוסיף אם תרצה)
             "detections": [],
-            # objdet: השרת ישלים אם חסר; להשאיר ריק זה תקין.
         }
 
         _post_payload(payload)
@@ -361,7 +399,8 @@ def api_upload_video():
         file_name=res["file_name"],
         size_bytes=res["size"],
         size_mb=round(res["size"] / (1024 * 1024), 2),
-        path=res["path"],
+        path=res["path"],              # נתיב זמני (ב-/tmp)
+        persisted=False                # חיווי: לא נשמר קבוע
     ), 200
 
 @upload_video_bp.route("/api/upload_video/status", methods=["GET"])
@@ -379,7 +418,9 @@ def api_upload_status():
             "fps": _PAY_EMIT["fps"],
             "running": bool(_PAY_EMIT.get("thr") and _PAY_EMIT["thr"].is_alive()),
             "last_frame_id": _PAY_EMIT["last_frame_id"],
-        }
+        },
+        "persisted": False,
+        "storage": "tmpfs",            # אינדיקציה שהקובץ זמני
     })
     return jsonify(d)
 
@@ -396,7 +437,7 @@ def api_video_use_file():
 
     j = request.get_json(silent=True) or {}
     fps_val = j.get("fps")
-    fps = int(fps_val) if isinstance(fps_val, (int, float)) or (isinstance(fps_val, str) and fps_val.isdigit()) else None
+    fps = int(fps_val) if isinstance(fps_val, (int, float)) or (isinstance(fps_val, str) and str(fps_val).isdigit()) else None
     quality = int(j.get("quality", 5))
 
     try:
@@ -419,7 +460,10 @@ def api_video_use_file():
 def api_video_stop_file():
     _stop_payload_emitter()
     _stop_ffmpeg()
-    return jsonify(ok=True, stopped=True)
+    # מנקה את הקובץ הזמני אחרי עצירה
+    _cleanup_last_upload()
+    _LAST_UPLOAD.update({"path": None, "file_name": None, "size": 0, "last_ok": False})
+    return jsonify(ok=True, stopped=True, cleaned_temp=True)
 
 @upload_video_bp.route("/video/stream_file.mjpg", methods=["GET"])
 def video_stream_file_mjpg():
@@ -472,4 +516,6 @@ def api_debug_ffmpeg():
         },
         "last_upload": dict(_LAST_UPLOAD),
         "server_base": SERVER_BASE_URL,
+        "persisted": False,
+        "storage": "tmpfs"
     })
