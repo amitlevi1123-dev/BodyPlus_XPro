@@ -1,0 +1,100 @@
+# -------------------------------------------------------------------
+# squat_dumbbell.yaml — סקוואט עם משקולת יד (Dumbbell Squat)
+# -------------------------------------------------------------------
+# תרגיל זה מיועד לביצוע עם משקולת יד (אחת או שתיים), ללא מוט.
+# זיהוי אוטומטי: נדרש alias קנוני objdet.dumbbell_present (bool).
+# -------------------------------------------------------------------
+
+id: squat.dumbbell
+family: squat
+extends: squat.base
+
+meta:
+  selectable: true
+  display_name: "סקוואט משקולת יד"
+  description: "סקוואט עם משקולת יד — דגש על יציבות גב, ברכיים בקו, ועקבים נעוצים תחת עומס קדמי."
+  equipment: "dumbbell"   # חשוב: באנגלית. המסווג מסנן לפי meta.equipment
+
+scoring:
+  criteria:
+
+    depth:
+      weight: 1.2
+      rule:
+        kind: threshold_window
+        input: "min(knee_left_deg, knee_right_deg)"
+        target_max: 90
+        cutoff_max: 150
+        direction: lower_is_better
+
+    tempo:
+      weight: 0.6
+      rule:
+        kind: tempo_window
+        input: rep.timing_s
+        min: 0.7
+        max: 2.5
+        cutoff_min: 0.4
+        cutoff_max: 4.0
+
+    stance_width:
+      weight: 0.8
+      rule:
+        kind: band_center
+        input: features.stance_width_ratio
+        min_ok: 0.90
+        max_ok: 1.20
+        cutoff_min: 0.70
+        cutoff_max: 1.50
+
+    foot_angle:
+      weight: 0.7
+      rule:
+        kind: band_center
+        input: "mean(abs(toe_angle_left_deg), abs(toe_angle_right_deg))"
+        min_ok: 8
+        max_ok: 20
+        cutoff_min: 0
+        cutoff_max: 30
+
+    head_alignment:
+      weight: 0.8
+      rule:
+        kind: symmetric_threshold
+        input: "abs(head_pitch_deg - spine_flexion_deg)"
+        ok:   10
+        warn: 20
+        bad:  30
+
+    heels_grounded:
+      weight: 0.8
+      rule:
+        kind: boolean_flag
+        input: "(heel_lift_left or heel_lift_right)"   # True אם יש הרמת עקב
+        good_when: false                               # טוב כשאין הרמה
+        penalty: 0.50                                  # ענישה משמעותית אם יש הרמה
+
+  safety_caps:
+    - { when: "spine_rounding <= 0.6", cap: 0.70 }
+    - { when: "knee_valgus   <= 0.6", cap: 0.75 }
+    - { when: "spine_sidebend<= 0.6", cap: 0.80 }
+
+match_hints:
+  must_have: [pose.available, objdet.dumbbell_present]
+  pose_view: ["front", "front_left", "front_right"]
+  weight: 1.0
+
+rep_signal:
+  # שימוש בעוגני שורש כף-היד (קיימים כקנוניים ב-aliases)
+  source: "value|min|wrist_left_y_px,wrist_right_y_px"
+  thresholds:
+    min_rom_good: 60
+    min_rep_ms: 500
+    max_rep_ms: 7000
+
+# -------------------------------------------------------------------
+# הערות:
+# • ודא שהמסווג _infer_equipment מבחין בין objdet.bar_present / objdet.dumbbell_present
+#   ומחזיר "barbell" רק כש-bar מזוהה, ו-"dumbbell" כש-dumbbell מזוהה. אחרת תיווצר סינון שגוי.
+# • אין שימוש ב-must_not_have/fields דוקומנטריים כי המסווג הנוכחי מנקד רק must_have/ranges/pose_view/weight.
+# -------------------------------------------------------------------
