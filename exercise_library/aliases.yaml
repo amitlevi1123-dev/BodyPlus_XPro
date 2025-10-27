@@ -86,6 +86,32 @@ canonical_keys:
     unit: bool
     aliases: [objdet.kettlebell_present, kettlebell.present]
 
+  # ✅ תוספות גנריות לציוד/אובייקט (לזיהוי ותאימות עתידית)
+  objdet.object_present:
+    unit: bool
+    aliases: [objdet.object_present, equipment.present, object.present]
+
+  objdet.object_kind:
+    unit: text
+    aliases: [objdet.object_kind, equipment.kind, object.kind]
+    # תיעוד: ערכים מומלצים כיום: barbell, dumbbell, kettlebell, trapbar, plate, band, bodyweight, unknown
+    # ניתן להרחבה עתידית (cable, sandbag, machine, smith_machine, וכו')
+
+  # סיגנל גובה כלל-מערכתי לאובייקט (מוט/דאמבלים/קטלבל/גוף) — קל לזכור
+  object_y:
+    unit: px
+    aliases: [object_y, object.y_px, equipment.y, equipment.y_px]
+
+  # מרכז כפות הידיים — פרוקסי מצוין ל-object_y כשאין מוט (DB/KB/BW)
+  hands_center_y:
+    unit: px
+    aliases: [hands_center_y, hands_center_y_px, hands.centroid_y_px]
+
+  # גובה האגן — fallback ל-BW/כללי
+  hip_y_px:
+    unit: px
+    aliases: [hip_y_px, hip.y_px]
+
   # ────────────────────────────────────────────────────────────────────────────
   # נקודות עוגן ביד/שורש כף היד (ל־reps auto-pick)
   # ────────────────────────────────────────────────────────────────────────────
@@ -416,3 +442,5 @@ tolerances:
 # 3) מדדי סימטריה: symmetry.knee_diff_deg / symmetry.hip_diff_deg / symmetry.shoulder_diff_deg
 # 4) Hinge Ratio: torso_forward_deg / avg(knee_left/right_deg) (ratio)
 # 5) balance_score מתנועה צדית מנורמלת (shoulders_delta_px / hips_delta_px)
+# 6) object_x (px) למסלול אופקי של האובייקט (לתזמון “בר קרוב לגוף”)
+# 7) grip_width_px (px) והשלכות על torque במפרקי כתף/מרפק

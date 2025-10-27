@@ -119,10 +119,18 @@
             <input id="cap-token" type="text" placeholder="X-Ingest-Token" class="form">
           </label>
         </div>
+
         <div class="flex items-center gap-2">
           <button id="cap-start" class="px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 text-sm">התחל שידור</button>
           <button id="cap-stop"  class="px-4 py-2 rounded-lg bg-gray-200 text-gray-700 hover:bg-gray-300 text-sm" disabled>עצור</button>
         </div>
+
+        <!-- חדש: הצגת/הסתרת פריוויו Capture -->
+        <label class="flex items-center gap-2">
+          <input id="cap-show-preview" type="checkbox" class="scale-110" checked>
+          הצג פריוויו Capture
+        </label>
+
         <div id="cap-err" class="text-sm text-red-600 hidden"></div>
         <div class="grid grid-cols-2 gap-3 text-xs text-gray-600">
           <div>Tx FPS: <b id="cap-txfps">0.0</b></div>
@@ -148,7 +156,7 @@
     </div>
   </section>
 
-  <!-- C) סטטוס/Health/Payload (האינדיקציות נשארות כמו שהיו) -->
+  <!-- C) סטטוס/Health/Payload -->
   <section id="video-status-widget" class="grid grid-cols-1 lg:grid-cols-3 gap-6">
     <div class="card p-4">
       <h4 class="font-semibold mb-3">סטטוס וידאו</h4>

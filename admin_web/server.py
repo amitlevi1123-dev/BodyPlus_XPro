@@ -66,27 +66,27 @@ try:
 except Exception:
     start_video_metrics_worker = None  # type: ignore
 
-# ===== Logging (init only) =====
+# ===== Logging (imports) =====
 try:
     from core.logs import setup_logging, logger
 except Exception:
     logging.basicConfig(level=logging.INFO, format="%(asctime)s | %(levelname)s | %(message)s")
     logger = logging.getLogger("server")
 
-# Payload גרסה
+# ===== Payload גרסה =====
 try:
     from core.payload import PAYLOAD_VERSION
 except Exception:
     PAYLOAD_VERSION = "1.2.0"
 
-# payload משותף
+# ===== payload משותף =====
 try:
     from admin_web.state import get_payload as get_shared_payload  # type: ignore
 except Exception:
     def get_shared_payload() -> Dict[str, Any]:
         return {}
 
-# Persist (DB) — אתחול בלבד
+# ===== Persist (DB) — אתחול בלבד =====
 try:
     from db.persist import AVAILABLE as DB_PERSIST_AVAILABLE, init as db_persist_init
 except Exception as _e:
@@ -284,6 +284,10 @@ def _server_side_schema_fixups(d: Dict[str, Any]) -> Dict[str, Any]:
 
 # ===== App factory =====
 def create_app() -> Flask:
+    # -------- פיצוח הבעיה: לפתוח את רמת ה־UI לפני setup_logging --------
+    os.environ.setdefault("LOG_UI_LEVEL", "INFO")          # לראות גם INFO בלשונית לוגים
+    os.environ.setdefault("LOG_SYS_TO_FILE_ONLY", "0")     # לא לחסום [SYS] נמוכים מה־UI
+
     try:
         setup_logging()
     except Exception:
@@ -625,7 +629,7 @@ def create_app() -> Flask:
             logger.exception("Error in /api/metrics")
             return jsonify(ok=False, error=str(e)), 500
 
-    # ----- Errors -----
+    # ----- Error handlers -----
     @app.errorhandler(404)
     def not_found(_e):
         msg = {"error": "Not Found",
@@ -640,6 +644,16 @@ def create_app() -> Flask:
         return Response("Server error:\n" + str(e), status=500,
                         mimetype="text/plain; charset=utf-8")
 
+    # ----- כלי דיבוג מהיר ללוגים -----
+    @app.post("/api/debug/logs_burst")
+    def logs_burst():
+        logger.debug("debug ping")
+        logger.info("info ping")
+        logger.warning("warning ping")
+        logger.error("error ping")
+        return {"ok": True}
+
+    # ----- MJPEG quick test -----
     @app.get("/test_stream")
     def test_stream():
         return Response("""<!doctype html><meta charset="utf-8">
