@@ -94,7 +94,7 @@ canonical_keys:
   objdet.object_kind:
     unit: text
     aliases: [objdet.object_kind, equipment.kind, object.kind]
-    # תיעוד: ערכים מומלצים כיום: barbell, dumbbell, kettlebell, trapbar, plate, band, bodyweight, unknown
+    # תיעוד: ערכים מומלצים כיום:barbell, dumbbell, kettlebell, trapbar, plate, band, bodyweight, unknown
     # ניתן להרחבה עתידית (cable, sandbag, machine, smith_machine, וכו')
 
   # סיגנל גובה כלל-מערכתי לאובייקט (מוט/דאמבלים/קטלבל/גוף) — קל לזכור

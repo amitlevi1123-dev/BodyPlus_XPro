@@ -1,9 +1,18 @@
-# app/ui/video.py
-# -------------------------------------------------------
-# 🎥 VideoStreamer — תומך גם ב-ingest_jpeg(jpeg_bytes):
-# מפענח JPEG → push_bgr_frame → הפייפליין (MediaPipe/OD/מדידות) רץ,
-# וגם שומר JPEG להצגה ב-/video/stream.mjpg.
-# -------------------------------------------------------
+# -*- coding: utf-8 -*-
+"""
+app/ui/video.py
+--------------------------------------------
+🎥 VideoStreamer — סטרימר MJPEG יציב:
+- ingest_jpeg(jpeg_bytes) להזנת פריימים מהדפדפן/טלפון לפייפליין.
+- push_bgr_frame/push_jpeg לעדכון הפריים האחרון + יצירת JPEG.
+- get_jpeg_generator() להזרמת MJPEG.
+
+⚠️ בטוח לענן:
+- לא פותח מצלמה בזמן import.
+- אם אין /dev/video0 או NO_CAMERA=1 → לא ינסה לפתוח מצלמה בכלל.
+- תצוגת OpenCV Preview לא מופעלת בענן (no-op אם CV2 לא זמין/NO_CAMERA=1).
+"""
+
 from __future__ import annotations
 import os, time, threading, io
 from typing import Optional, Callable, Tuple, List, Dict, Any
@@ -32,27 +41,32 @@ except Exception:
     def set_payload(_p: Dict[str, Any]) -> None:
         pass
 
-# ============================== styling ==============================
+# ---- Global camera guards (serverless safe) ----
+_NO_CAM_ENV = (os.getenv("NO_CAMERA") == "1") or (not os.path.exists("/dev/video0"))
+if _NO_CAM_ENV:
+    os.environ.setdefault("NO_CAMERA", "1")
+    # אם cv2 קיים, מחליף את VideoCapture ב-stub שלא ניגש ל-/dev/video0
+    if CV2_OK:
+        class _DummyCap:
+            def __init__(self, *a, **k): pass
+            def isOpened(self): return False
+            def read(self): return False, None
+            def release(self): pass
+            def set(self, *a): return False
+            def get(self, *a): return 0
+        cv2.VideoCapture = _DummyCap  # type: ignore[attr-defined]
+        try:
+            # הורדת רעש לוגים של OpenCV (לא בכל גרסה קיים)
+            cv2.setLogLevel(cv2.LOG_LEVEL_SILENT)  # type: ignore[attr-defined]
+        except Exception:
+            pass
+
+# ============================== styling (אופציונלי) ==============================
 PRIMARY       = (255, 182,  56)  # BGR
-TEXT_DARK     = ( 36,  36,  36)
 WHITE         = (255, 255, 255)
 BLACK         = (  0,   0,   0)
-BTN_BG        = (246, 248, 252)
-BTN_BG_HOVER  = (240, 244, 252)
-BTN_BG_ACTIVE = (255, 235, 200)
-BORDER        = (120, 120, 120)
-
-BAR_BG        = (  0,   0,   0)
-BAR_ALPHA     = 0.25
-BAR_H         = 64
-BTN_W, BTN_H  = 170, 44
-BTN_PAD, BTN_Y = 10, 12
-RADIUS        = 16
 
 FONT   = cv2.FONT_HERSHEY_SIMPLEX if CV2_OK else 0
-FS_BTN = 0.55
-FS_HINT= 0.52
-FS_STAT= 0.60
 
 def _safe_now() -> float:
     try:
@@ -63,7 +77,8 @@ def _safe_now() -> float:
 # ============================== core streamer ==============================
 class VideoStreamer:
     """
-    סטרימר יציב שמייצר MJPEG. כעת כולל ingest_jpeg(jpeg_bytes) לחיבור capture-דפדפן לפייפליין.
+    סטרימר יציב שמייצר MJPEG. כולל ingest_jpeg(jpeg_bytes) לחיבור capture-דפדפן לפייפליין.
+    בטוח לענן: לא יפתח מצלמה אם NO_CAMERA=1 או אם אין /dev/video0.
     """
     def __init__(self,
                  camera_index: int = 0,
@@ -78,40 +93,46 @@ class VideoStreamer:
         self.fps, self.jpeg_quality = int(fps), int(jpeg_quality)
         self.window_name = window_name
 
+        # קצבי עבודה
         self.target_fps: int = int(os.getenv("STREAM_FPS", str(self.fps)))
         self.encode_fps: int = int(os.getenv("MJPEG_FPS", str(min(self.fps, 15))))
-        self._next_capture_due: float = 0.0
         self._next_encode_due: float = 0.0
         self._decimation: int = max(1, int(os.getenv("STREAM_DECIMATION", "1")))
         self._decim_counter: int = 0
 
+        # סטייט פריימים
         self._last_jpeg: Optional[bytes] = None
         self._last_bgr = None
         self._lock = threading.Lock()
         self._cv = threading.Condition(self._lock)
 
+        # סטייט מצלמה/ריצה
         self._opened = False
         self._running = False
         self._last_size: Optional[Tuple[int, int]] = None
         self._last_push_ts = 0.0
-        self._light_mode = "normal"
-        self._source_desc = None
+        self._source_desc: Optional[str] = None
         self._fps_win: List[float] = []
-        self._last_fps = None
+        self._last_fps: Optional[float] = None
 
-        self._preview = bool(show_preview_default)
-        self._preview_thread: Optional[threading.Thread] = None
-
+        # Freezing
         self._frozen = False
         self._freeze_until: Optional[float] = None
 
+        # Hooks
         self.on_open_metrics: Optional[Callable[[], None]] = None
         self.on_freeze_change: Optional[Callable[[bool], None]] = None
 
+        # Capture thread
         self._cap: Optional["cv2.VideoCapture"] = None
         self._cap_thread: Optional[threading.Thread] = None
         self._cap_lock = threading.Lock()
 
+        # Preview (לא נדרש בענן; no-op אם אין CV2 או NO_CAMERA)
+        self._preview = bool(show_preview_default)
+        self._preview_thread: Optional[threading.Thread] = None
+
+        # לא מפעילים AUTO_CAPTURE בענן. גם אם מוגדר, guard יחסום.
         if os.getenv("AUTO_CAPTURE", "0") == "1":
             self.start_auto_capture()
 
@@ -122,23 +143,20 @@ class VideoStreamer:
         return float(self._last_fps) if self._last_fps is not None else None
     def last_frame_size(self) -> Optional[Tuple[int, int]]:
         return tuple(self._last_size) if self._last_size else None
-    def get_light_mode(self) -> str: return self._light_mode
+    def get_light_mode(self) -> str: return "normal"
     def source_desc(self) -> Optional[str]: return self._source_desc
 
     # ------------ Camera settings helpers ------------
     def get_camera_settings(self) -> Dict[str, int]:
         if CV2_OK and self._cap is not None:
             try:
-                w = int(self._cap.get(cv2.CAP_PROP_FRAME_WIDTH)  or self.width)
-                h = int(self._cap.get(cv2.CAP_PROP_FRAME_HEIGHT) or self.height)
-                f = int(self._cap.get(cv2.CAP_PROP_FPS)          or self.fps)
+                w = int(self._cap.get(cv2.CAP_PROP_FRAME_WIDTH)  or self.width)   # type: ignore[attr-defined]
+                h = int(self._cap.get(cv2.CAP_PROP_FRAME_HEIGHT) or self.height)  # type: ignore[attr-defined]
+                f = int(self._cap.get(cv2.CAP_PROP_FPS)          or self.fps)     # type: ignore[attr-defined]
                 return {"width": w, "height": h, "fps": f}
             except Exception:
                 pass
         return {"width": int(self.width), "height": int(self.height), "fps": int(self.fps)}
-
-    def get_cap(self):
-        return self._cap
 
     def set_resolution(self, width: int, height: int) -> None:
         try:
@@ -150,10 +168,10 @@ class VideoStreamer:
         if CV2_OK and self._cap is not None:
             try:
                 with self._cap_lock:
-                    self._cap.set(cv2.CAP_PROP_FRAME_WIDTH, float(self.width))
-                    self._cap.set(cv2.CAP_PROP_FRAME_HEIGHT, float(self.height))
-                    cur_w = int(self._cap.get(cv2.CAP_PROP_FRAME_WIDTH) or self.width)
-                    cur_h = int(self._cap.get(cv2.CAP_PROP_FRAME_HEIGHT) or self.height)
+                    self._cap.set(cv2.CAP_PROP_FRAME_WIDTH,  float(self.width))   # type: ignore[attr-defined]
+                    self._cap.set(cv2.CAP_PROP_FRAME_HEIGHT, float(self.height))  # type: ignore[attr-defined]
+                    cur_w = int(self._cap.get(cv2.CAP_PROP_FRAME_WIDTH)  or self.width)   # type: ignore[attr-defined]
+                    cur_h = int(self._cap.get(cv2.CAP_PROP_FRAME_HEIGHT) or self.height)  # type: ignore[attr-defined]
                     self.width, self.height = cur_w, cur_h
                     self._last_size = (cur_w, cur_h)
             except Exception:
@@ -181,13 +199,13 @@ class VideoStreamer:
         msg_parts: List[str] = []
         with self._cap_lock:
             try:
-                if width  is not None: self._cap.set(cv2.CAP_PROP_FRAME_WIDTH,  float(self.width))
-                if height is not None: self._cap.set(cv2.CAP_PROP_FRAME_HEIGHT, float(self.height))
-                if fps    is not None: self._cap.set(cv2.CAP_PROP_FPS,          float(self.fps))
+                if width  is not None: self._cap.set(cv2.CAP_PROP_FRAME_WIDTH,  float(self.width))   # type: ignore[attr-defined]
+                if height is not None: self._cap.set(cv2.CAP_PROP_FRAME_HEIGHT, float(self.height))  # type: ignore[attr-defined]
+                if fps    is not None: self._cap.set(cv2.CAP_PROP_FPS,          float(self.fps))     # type: ignore[attr-defined]
 
-                cur_w = int(self._cap.get(cv2.CAP_PROP_FRAME_WIDTH)  or self.width)
-                cur_h = int(self._cap.get(cv2.CAP_PROP_FRAME_HEIGHT) or self.height)
-                cur_f = int(self._cap.get(cv2.CAP_PROP_FPS)          or self.fps)
+                cur_w = int(self._cap.get(cv2.CAP_PROP_FRAME_WIDTH)  or self.width)   # type: ignore[attr-defined]
+                cur_h = int(self._cap.get(cv2.CAP_PROP_FRAME_HEIGHT) or self.height)  # type: ignore[attr-defined]
+                cur_f = int(self._cap.get(cv2.CAP_PROP_FPS)          or self.fps)     # type: ignore[attr-defined]
 
                 self.width, self.height, self.fps = cur_w, cur_h, cur_f
                 self._last_size = (cur_w, cur_h)
@@ -208,7 +226,6 @@ class VideoStreamer:
         """
         לקבל JPEG מהשרת (ingest), לפענח, להזין לפייפליין, ולשמור להצגה.
         """
-        # 1) decode JPEG → BGR/RGB → push_bgr_frame
         frame_bgr = None
         try:
             if CV2_OK:
@@ -216,7 +233,7 @@ class VideoStreamer:
                 frame_bgr = cv2.imdecode(arr, cv2.IMREAD_COLOR)   # BGR
             elif PIL_OK:
                 im = Image.open(io.BytesIO(jpeg_bytes)).convert("RGB")
-                import numpy as _np  # רק אם צריך
+                import numpy as _np  # lazy import רק אם צריך
                 frame_bgr = _np.asarray(im)[:, :, ::-1]           # RGB→BGR
         except Exception:
             frame_bgr = None
@@ -224,7 +241,6 @@ class VideoStreamer:
         if frame_bgr is not None:
             self.push_bgr_frame(frame_bgr)
         else:
-            # אין דיקוד? לפחות נציג את ה-JPEG כדי שהסטרים יעבוד
             self.push_jpeg(jpeg_bytes)
 
     # ------------ Push APIs ------------
@@ -248,14 +264,14 @@ class VideoStreamer:
             if frame is not None and CV2_OK:
                 if self.encode_fps > 0:
                     if now >= self._next_encode_due:
-                        ok, buf = cv2.imencode(".jpg", frame, [int(cv2.IMWRITE_JPEG_QUALITY), int(self.jpeg_quality)])
+                        ok, buf = cv2.imencode(".jpg", frame, [int(cv2.IMWRITE_JPEG_QUALITY), int(self.jpeg_quality)])  # type: ignore[attr-defined]
                         if ok:
                             with self._cv:
                                 self._last_jpeg = buf.tobytes()
                                 self._cv.notify_all()
                         self._next_encode_due = now + (1.0 / float(self.encode_fps))
                 else:
-                    ok, buf = cv2.imencode(".jpg", frame, [int(cv2.IMWRITE_JPEG_QUALITY), int(self.jpeg_quality)])
+                    ok, buf = cv2.imencode(".jpg", frame, [int(cv2.IMWRITE_JPEG_QUALITY), int(self.jpeg_quality)])  # type: ignore[attr-defined]
                     if ok:
                         with self._cv:
                             self._last_jpeg = buf.tobytes()
@@ -289,7 +305,7 @@ class VideoStreamer:
             return False, None
         frame = self._last_bgr
         if frame is None:
-            img = np.zeros((1, 1, 3), dtype=np.uint8)
+            img = np.zeros((1, 1, 3), dtype=np.uint8)  # type: ignore
             return True, img
         return True, frame
 
@@ -309,9 +325,10 @@ class VideoStreamer:
                 continue
             yield boundary + b"\r\nContent-Type: image/jpeg\r\n\r\n" + data + b"\r\n"
 
+    # alias
     iter_mjpeg = get_jpeg_generator
 
-    # ------------ Payload bridge (דוגמית) ------------
+    # ------------ Payload bridge (דוגמא) ------------
     def push_payload(self, pixels: Dict[str, Any], metrics: Dict[str, Any], ts: Optional[float] = None) -> None:
         try:
             payload = {
@@ -342,41 +359,22 @@ class VideoStreamer:
         self._freeze_until = _safe_now() + secs
         self._set_freeze_flag(True)
 
-    # ------------ Preview window (optional) ------------
+    # ------------ Preview window (optional; no-op בענן) ------------
     def enable_preview(self, on: bool):
-        if not CV2_OK:
+        # לא פותחים חלון בענן. רק בלוקאל, כשהכול זמין ואין NO_CAMERA.
+        if not CV2_OK or os.getenv("NO_CAMERA") == "1":
             return
         self._preview = bool(on)
-        if on and (self._preview_thread is None or not self._preview_thread.is_alive()):
-            self._preview_thread = threading.Thread(target=self._preview_loop, daemon=True)
-            self._preview_thread.start()
         if not on:
-            try: cv2.destroyWindow(self.window_name)
+            try: cv2.destroyWindow(self.window_name)  # type: ignore
             except Exception: pass
 
-    def _preview_loop(self):
-        if not CV2_OK:
-            return
-        try:
-            import cv2
-            cv2.namedWindow(self.window_name, cv2.WINDOW_NORMAL)
-            cv2.resizeWindow(self.window_name, 1120, 640)
-            while self._preview:
-                if self._last_bgr is None:
-                    cv2.waitKey(10); continue
-                cv2.imshow(self.window_name, self._last_bgr)
-                k = cv2.waitKey(1) & 0xFF
-                if k == 27:
-                    self._preview = False
-                    break
-        finally:
-            try: cv2.destroyWindow(self.window_name)
-            except Exception: pass
-
-    # ------------ Auto capture (ממצלמה מקומית) ------------
+    # ------------ Auto capture (מצלמה מקומית בלבד) ------------
     def start_auto_capture(self):
-        if not CV2_OK:
+        # Guard: אל תפתח מצלמה בענן/ללא התקן
+        if os.getenv("NO_CAMERA") == "1" or (not os.path.exists("/dev/video0")) or (not CV2_OK):
             self._source_desc = "headless/none"
+            self._ensure_placeholder_jpeg()
             return
         if self._cap_thread is not None and self._cap_thread.is_alive():
             return
@@ -392,14 +390,18 @@ class VideoStreamer:
         self._opened = False
 
     def _open_cap(self):
-        if not CV2_OK:
+        if os.getenv("NO_CAMERA") == "1" or (not os.path.exists("/dev/video0")) or (not CV2_OK):
             return None
-        backends = [(cv2.CAP_DSHOW, "dshow"), (cv2.CAP_MSMF, "msmf"), (0, "default")]
+        # נסה backends שונים (בלינוקס/מק/ווינדוס)
+        backends = [
+            # לינוקס/דיפולט
+            (0, "default"),
+        ]
+        cap = None
         for be, name in backends:
-            cap = None
             try:
-                cap = cv2.VideoCapture(self.camera_index, be) if be != 0 else cv2.VideoCapture(self.camera_index)
-                if cap.isOpened():
+                cap = cv2.VideoCapture(self.camera_index) if be == 0 else cv2.VideoCapture(self.camera_index, be)  # type: ignore
+                if cap is not None and cap.isOpened():
                     self._source_desc = f"camera:{self.camera_index}({name})"
                     return cap
                 if cap is not None:
@@ -408,10 +410,11 @@ class VideoStreamer:
                 if cap is not None:
                     try: cap.release()
                     except Exception: pass
+                cap = None
         return None
 
     def _capture_loop(self):
-        if not CV2_OK:
+        if os.getenv("NO_CAMERA") == "1" or (not os.path.exists("/dev/video0")) or (not CV2_OK):
             return
         self._running = True
         cap = self._open_cap()
@@ -425,9 +428,12 @@ class VideoStreamer:
             return
 
         self._opened = True
-        cap.set(cv2.CAP_PROP_FRAME_WIDTH,  self.width)
-        cap.set(cv2.CAP_PROP_FRAME_HEIGHT, self.height)
-        cap.set(cv2.CAP_PROP_FPS,          self.fps)
+        try:
+            cap.set(cv2.CAP_PROP_FRAME_WIDTH,  self.width)   # type: ignore[attr-defined]
+            cap.set(cv2.CAP_PROP_FRAME_HEIGHT, self.height)  # type: ignore[attr-defined]
+            cap.set(cv2.CAP_PROP_FPS,          self.fps)     # type: ignore[attr-defined]
+        except Exception:
+            pass
 
         next_due = _safe_now()
         try:
@@ -465,30 +471,28 @@ class VideoStreamer:
             return
         try:
             if CV2_OK and np is not None:
-                h, w = self.height, self.width
-                img = np.zeros((h, w, 3), dtype=np.uint8)
+                h, w = max(1, int(self.height)), max(1, int(self.width))
+                img = np.zeros((h, w, 3), dtype=np.uint8)  # type: ignore
                 img[:] = (20, 20, 20)
                 msg = "NO INPUT – waiting for frames"
-                cv2.putText(img, msg, (30, 80), FONT, 1.0, (200, 200, 200), 2, cv2.LINE_AA)
-                ok, buf = cv2.imencode(".jpg", img, [int(cv2.IMWRITE_JPEG_QUALITY), 70])
+                try:
+                    cv2.putText(img, msg, (30, 80), FONT, 1.0, (200, 200, 200), 2, cv2.LINE_AA)  # type: ignore
+                except Exception:
+                    pass
+                ok, buf = cv2.imencode(".jpg", img, [int(cv2.IMWRITE_JPEG_QUALITY), 70])  # type: ignore[attr-defined]
                 if ok:
                     self._last_size = (w, h)
                     self._last_jpeg = buf.tobytes()
                     return
-            # מינימום 1×1
-            self._last_jpeg = (
-                b"\xff\xd8\xff\xe0\x00\x10JFIF\x00\x01\x01\x01\x00H\x00H\x00\x00"
-                b"\xff\xdb\x00C\x00" + b"\x08"*64 +
-                b"\xff\xc0\x00\x11\x08\x00\x01\x00\x01\x03\x01\"\x00\x02\x11\x01\x03\x11\x01"
-                b"\xff\xda\x00\x0c\x03\x01\x00\x02\x11\x03\x11\x00?\x00\xcf\xff\xd9"
-            )
         except Exception:
-            self._last_jpeg = (
-                b"\xff\xd8\xff\xe0\x00\x10JFIF\x00\x01\x01\x01\x00H\x00H\x00\x00"
-                b"\xff\xdb\x00C\x00" + b"\x08"*64 +
-                b"\xff\xc0\x00\x11\x08\x00\x01\x00\x01\x03\x01\"\x00\x02\x11\x01\x03\x11\x01"
-                b"\xff\xda\x00\x0c\x03\x01\x00\x02\x11\x03\x11\x00?\x00\xcf\xff\xd9"
-            )
+            pass
+        # מינימום 1×1 — JPEG קטן תקני
+        self._last_jpeg = (
+            b"\xff\xd8\xff\xe0\x00\x10JFIF\x00\x01\x01\x01\x00H\x00H\x00\x00"
+            b"\xff\xdb\x00C\x00" + b"\x08"*64 +
+            b"\xff\xc0\x00\x11\x08\x00\x01\x00\x01\x03\x01\"\x00\x02\x11\x01\x03\x11\x01"
+            b"\xff\xda\x00\x0c\x03\x01\x00\x02\x11\x03\x11\x00?\x00\xcf\xff\xd9"
+        )
 
     def _update_fps(self, now: float):
         self._fps_win.append(now)

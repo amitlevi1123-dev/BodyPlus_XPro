@@ -22,7 +22,7 @@ from __future__ import annotations
 from typing import List, Dict, Any, Optional, Tuple
 
 # ---- מפת מחלקות ברירת-מחדל (תואמת ל-weights) ----
-# 0 = dumbbell, 1 = barbell
+# 0 = dumbbell, 1 =barbell
 DEFAULT_CLASS_INDEX_MAP: Dict[int, str] = {
     0: "dumbbell",
     1: "barbell",
