@@ -141,6 +141,22 @@ _PAY_EMIT = {
     "last_frame_id": 0,
 }
 
+# ---------- stream mode helper (נדרש ע"י routes_video) ----------
+def _ffmpeg_proc_running() -> bool:
+    with _FILE_STREAM["lock"]:
+        p = _FILE_STREAM.get("proc")
+        return bool(p and (p.poll() is None))
+
+def get_stream_mode() -> str:
+    """
+    מחזיר 'file' אם יש קובץ שהועלה ויש תהליך ffmpeg פעיל להזנה,
+    אחרת 'camera' — כך /video/stream.mjpg ידע אם להפנות ל-/video/stream_file.mjpg.
+    """
+    path = _LAST_UPLOAD.get("path")
+    if path and os.path.exists(str(path)) and _ffmpeg_proc_running():
+        return "file"
+    return "camera"
+
 # ================================= Helpers ===================================
 
 def _ffmpeg_available() -> bool:
