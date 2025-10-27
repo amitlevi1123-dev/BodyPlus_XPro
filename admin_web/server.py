@@ -26,6 +26,30 @@ from flask import (
 )
 from werkzeug.middleware.proxy_fix import ProxyFix
 
+# ========== CAMERA GUARD (serverless-safe) ==========
+# חייב להיות לפני כל import של מודולים שעלולים לפתוח מצלמה בזמן העלייה.
+if not os.path.exists("/dev/video0"):
+    os.environ.setdefault("NO_CAMERA", "1")
+
+try:
+    import cv2  # type: ignore
+    if os.getenv("NO_CAMERA") == "1":
+        class _DummyCap:
+            def __init__(self, *a, **k): pass
+            def isOpened(self): return False
+            def read(self): return False, None
+            def release(self): pass
+            def set(self, *a): return False
+            def get(self, *a): return 0
+        cv2.VideoCapture = _DummyCap  # type: ignore[attr-defined]
+        try:
+            cv2.setLogLevel(cv2.LOG_LEVEL_SILENT)  # type: ignore[attr-defined]
+        except Exception:
+            pass
+except Exception:
+    pass
+# ========== /CAMERA GUARD ==========
+
 # ===== Blueprints =====
 from admin_web.routes_video import video_bp  # חובה
 
