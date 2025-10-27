@@ -4,57 +4,46 @@
 # מטרת המשפחה: למדוד תנועה מבוססת Hinge — דדליפטים, RDL, סטיף-לג, טרפ-בר וכו’.
 #
 # עקרונות:
-# - מדידת טווח תנועה לפי זוויות הירך והגו (לא לפי פיקסלים)
-# - זיהוי פאזות ע"י torso_forward_deg + hip_*_deg
-# - שליטה בקצב, בטיחות, יישור ברך-כף-רגל ומגע עקבים
-# - מצב Top (נעילה/מתח בצמרת) יוגדר בכל וריאנט ספציפי
-#
-# הערה: קובץ בסיס זה אינו מכריח נעילה מלאה — הוא מספק hooks, והווריאנטים מגדירים מדיניות Top.
+# - ROM זוויתי לפי ירך+גו (חסין מרחק/זום; לא מסתמך על פיקסלים)
+# - זיהוי פאזות ע"י torso_forward_deg + hip_*_deg; object_y רק כגיבוי
+# - ניקוד בטיחות/תבנית/שליטה/עמידה; Top (נעילה/מתח) יוגדר בווריאנטים
+# - כל המפתחות קנוניים לפי aliases.yaml
 # =============================================================================
 
 meta:
   id: "hinge.base"
   family: "hinge"
   display_name: "תנועת Hinge (בסיס משפחה)"
-  selectable: false            # לא נבחר ישירות; הווריאנטים יורשים ממנו
+  selectable: false
   version: 1.0.0
   notes: >
-    קובץ זה מגדיר את בסיס המשפחה של תנועות ההינג׳. הווריאנטים (דדליפט רגיל,
-    RDL, סטיף-לג, טרפ-בר וכו’) יורשים ממנו ומשנים מדיניות Top לפי הצורך.
-    המדידה נשענת על זוויות הירך והגו בלבד — ללא תלות בפיקסלים — מה שמקשה
-    על הטיות בגלל מרחק מצלמה/זום/גובה מתאמן.
+    הווריאנטים (דדליפט רגיל, RDL, סטיף-לג, טרפ-בר, KB/DB, משקל-גוף) יורשים מהבסיס
+    ומשנים בעיקר את start_mode/targets ומדיניות ה-Top (נעילה/מתח).
 
 # =============================================================================
-# 🧭 רמזי זיהוי בסיסיים למסווג
+# 🧭 רמזים למסווג — בסיס (ווריאנטים ירחיבו לפי ציוד)
 # =============================================================================
 match_hints:
   must_have: [pose.available]
-  pose_view: ["side", "front_left", "front_right"]  # תצפית צד/אלכסון-קדמי עדיפה
+  pose_view: ["side", "front_left", "front_right"]
   motion_pattern: ["hip_hinge"]
   joints_focus: ["hips", "spine", "knees"]
 
 # =============================================================================
-# 🧾 הגדרות כלליות
+# 🧾 הגדרות כלליות / יעדי ROM ברירת-מחדל (ווריאנטים רשאים לדרוס)
 # =============================================================================
 defaults:
-  # מצב Top יוגדר בווריאנט ("full_lockout" או "tension_top")
-  lockout_mode: "inherit"
-
-  # יעדים כלליים לטווח תנועה — נבחרים לפי start_mode בווריאנט
+  lockout_mode: "inherit"   # יוגדר בווריאנט: "full_lockout" / "tension_top"
   targets:
-    from_floor:
-      hip_deg: 60
-      torso_deg: 35
-    from_standing:
-      hip_deg: 48
-      torso_deg: 30
+    from_floor:    { hip_deg: 60, torso_deg: 35 }
+    from_standing: { hip_deg: 48, torso_deg: 30 }
 
 # =============================================================================
-# 🧩 קריטריונים ודרישות מדידה
+# 🧩 קריטריונים (מה מודדים)
 # =============================================================================
 criteria:
 
-  # ----- קריטיים (חובה לניקוד חזרה) -----
+  # ----- קריטיים (בלעדיהם אין ניקוד חזרה) -----
   critical:
     - pose.available
     - spine_flexion_deg
@@ -62,189 +51,170 @@ criteria:
     - hip_left_deg
     - hip_right_deg
 
-  # ----- מקורות עזר לפאזות/ספירה (לא חובה; אחד מהם מספיק במקרה הצורך) -----
+  # ----- מקורות עזר לפאזות/ספירה (לא חובה; לפחות אחד) -----
   fallback_sources:
-    - object_y          # גובה העומס (אם מזוהה עצם)
-    - hands_center_y    # גיבוי כשאין ציוד ברור
-    - hip_y_px          # חירום לספירה בלבד
+    - object_y
+    - hands_center_y
+    - hip_y_px
 
-  # ----- שלמות תבנית Hinge (שלא יהפוך לסקוואט) -----
+  # ----- תבנית Hinge -----
   hinge_posture:
-    inputs: [torso_forward_deg, knee_left_deg, knee_right_deg]
-    description: "בודק יחס גו/ברך; הינג׳ תקין = הטיית גו משמעותית מול כפיפת ברך מתונה."
+    requires: [torso_forward_deg, knee_left_deg, knee_right_deg]
+    # הגיון: הינג' תקין = הטיית גו משמעותית מול כפיפת ברך מתונה (לא להפוך לסקוואט)
 
-  # מגבלת כפיפת ברך (לשמור על ברך 'פתוחה' יחסית להבדיל מסקוואט)
   knee_flex_limit:
-    inputs: [knee_left_deg, knee_right_deg]
-    description: "בודק שהברך אינה נסגרת עמוק; יעד טיפוסי ~100–115°."
+    requires: [knee_left_deg, knee_right_deg]
+    # יעד טיפוסי ~100–115° (דריסה בווריאנט/בקוד הניקוד)
 
-  # ----- טווח תנועה לפי זוויות — ללא פיקסלים -----
+  # ----- ROM זוויתי (שמרני) -----
   rom_joint:
-    inputs: [hip_left_deg, hip_right_deg, torso_forward_deg]
-    method: "dual_angle_rom"
-    description: "ROM שמרני: המינימום בין יחס ה-ROM של ירך לבין זה של הגו מול היעד."
+    requires: [hip_left_deg, hip_right_deg, torso_forward_deg]
+    # חישוב בקוד: min( hip_rom/target_hip , torso_rom/target_torso )
 
   # ----- בטיחות -----
-  safety:
-    spine_rounding: spine_flexion_deg                  # עגילת גב (סגיטלי)
-    lateral_bend: spine_curvature_side_deg             # עיקום צדדי (פרונטלי)
-    head_alignment: [head_pitch_deg, torso_forward_deg]# ראש בקו עם הגו
+  spine_rounding:   { requires: [spine_flexion_deg] }
+  lateral_bend:     { requires: [spine_curvature_side_deg] }
+  head_alignment:   { requires: [head_pitch_deg, torso_forward_deg] }
 
-  # ----- שליטה וקצב -----
-  tempo:
-    inputs: [rep.timing_s]
-  phase_control:
-    inputs: [rep.ecc_s, rep.con_s, rep.pause_bottom_s, rep.pause_top_s]
-  phase_balance:
-    inputs: [rep.ecc_s, rep.con_s]
-    description: "איזון בין משכי אקצנטרי/קונצנטרי (ללא קביעה סגנונית קשיחה)."
+  # ----- עמידה/רגליים -----
+  stance_width:     { requires: [features.stance_width_ratio] }
+  toe_angle:        { requires: [toe_angle_left_deg, toe_angle_right_deg] }
+  knee_valgus:      { requires: [knee_foot_alignment_left_deg, knee_foot_alignment_right_deg] }
+  heels_grounded:   { requires: [heel_lift_left, heel_lift_right] }
+  foot_contact:     { requires: [foot_contact_left, foot_contact_right] }
+  weight_shift:     { requires: [weight_shift] }
 
-  # ----- מנח רגליים ויציבות -----
-  stance:
-    stance_width: features.stance_width_ratio
-    toe_angle_left: toe_angle_left_deg
-    toe_angle_right: toe_angle_right_deg
-    toe_angle_pair: [toe_angle_left_deg, toe_angle_right_deg]
-    heels_grounded_inputs: [heel_lift_left, heel_lift_right]
-    knee_valgus: [knee_foot_alignment_left_deg, knee_foot_alignment_right_deg]
+  # ----- קצב/פאזות -----
+  tempo:            { requires: [rep.timing_s] }
+  phase_control:    { requires: [rep.ecc_s, rep.con_s, rep.pause_bottom_s, rep.pause_top_s] }
+  phase_balance:    { requires: [rep.ecc_s, rep.con_s] }
+  turn_quality:     { requires: [rep.dir, rep.state, rep.phase] }
 
-  # מגע עקבים (קריטריון מפורש)
-  heels_grounded:
-    inputs: [heel_lift_left, heel_lift_right]
-    description: "True כשהעקבים לא מורמים (כלומר אין הרמת עקב)."
-
-  # זווית כפות רגליים כקריטריון זוגי
-  toe_angle:
-    inputs: [toe_angle_left_deg, toe_angle_right_deg]
-    description: "טווח רצוי 5–20° לכל רגל, וא-סימטריה ≤10°."
-
-  # ----- איכות שינוי כיוון -----
-  turn_quality:
-    inputs: [rep.dir, rep.state, rep.phase]
-
-  # ----- Hook לציון Top (נעילה/מתח) — הווריאנט יגדיר מדיניות -----
-  top_quality_hook:
-    description: >
-      מדד גנרי שישמש לווריאנט כדי לחשב multiplier לפי המדיניות שלו
-      (נעילה מלאה ב-Conventional / מתח בצמרת ב-RDL/SLDL).
-    inputs:
-      - rep.pause_top_s
-      - torso_forward_deg
-      - spine_flexion_deg
-      - heel_lift_left
-      - heel_lift_right
+  # ----- Hook לצמרת (Top) — הווריאנט קובע איך לפרש -----
+  top_quality_hook: { requires: [rep.pause_top_s, torso_forward_deg, spine_flexion_deg, heel_lift_left, heel_lift_right] }
 
 # =============================================================================
-# ⚖️ משקלים לציון כולל (0–2)
+# ⚖️ SCORING — מדיניות וכללי ניקוד (ברמת הבייס)
 # =============================================================================
-weights:
-  # בטיחות
-  spine_rounding: 2.0
-  lateral_bend: 1.4
-  head_alignment: 1.2
+scoring:
 
-  # תבנית תנועה
-  hinge_posture: 1.8
-  knee_flex_limit: 1.0
+  policy:
+    missing: skip
+    min_criteria_for_full_quality: 3
 
-  # טווח תנועה (ROM)
-  rom_joint: 1.5
+  # משקלים מוצעים (0–2) — הנוסחה בקוד מבצעת weighted_mean
+  weights:
+    spine_rounding: 2.0
+    lateral_bend:   1.4
+    head_alignment: 1.2
 
-  # שליטה וקצב
-  phase_control: 1.5
-  tempo: 1.0
-  phase_balance: 0.8
+    hinge_posture:  1.8
+    knee_flex_limit:1.0
 
-  # רגליים ויציבה
-  knee_valgus: 1.4
-  heels_grounded: 1.0
-  stance_width: 0.8
-  toe_angle: 0.6
+    rom_joint:      1.5
 
-  # שינוי כיוון וצמרת
-  turn_quality: 0.5
-  top_quality_hook: 1.0   # יומר למכפיל/בקרת Top בווריאנט
+    phase_control:  1.5
+    tempo:          1.0
+    phase_balance:  0.8
 
-# =============================================================================
-# 🧮 מדיניות ניקוד (תיאורית)
-# =============================================================================
-scoring_logic:
-  description: >
-    הציון הסופי הוא ממוצע משוקלל של הקריטריונים. קיימות תקרות בטיחות
-    שמגבילות ציון סופי כשבטיחות ירודה, כדי שלא 'להבריק' על חשבון בטיחות.
-  formula: >
-    rep_score_core = weighted_mean(all_criteria)
-    # Safety Caps (דוגמה):
-    if spine_rounding_score <= 0.6 → rep_score_core *= 0.85
-    if knee_valgus_score   <= 0.6 → rep_score_core *= 0.90
-    # הווריאנט מוסיף כאן את מדיניות ה-Top (מכפיל):
-    # rep_score = rep_score_core * top_policy_multiplier
+    knee_valgus:    1.4
+    heels_grounded: 1.0
+    stance_width:   0.8
+    toe_angle:      0.6
+    foot_contact:   0.6
+    weight_shift:   0.6
+
+    turn_quality:   0.5
+    top_quality_hook: 1.0
+
+  # תקרות בטיחות כלליות (גבול על לציון הסופי)
+  safety_caps:
+    - { when: "spine_rounding <= 0.6", cap: 0.85 }
+    - { when: "knee_valgus   <= 0.6", cap: 0.90 }
+    - { when: "heels_grounded<= 0.5", cap: 0.90 }
 
 # =============================================================================
-# 🔁 לוגיקת ספירת חזרות
+# 🔁 ספירת חזרות — הגדרות סיגנל וגייט
 # =============================================================================
+rep_signal:
+  # בוחרים סיגנל זוויתי, חסין מרחק/זום:
+  source: "angle|min|torso_forward_deg,hip_left_deg,hip_right_deg"
+  thresholds:
+    phase_delta: 5         # שינוי מינימלי כדי לצאת מ-start
+    min_turn_ms: 100       # השהייה מינימלית ב-turn למניעת false-turn
+    min_rep_ms: 500
+    max_rep_ms: 6000
+    # ספי ROM מינימליים לסיווג איכות (במעלות):
+    min_rom_good: 25
+    min_rom_partial: 18
+
 rep_detection:
-  description: >
-    חזרה מזוהה לפי שינוי פאזה (turn) על סמך זוויות הירך והגו. object_y משמש עזר
-    בלבד אם יש ציוד. סף ספירה: rom_joint_ratio ≥ 0.30 (אחרת לא נספרת).
   phases: [start, towards, turn, away]
   turn_guard:
-    min_rom_fraction: 0.30     # מתחת לזה — לא נספר
-    small_rep_threshold: 0.50   # בין 0.30–0.50 — נספר כ'חלקי' ומסומן short
+    min_rom_fraction: 0.30      # מתחת לזה — לא חזרה
+    small_rep_threshold: 0.50   # בין 0.30–0.50 → partial/short (לפי gate)
+  description: >
+    זיהוי חזרה בעיקר מזוויות; object_y/hands_center_y/hip_y_px משמשים כגיבוי בלבד.
+    מדיניות Top (נעילה/מתח) לא נאכפת כאן — תוגדר בווריאנט ותשפיע כמכפיל.
+
+# =============================================================================
+# 📣 חיבור לפידבק — מיפוי קריטריונים ↔ קבוצות משפטים קיימות (phrases.yaml)
+# =============================================================================
+feedback:
+  # לכל קריטריון מצוינת קבוצת המשפטים ה"גנרית" הקיימת בקובץ he:
+  bindings:
+    rom_joint:        range_of_motion           # rep_good / set_good / rep_weak / ...
+    tempo:            tempo
+    phase_control:    tempo_control
+    hinge_posture:    posture                   # שימושי לפידבק על הטיית גו כללית
+    spine_rounding:   spine_rounding
+    lateral_bend:     spine_sidebend
+    head_alignment:   head_alignment
+
+    stance_width:     stance_width
+    toe_angle:        toe_angle_target          # 8–20°
+    knee_valgus:      knee_alignment
+    heels_grounded:   heels_grounded
+    foot_contact:     foot_contact
+    weight_shift:     weight_shift
+
+  # אירועי סט כלליים (ללא Top) — קיימים כבר אצלך בקובץ (measurement_quality/general)
+  set_events:
+    pose_missing:     measurement_quality.pose_missing
+    visibility_low:   measurement_quality.visibility_low
+    not_enough_frames: general.not_enough_frames
+    low_confidence:   general.low_pose_confidence
+
+  # Top-policy specific — יוגדרו בווריאנטים (שמות קודים בלבד; הטקסטים ב-phrases):
+  variant_placeholders:
+    conventional_last_rep_no_full_lockout: "set.last_rep_no_full_lockout"
+    rdl_excessive_top_hold:                "set.excessive_top_hold_for_rdl"
 
 # =============================================================================
 # 📈 סיכום עקרונות
 # =============================================================================
 summary:
-  - מדידות קריטיות מזוויות (לא מפיקסלים) → חסינות לסקייל/מרחק מצלמה.
-  - קריטריונים מבוססי ROM, יציבה ובטיחות + שליטה בפאזות.
-  - מדיניות Top (נעילה/מתח) מוגדרת בווריאנטים, לא בבסיס.
-  - מתאים לכל וריאציות ההינג׳ (קונבנציונלי, RDL, סטיף-לג, טרפ-בר וכו’).
-
-# =============================================================================
-# 📣 Hooks לדיווח (מיפוי אירועים → קודי משפטים ב-phrases.yaml)
-# =============================================================================
-phrases:
-  # ברירת מחדל למשפחה — הווריאנטים יכולים לדרוס/להוסיף
-  namespace: "hinge.common"
-
-  rom_joint_map:
-    good:        "hinge.common.rom_joint.rep_good"
-    short:       "hinge.common.rom_joint.rep_short"
-    too_short:   "hinge.common.rom_joint.rep_too_short"
-    set_good:    "hinge.common.rom_joint.set_good"
-    set_weak:    "hinge.common.rom_joint.set_weak"
-    rep_missing: "hinge.common.rom_joint.rep_missing"
-    set_missing: "hinge.common.rom_joint.set_missing"
-
-  turn_map:
-    good:        "hinge.common.turn.rep_good"
-    weak:        "hinge.common.turn.rep_weak"
-    set_good:    "hinge.common.turn.set_good"
-    set_weak:    "hinge.common.turn.set_weak"
-    rep_missing: "hinge.common.turn.rep_missing"
-    set_missing: "hinge.common.turn.set_missing"
-
-  path_hints_map:
-    close: "hinge.common.path_hints.rep_close"
-    swing: "hinge.common.path_hints.rep_swing"
+  - קריטריונים קריטיים מזוויות בלבד → חסינות לשינויים בצילום.
+  - ניקוד משוקלל + תקרות בטיחות מונעים “ציון יפה” עם טכניקה מסוכנת.
+  - Top (נעילה/מתח) הוא פר ווּריאנט — אין ענישה בבייס.
+  - ROM לפי hip+torso עם יעדי ברירת-מחדל, ניתנים לדריסה.
 
 # =============================================================================
 # 🚀 שיפורים עתידיים (Roadmap)
 # =============================================================================
 future_improvements:
-  - pelvis_tilt_and_rotation: "לזהות היפראקסטנשן או סטיות באגן בלוק-אאוט."
-  - object_x_tracking: "מעקב אופקי לעומס (bar path) לזיהוי ‘קרוב לגוף’."
-  - symmetry_indices: "מדדי איזון R/L (hips/shoulders) לטיוב פידבק."
-  - adaptive_targets: "התאמת יעדי ROM/Tempo לפי גובה/אורך גפיים."
-  - phase_jerk_metrics: "זיהוי שינויי כיוון חדים מדי (turn/top) על בסיס מהירות/תאוצה."
-  - grip_width: "מדד רוחב אחיזה והשפעתו על יציבות כתף/מרפק."
+  - pelvis_tilt_and_rotation: "לזהות היפראקסטנשן/סטיות אגן בטופ."
+  - object_x_tracking:        "מסלול אופקי (bar path) לבדיקת ‘מוט קרוב לגוף’."
+  - symmetry_indices:         "איזון ימין/שמאל (hips/shoulders) לזיהוי הטיות."
+  - adaptive_targets:         "יעדי ROM/Tempo מותאמים גובה/אורך גפיים."
+  - phase_jerk_metrics:       "מדדי ‘קפיצה’ בהיפוך/טופ לפי מהירות/תאוצה."
+  - grip_width:               "מדד רוחב אחיזה — יופעל בווריאנטים עם מוט/דאמבלים."
 
 # =============================================================================
-# 🧠 הערכת אמינות (סקירה)
+# 🧠 הערכת אמינות
 # =============================================================================
 review:
   summary: >
-    המבנה אמין לשימוש במצלמה אחת הודות למדידה מזוויות בלבד. תקרות בטיחות
-    מונעות ציונים גבוהים כשיש כשלים יציבתיים. מדיניות Top נשארת בווריאנטים,
-    כך שקונבנציונלי מקבל נעילה מלאה ואילו RDL/SLDL מעדיפים מתח בצמרת.
+    הבייס יציב ואמין למצלמה אחת: ROM זוויתי, סיגנל חזרות נקי, וחיבור מלא ל-phrases
+    הגנריים. הווריאנטים מוסיפים רק ציוד/start_mode/יעדים ומדיניות Top, בלי לשנות
+    את הליבה — מה שמונע באגים בין תרגילים ושומר על עקביות בדוחות.

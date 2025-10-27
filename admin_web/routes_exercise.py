@@ -10,9 +10,10 @@ Endpoints:
 - POST   /api/exercise/score
 - POST   /api/exercise/detect
 - GET    /api/exercise/last
-- GET    /api/exercise/diag/stream     ← דיאגנוסטיקה חיה (SSE)
-- GET    /api/connection/status        ← סטטוס חיבור כולל
-- GET    /api/exercise/last/json       ← פתיחת JSON מלא של הדוח האחרון
+- GET    /api/exercise/diag/stream
+- GET    /api/exercise/diag          ← חדש (Snapshot בשביל הכפתור)
+- GET    /api/connection/status
+- GET    /api/exercise/last/json
 """
 
 from __future__ import annotations
@@ -136,7 +137,7 @@ def exercise_last():
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# 🔵 דיאגנוסטיקה חיה + סטטוס חיבור + JSON מלא
+# 🔵 דיאגנוסטיקה חיה + Snapshot + JSON מלא
 # ─────────────────────────────────────────────────────────────────────────────
 
 @bp_exercise.get("/diag/stream")
@@ -177,6 +178,25 @@ def api_exercise_diag_stream():
                 last_ping = time.time()
 
     return Response(stream_with_context(gen()), mimetype="text/event-stream")
+
+
+@bp_exercise.get("/diag")
+def api_exercise_diag_snapshot():
+    """Snapshot סינכרוני (כפתור 'Snapshot' ב־UI)"""
+    try:
+        from admin_web.state import get_payload as get_shared_payload
+        snap = get_shared_payload() or get_last_report() or {}
+        metrics = snap.get("metrics") or {}
+        keys = list(metrics.keys())[:40] if isinstance(metrics, dict) else []
+        return jsonify({
+            "ts": int(time.time()),
+            "view_mode": snap.get("view_mode"),
+            "meta": snap.get("meta", {}),
+            "metrics_keys": keys,
+            "has_report": bool(get_last_report()),
+        }), 200
+    except Exception as e:
+        return jsonify(ok=False, error=str(e)), 500
 
 
 @bp_exercise.get("/last/json")

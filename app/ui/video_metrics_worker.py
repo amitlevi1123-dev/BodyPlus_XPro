@@ -1,97 +1,80 @@
 # -*- coding: utf-8 -*-
 """
-app/ui/video_metrics_worker.py — מחבר את הווידאו למערכת המדידות (גרסה בטוחה)
--------------------------------------------------------------------------------
-שינויים חשובים:
-- לא דוחף payload חדש שדורס את הקיים.
-- מבצע merge עדין רק לשדות metrics (תחת prefix 'video.*').
-- לא שולח POST ולא קורא VideoStreamer.push_payload (מונע מריבות עם main).
-- מוגדר כבוי כברירת מחדל; מפעילים רק אם VIDEO_METRICS_WORKER=1.
+app/ui/video_metrics_worker.py — Metrics מהפריים האחרון (PIL בלבד)
+- משתמש ב-VideoStreamer.get_latest_jpeg()
+- מחשב brightness פשוט (ממוצע ערוץ L)
+- רץ רק אם VIDEO_METRICS_WORKER=1
 """
 
 from __future__ import annotations
 import os, threading, time, traceback
 from typing import Dict, Any, Optional
+from io import BytesIO
 
 try:
-    import cv2
-    import numpy as np
-    CV2_OK = True
+    from PIL import Image, ImageStat  # type: ignore
+    PIL_OK = True
 except Exception:
-    cv2 = None  # type: ignore
-    np = None   # type: ignore
-    CV2_OK = False
+    Image = None  # type: ignore
+    ImageStat = None  # type: ignore
+    PIL_OK = False
 
-# מקור הפריים (לא משתמשים ב-push_payload שלו)
 from app.ui.video import get_streamer
 
-# גישה ל-state המשותף כדי לבצע merge עדין
 try:
     from admin_web.state import get_payload as _get_shared, set_payload as _set_shared  # type: ignore
 except Exception:
     def _get_shared() -> Dict[str, Any]: return {}
     def _set_shared(_p: Dict[str, Any]) -> None: pass
 
-# הפעלה רק אם רוצים במפורש
 ENABLED = (os.getenv("VIDEO_METRICS_WORKER", "0") == "1")
 
 _WORKER_THREAD: Optional[threading.Thread] = None
 _WORKER_STOP = False
 
-
-def _analyze_frame(frame) -> Dict[str, Any]:
-    """מדידות בסיסיות בלבד, לא מחזיר מבנה payload — רק metrics."""
-    h = w = None
-    brightness = 0.0
+def _analyze_jpeg(jpeg: bytes) -> Dict[str, Any]:
+    if not (jpeg and PIL_OK):
+        return {}
     try:
-        if frame is not None and CV2_OK:
-            h, w = frame.shape[:2]
-            gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-            brightness = float(gray.mean())
+        with Image.open(BytesIO(jpeg)) as im:  # type: ignore
+            w, h = im.size
+            l = im.convert("L")
+            stat = ImageStat.Stat(l)  # type: ignore
+            brightness = float(stat.mean[0]) if stat and stat.mean else 0.0
+            return {
+                "video.width":  w,
+                "video.height": h,
+                "video.brightness": round(brightness, 2),
+            }
     except Exception:
-        pass
+        return {}
 
-    return {
-        "video.width":  w or 0,
-        "video.height": h or 0,
-        "video.brightness": round(brightness, 2),
-    }
-
-
-def _merge_metrics_only(extra_metrics: Dict[str, Any]) -> None:
-    """
-    מביא payload קיים מה־RAM (admin_web.state), ממזג רק metrics, ושומר.
-    לא נוגע ב-objdet/mp/detections/וכו'.
-    """
+def _merge_metrics_only(extra: Dict[str, Any]) -> None:
     base = _get_shared() or {}
     m = base.get("metrics")
     if not isinstance(m, dict):
         m = {}
-    # merge עדין:
-    for k, v in (extra_metrics or {}).items():
-        m[k] = v
+    m.update(extra or {})
     base["metrics"] = m
-    # חותמת זמן עדינה
     base.setdefault("ts", time.time())
     base.setdefault("payload_version", base.get("payload_version", "1.2.0"))
     _set_shared(base)
 
-
-def _loop(interval: float = 0.1):
+def _loop(interval: float = 0.25):
     s = get_streamer()
+    last_seen_id = None
     while not _WORKER_STOP:
         try:
-            ok, frame = s.read_frame()
-            if ok and frame is not None:
-                metrics = _analyze_frame(frame)
-                _merge_metrics_only(metrics)
+            jpeg = s.get_latest_jpeg()
+            if jpeg:
+                metrics = _analyze_jpeg(jpeg)
+                if metrics:
+                    _merge_metrics_only(metrics)
         except Exception:
             traceback.print_exc()
         time.sleep(interval)
 
-
 def start_video_metrics_worker() -> bool:
-    """מפעיל worker רק אם ENABLED=True, ורק פעם אחת."""
     global _WORKER_THREAD, _WORKER_STOP
     if not ENABLED:
         return False
@@ -103,9 +86,7 @@ def start_video_metrics_worker() -> bool:
     t.start()
     return True
 
-
 def stop_video_metrics_worker(timeout: float = 1.5) -> None:
-    """מפסיק את ה־worker ומחכה לסיום נקי."""
     global _WORKER_STOP, _WORKER_THREAD
     _WORKER_STOP = True
     t = _WORKER_THREAD
@@ -113,7 +94,5 @@ def stop_video_metrics_worker(timeout: float = 1.5) -> None:
         t.join(timeout=timeout)
     _WORKER_THREAD = None
 
-
 def is_video_metrics_worker_running() -> bool:
-    """בודק אם ה־worker פעיל כרגע."""
     return (_WORKER_THREAD is not None) and _WORKER_THREAD.is_alive()

@@ -1,18 +1,11 @@
 # -*- coding: utf-8 -*-
 """
-server.py — Admin UI + API (חיבור נקי למסד דרך db/persist)
------------------------------------------------------------
+server.py — Admin UI + API (Browser-only video ingest)
+------------------------------------------------------
 • Flask (דשבורד, וידאו, לוגים כ-Blueprint) — /video/stream.mjpg
-• /payload מעדיף admin_web.state; אחרת LAST_PAYLOAD המקומי
-• סטרים MJPEG דרך admin_web.routes_video
-• תרגילים: נרשמים דרך admin_web.routes_exercise (Blueprint)
-• Data API (אם קיים): /api/workouts, /api/workouts/<id>/sets, /api/sets/<id>/report
-
-חדש:
-- שימוש בשכבת Persist אחת: db/persist.py (אתחול בלבד מהשרת)
-- ראוטי לוגים (‎/api/logs*‎) ב־admin_web/routes_logs.py
-- ראוטי exercise* ב־admin_web/routes_exercise.py
-- בריאות/דיאגנוסטיקה (version/healthz/readyz/…): admin_web/routes_system.py
+• /payload ו-/api/payload_last
+• סטרים MJPEG דרך admin_web.routes_video (ingest מהדפדפן)
+• Upload-Video (FFmpeg) נשאר אופציונלי
 """
 
 from __future__ import annotations
@@ -26,53 +19,29 @@ from flask import (
 )
 from werkzeug.middleware.proxy_fix import ProxyFix
 
-# ========== CAMERA GUARD (serverless-safe) ==========
-# חייב להיות לפני כל import של מודולים שעלולים לפתוח מצלמה בזמן העלייה.
-if not os.path.exists("/dev/video0"):
-    os.environ.setdefault("NO_CAMERA", "1")
-
-try:
-    import cv2  # type: ignore
-    if os.getenv("NO_CAMERA") == "1":
-        class _DummyCap:
-            def __init__(self, *a, **k): pass
-            def isOpened(self): return False
-            def read(self): return False, None
-            def release(self): pass
-            def set(self, *a): return False
-            def get(self, *a): return 0
-        cv2.VideoCapture = _DummyCap  # type: ignore[attr-defined]
-        try:
-            cv2.setLogLevel(cv2.LOG_LEVEL_SILENT)  # type: ignore[attr-defined]
-        except Exception:
-            pass
-except Exception:
-    pass
-# ========== /CAMERA GUARD ==========
-
 # ===== Blueprints =====
-from admin_web.routes_video import video_bp  # חובה
+from admin_web.routes_video import video_bp  # ingest + stream
 
-# העלאת וידאו (אופציונלי)
+# Upload video (optional)
 try:
     from admin_web.routes_upload_video import upload_video_bp
 except Exception:
     upload_video_bp = None  # type: ignore
 
-# פעולות/סטייט (אופציונלי)
+# Actions / State (optional)
 try:
     from admin_web.routes_actions import actions_bp, state_bp
 except Exception:
     actions_bp = None  # type: ignore
     state_bp = None  # type: ignore
 
-# לוגים
+# Logs (optional)
 try:
     from admin_web.routes_logs import bp_logs
 except Exception:
     bp_logs = None  # type: ignore
 
-# Exercise API
+# Exercise API (optional)
 try:
     from admin_web.routes_exercise import bp_exercise
 except Exception:
@@ -84,13 +53,7 @@ try:
 except Exception:
     bp_system = None  # type: ignore
 
-# וורקר מדידות וידאו (אופציונלי)
-try:
-    from app.ui.video_metrics_worker import start_video_metrics_worker
-except Exception:
-    start_video_metrics_worker = None  # type: ignore
-
-# ===== Logging (imports) =====
+# ===== Logging =====
 try:
     from core.logs import setup_logging, logger
 except Exception:
@@ -278,11 +241,11 @@ def _ensure_detections_from_objdet(d: Dict[str, Any]) -> None:
                 if isinstance(bbox, dict):
                     x = bbox.get("x", bbox.get("x1")); y = bbox.get("y", bbox.get("y1"))
                     w = bbox.get("w"); h = bbox.get("h")
-                    if _finite(x) and _finite(y) and _finite(w) and _finite(h):
+                    if all(isinstance(v,(int,float)) for v in (x,y,w,h)):
                         bb = [float(x), float(y), float(x + w), float(y + h)]
                     else:
                         x1 = bbox.get("x1"); y1 = bbox.get("y1"); x2 = bbox.get("x2"); y2 = bbox.get("y2")
-                        if all(_finite(v) for v in (x1, y1, x2, y2)):
+                        if all(isinstance(v,(int,float)) for v in (x1,y1,x2,y2)):
                             bb = [float(x1), float(y1), float(x2), float(y2)]
                 elif isinstance(bbox, (list, tuple)) and len(bbox) >= 4:
                     x1, y1, a, b = [float(bbox[0]), float(bbox[1]), float(bbox[2]), float(bbox[3])]
@@ -292,7 +255,7 @@ def _ensure_detections_from_objdet(d: Dict[str, Any]) -> None:
             item: Dict[str, Any] = {}
             if isinstance(conf, (int, float)) and math.isfinite(float(conf)):
                 item["conf"] = float(conf)
-            if isinstance(bb, list) and len(bb) == 4 and all(_finite(v) for v in bb):
+            if isinstance(bb, list) and len(bb) == 4 and all(isinstance(v,(int,float)) for v in bb):
                 item["bbox"] = [float(v) for v in bb]
             if item:
                 dets.append(item)
@@ -308,10 +271,6 @@ def _server_side_schema_fixups(d: Dict[str, Any]) -> Dict[str, Any]:
 
 # ===== App factory =====
 def create_app() -> Flask:
-    # -------- פיצוח הבעיה: לפתוח את רמת ה־UI לפני setup_logging --------
-    os.environ.setdefault("LOG_UI_LEVEL", "INFO")          # לראות גם INFO בלשונית לוגים
-    os.environ.setdefault("LOG_SYS_TO_FILE_ONLY", "0")     # לא לחסום [SYS] נמוכים מה־UI
-
     try:
         setup_logging()
     except Exception:
@@ -350,43 +309,17 @@ def create_app() -> Flask:
         app.register_blueprint(state_bp)
         logger.info("[Server] Registered state_bp (/api/video/state)")
 
-    try:
-        from admin_web.routes_objdet import objdet_bp
-        app.register_blueprint(objdet_bp)
-        logger.info("[Server] Registered objdet_bp blueprint")
-    except Exception:
-        pass
-
-    # Data API (אם קיים)
-    try:
-        from admin_web.routes_data_api import bp_data
-        app.register_blueprint(bp_data)
-        logger.info("[Server] Registered data_api blueprint (/api)")
-    except Exception as e:
-        logger.info(f"[API] data_api not available ({e})")
-
-    # Logs API
     if bp_logs is not None:
         app.register_blueprint(bp_logs)
-        logger.info("[Server] Registered logs_bp blueprint (/api/logs*)")
+        logger.info("[Server] Registered logs_bp (/api/logs*)")
 
-    # Exercise API
     if bp_exercise is not None:
         app.register_blueprint(bp_exercise)
-        logger.info("[Server] Registered exercise_bp blueprint (/api/exercise*)")
+        logger.info("[Server] Registered exercise_bp (/api/exercise*)")
 
-    # System/health/diagnostics API
     if bp_system is not None:
         app.register_blueprint(bp_system)
-        logger.info("[Server] Registered system_bp blueprint (/version,/healthz,…)")
-
-    # וורקר מדידות וידאו (אם יש)
-    if callable(start_video_metrics_worker):
-        try:
-            start_video_metrics_worker()
-            logger.info("[VideoWorker] video_metrics_worker started")
-        except Exception as e:
-            logger.warning(f"[VideoWorker] failed to start: {e}")
+        logger.info("[Server] Registered system_bp (/version,/healthz,…)")
 
     # אתחול Persist (DB) — no-op אם לא זמין
     try:
@@ -395,7 +328,7 @@ def create_app() -> Flask:
     except Exception as _e:
         logger.warning(f"DB persist init failed: {_e}")
 
-    logger.info("=== Admin UI (Flask – Single server) ===")
+    logger.info("=== Admin UI (Flask – Browser ingest) ===")
     logger.info(f"APP_VERSION={APP_VERSION}  DEFAULT_BACKEND={DEFAULT_BACKEND or '(none)'}")
 
     # ----- Global headers / CORS / cache bust -----
@@ -407,10 +340,11 @@ def create_app() -> Flask:
         resp.headers["X-Accel-Buffering"] = "no"
         resp.headers["Access-Control-Allow-Origin"] = "*"
         resp.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
-        resp.headers["Access-Control-Allow-Headers"] = "Content-Type"
+        # חשוב: לאפשר גם X-Ingest-Token מהדפדפן
+        resp.headers["Access-Control-Allow-Headers"] = "Content-Type, X-Ingest-Token"
         return resp
 
-    # ----- Jinja helpers (FIX: has_endpoint/url_for_safe) -----
+    # ----- Jinja helpers -----
     @app.context_processor
     def _inject():
         def has_endpoint(name: str) -> bool:
@@ -423,11 +357,6 @@ def create_app() -> Flask:
             "url_for_safe": url_for_safe,
             "app_version": APP_VERSION,
         }
-
-    # בנוסף, כגיבוי:
-    app.jinja_env.globals.setdefault("has_endpoint", lambda name: name in app.view_functions)
-    app.jinja_env.globals.setdefault("url_for_safe",
-                                     lambda name, **kw: url_for(name, **kw) if name in app.view_functions else "#")
 
     # ----- Static/SPAs -----
     def _serve_gz_or_plain(path_no_gz: Path, default_mime: str) -> Response:
@@ -502,19 +431,8 @@ def create_app() -> Flask:
 
     @app.route("/exercise", endpoint="exercise_page", methods=["GET"])
     def exercise_page():
-        try:
-            return render_template("exercise.html", active_page="exercise_page",
-                                   page_title="זיהוי תרגיל", app_version=APP_VERSION)
-        except Exception as e:
-            logger.warning(f"/exercise fallback (template missing?): {e}")
-            html = """
-            <!doctype html><meta charset='utf-8'>
-            <title>Exercise (fallback)</title>
-            <style>body{font-family:system-ui,Segoe UI,Arial;margin:2rem}code{background:#f3f3f3;padding:.2rem .4rem}</style>
-            <h1>Exercise – Fallback</h1>
-            <p>תבנית <code>templates/exercise.html</code> לא נמצאה/קרסה. אפשר להמשיך לעבוד בדפים אחרים.</p>
-            """
-            return Response(html, mimetype="text/html")
+        return render_template("exercise.html", active_page="exercise_page",
+                               page_title="זיהוי תרגיל", app_version=APP_VERSION)
 
     @app.route("/system", methods=["GET"])
     def system_page():
@@ -534,7 +452,7 @@ def create_app() -> Flask:
         def legacy_images(filename: str):
             return send_from_directory(str(LEGACY_IMAGES), filename)
 
-    # ----- Payload -----
+    # ----- Payload APIs -----
     @app.route("/payload", methods=["GET"])
     def payload_route():
         try:
@@ -562,7 +480,23 @@ def create_app() -> Flask:
                             "objdet": _get_empty_objdet_payload(),
                             "payload_version": PAYLOAD_VERSION}), 500
 
-    # ----- OD ingest -----
+    # חדש: תואם ל-JS שלך
+    @app.route("/api/payload_last", methods=["GET"])
+    def api_payload_last():
+        try:
+            shared = get_shared_payload()
+            out = dict(shared) if isinstance(shared, dict) else {}
+            if not out:
+                with LAST_PAYLOAD_LOCK:
+                    out = dict(LAST_PAYLOAD) if isinstance(LAST_PAYLOAD, dict) else {}
+            if not out:
+                return jsonify({"ok": False, "error": "no_payload"}), 200
+            out.setdefault("payload_version", PAYLOAD_VERSION)
+            return jsonify(out), 200
+        except Exception as e:
+            return jsonify({"ok": False, "error": str(e)}), 500
+
+    # ----- OD ingest (כמו אצלך) -----
     REQUIRED_KEYS = ("detections",)
     MAX_DETS = int(os.getenv("MAX_DETECTIONS", "500"))
 
@@ -639,7 +573,7 @@ def create_app() -> Flask:
 
         return jsonify(ok=True, stored=True, ts=time.time()), 200
 
-    # ----- Metrics / Diagnostics (metrics בלבד נשאר כאן) -----
+    # ----- Metrics -----
     @app.route("/api/metrics", methods=["GET"])
     def api_metrics():
         try:
@@ -693,5 +627,4 @@ if __name__ == "__main__":
     port = int(os.getenv("PORT", "5000"))
     app = create_app()
     logger.info("Server ready. /payload ו-/video זמינים. /capture לפתיחת מצלמה לשידור ingest.")
-    logger.info("DB persist layer: %s", "ON" if DB_PERSIST_AVAILABLE else "OFF")
     app.run(host="0.0.0.0", port=port, debug=False, use_reloader=False, threaded=True)

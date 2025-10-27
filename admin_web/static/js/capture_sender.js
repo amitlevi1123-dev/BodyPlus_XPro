@@ -1,4 +1,4 @@
-/* static/js/capture_sender.js — Capture מהדפדפן → /api/ingest_frame (ללא תצוגת סטרים נוספת) */
+/* static/js/capture_sender.js — Capture מהדפדפן → /api/ingest_frame */
 (function () {
   'use strict';
 
@@ -24,7 +24,6 @@
   const bStart = $('cap-start');
   const bStop  = $('cap-stop');
 
-  // אם אין בלוק Capture בדף — לא עושים כלום
   if (!vEl || !cEl || !bStart || !bStop) return;
 
   let stream = null;
@@ -43,9 +42,8 @@
     const fps=txTimes.length>=2? (txTimes.length-1)/((txTimes[txTimes.length-1]-txTimes[0])/1000) : 0;
     if (txEl) txEl.textContent = fps.toFixed(1);
   }
-
   function applyPreviewVisibility(){
-    const wrap = vEl.parentElement; // ה- DIV השחור
+    const wrap = vEl?.parentElement;
     if (!wrap || !chkPreview) return;
     wrap.style.display = chkPreview.checked ? '' : 'none';
   }
@@ -84,7 +82,7 @@
   }
 
   function draw(){
-    const ctx = cEl.getContext('2d');
+    const ctx = cEl.getContext('2d', { willReadFrequently:true });
     const vw = vEl.videoWidth || cEl.width;
     const vh = vEl.videoHeight || cEl.height;
     cEl.width = vw; cEl.height = vh;
@@ -92,6 +90,25 @@
     if (chkMir && chkMir.checked){ ctx.scale(-1,1); ctx.drawImage(vEl,-vw,0,vw,vh); }
     else { ctx.drawImage(vEl,0,0,vw,vh); }
     ctx.restore();
+  }
+
+  async function setActiveSource(name){
+    try{
+      await fetch('/api/source/set', {
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ source: name })
+      });
+    }catch(_){}
+  }
+
+  async function pingStatus(){
+    try{
+      const r = await fetch('/api/video/status', { cache:'no-store' });
+      if (!r.ok) return;
+      const j = await r.json();
+      if (j?.frame?.age_ms != null && latEl) latEl.textContent = j.frame.age_ms;
+    }catch(_){}
   }
 
   async function loop(){
@@ -138,21 +155,27 @@
       await openCam();
       sending = true; sentCount=0; txTimes=[];
       bStart.disabled = true; bStop.disabled = false;
+      await setActiveSource('capture');
       await loop();
-    } catch(_){
+    } catch(e){
+      setErr(e?.message || String(e));
       sending=false; bStart.disabled=false; bStop.disabled=true;
     }
   }
   function stop(){
     sending = false;
     bStop.disabled = true; bStart.disabled = false;
-    if (stream){ try{ stream.getTracks().forEach(t=>t.stop()); }catch(_){ } stream=null; }
+    try{
+      setActiveSource('none');
+      if (stream){ stream.getTracks().forEach(t=>t.stop()); }
+    }catch(_){}
+    stream=null;
   }
 
   bStart.addEventListener('click', start);
   bStop .addEventListener('click', stop);
-  selRes.addEventListener('change', async ()=>{ if (sending) await openCam(); });
-  selCam.addEventListener('change', async ()=>{ if (sending) await openCam(); });
+  selRes && selRes.addEventListener('change', async ()=>{ if (sending) await openCam(); });
+  selCam && selCam.addEventListener('change', async ()=>{ if (sending) await openCam(); });
   if (chkPreview) chkPreview.addEventListener('change', applyPreviewVisibility);
 
   (async ()=>{
@@ -162,5 +185,6 @@
     applyPreviewVisibility();
   })();
 
-  window.addEventListener('beforeunload', ()=>{ sending=false; if(stream){ try{ stream.getTracks().forEach(t=>t.stop()); }catch(_){ } } });
+  window.addEventListener('beforeunload', ()=>{ sending=false; try{ if(stream){ stream.getTracks().forEach(t=>t.stop()); } }catch(_){ } });
+  setInterval(pingStatus, 1500);
 })();

@@ -1,234 +1,209 @@
 # -*- coding: utf-8 -*-
 # ===================================================================
-# <family>.base.yaml — תבנית בסיס גנרית למשפחה חדשה (עם הסברים)
+# <family>.base.yaml — בסיס גנרי לכל המשפחות (Lower/Upper/Core)
 # ===================================================================
-# איך זה משתלב בזרימה?
-# Camera → Pose/ObjDet → Normalizer+Aliases → Canonical Payload → Classifier
-#                                         \→ (קבצי YAML: משפחה+ווריאנטים)
-#
-# • קובץ "בסיס" למשפחה: לא נבחר באימון (selectable:false). הווריאנטים יורשים.
-# • כל המפתחות כאן הם קנוניים לפי aliases.yaml — אל תשנה שמות, רק הוסף/הסר קריטריונים.
-# • grading באותיות לא בשימוש. יש ציון מספרי + תקרות בטיחות (caps) בלבד.
-# • policy.missing=skip מבטיח שקריטריונים שאינם רלוונטיים פשוט ידולגו.
-#
-# זיהוי תרגיל (בגדול):
-# 1) המסווג מסיק ציוד מה־payload (objdet.*_present) או עפ״י fallback תנוחתי.
-# 2) מסנן מהספרייה רק תרגילים עם meta.equipment תואם.
-# 3) מנקד כל מועמד לפי match_hints שלו (must_have / must_not_have / any_of / ranges / pose_view).
-# 4) מחליט בצורה יציבה (hysteresis/freeze).
-#
-# איפה מגדירים את תנאי הזיהוי?
-# • כאן (בבסיס) רק המינימום. את הכללים הספציפיים (must_have/must_not/equipment/pose_view)
-#   רושמים בווריאנטים (למשל: bodyweight/dumbbell/barbell). הבסיס נשאר גנרי.
+# זרימה: Camera → Pose/ObjDet → Normalizer+Aliases → Canonical Payload
+#                                 └→ Classifier (משפחה+ווריאנטים)
+# עקרונות:
+# • קובץ בסיס: selectable:false — לא נבחר ישירות; הווריאנטים יורשים.
+# • מדדים קנוניים בלבד (ראה aliases.yaml).
+# • אין Grade באותיות — רק ציון מספרי עם תקרות בטיחות (safety caps).
+# • policy.missing=skip → קריטריון שאינו רלוונטי/חסר לא מפיל את כל הציון.
+# • “hooks” למדיניות ייחודית למשפחה/וריאנט (top/lockout, rom_policy וכו’).
 # ===================================================================
 
-# מזהה בסיס + שם משפחה
-id: <family>.base                 # דוגמה: squat.base / hinge.base / push.base
-family: <family>                  # דוגמה: squat
+id: <family>.base               # דוגמה: squat.base / hinge.base / push.base
+family: <family>                # דוגמה: squat / hinge / push / pull / lunge / core
 
 meta:
-  selectable: false               # קובץ בסיס: לא ניתן לבחירה ישירה
-  display_name: "<Family> (Base)" # שם תצוגה כללי; הווריאנטים יחליפו
+  selectable: false
+  display_name: "<Family> (Base)"
+  notes: >
+    בסיס גנרי לכל המשפחות. הווריאנטים יגדירו ציוד (equipment), זווית צפייה
+    ו”מדיניות טופ“ (נעילה/מתח), וידרשו את מדדי ה-ROM הרלוונטיים (ברך/ירך/מרפק/כתף).
 
-# -------------------------------------------------------------------
-# 🧠 קריטריונים (מה מודדים) — גנרי לכל המשפחות
-# -------------------------------------------------------------------
-# טיפ: אם למשפחה אין מדד מסוים (למשל toe_angle בפוש-אפ), לא נורא — המנוע ידלג (missing: skip).
+# ------------------------------------------------------------
+# 🗣️ מרחב מסרים (כדי למנוע התנגשויות בין משפחות/ווריאנטים)
+# ------------------------------------------------------------
+phrases:
+  namespace: "<family>.common"
+
+# ------------------------------------------------------------
+# 🎯 יעדי ROM ברירת מחדל (ניתן לדרוס בווריאנטים)
+# ------------------------------------------------------------
+targets:
+  lower:
+    from_floor:    { hip_deg: 60, torso_deg: 35 }   # hinge/דדליפט
+    from_standing: { hip_deg: 48, torso_deg: 30 }   # RDL/SLDL
+    squat_knee:    { knee_deg_target: 90 }          # עומק סקוואט טיפוסי
+  upper:
+    press:  { elbow_rom_deg: 70, shoulder_rom_deg: 45 }
+    pull:   { elbow_rom_deg: 70, shoulder_rom_deg: 45 }
+
+# ------------------------------------------------------------
+# 🧪 קריטריונים גנריים — המנוע ידלג אוטומטית על לא-רלוונטיים
+# ------------------------------------------------------------
 criteria:
-  # בטיחות עמוד-שדרה/גו
-  spine_rounding: { requires: [spine_flexion_deg] }              # כיפוף/עגילת גב (סגיטלי)
-  lateral_bend:   { requires: [spine_curvature_side_deg] }       # עיקום צדדי (פרונטלי)
-  posture:        { requires: [torso_forward_deg] }              # הטיית גו מול אנכי
-  head_spine:     { requires: [head_pitch_deg, torso_forward_deg] }  # ראש בקו הגו
+  # בטיחות עמוד־שדרה/גו (כל המשפחות)
+  spine_rounding:     { requires: [spine_flexion_deg] }
+  lateral_bend:       { requires: [spine_curvature_side_deg] }
+  head_spine:         { requires: [head_pitch_deg, torso_forward_deg] }
+  posture:            { requires: [torso_forward_deg] }
 
-  # ברכיים/כפות-רגליים (רלוונטי ל-Lower; ידולג ב-Upper)
-  knee_valgus:    { requires: [knee_foot_alignment_left_deg, knee_foot_alignment_right_deg] }
-  stance_width:   { requires: [features.stance_width_ratio] }
-  toe_angle:      { requires: [toe_angle_left_deg, toe_angle_right_deg] }
-  heel_contact:   { requires: [heel_lift_left, heel_lift_right] }
-  foot_contact:   { requires: [foot_contact_left, foot_contact_right] }
+  # יישור וגיאומטריית גפיים תחתונות (Lower; יתעלם ב-Upper/Core)
+  knee_valgus:        { requires: [knee_foot_alignment_left_deg, knee_foot_alignment_right_deg] }
+  stance_width:       { requires: [features.stance_width_ratio] }
+  toe_angle:          { requires: [toe_angle_left_deg, toe_angle_right_deg] }
+  heel_contact:       { requires: [heel_lift_left, heel_lift_right] }
+  foot_contact:       { requires: [foot_contact_left, foot_contact_right] }
 
-  # עומק/ROM (התאמה בווריאנטים: ברך/ירך/מרפק)
-  depth:          { requires: [knee_left_deg, knee_right_deg] }  # ברירת-מחדל ל-Lower
+  # ROM — שני מסלולים גנריים ל-Lower, ושניים ל-Upper
+  depth_knee:         { requires: [knee_left_deg, knee_right_deg] }           # squat/lunge
+  rom_joint_lower:    { requires: [hip_left_deg, hip_right_deg, torso_forward_deg] }  # hinge
+  rom_joint_upper:    { requires: [elbow_left_deg, elbow_right_deg, shoulder_right_deg, shoulder_left_deg] } # push/pull
 
-  # טמפו/קצב
-  tempo:          { requires: [rep.timing_s] }
+  # טמפו/פאזות (כולם)
+  tempo:              { requires: [rep.timing_s] }
+  phase_control:      { requires: [rep.ecc_s, rep.con_s, rep.pause_bottom_s, rep.pause_top_s] }
+  turn_quality:       { requires: [rep.dir, rep.state, rep.phase] }
 
-# -------------------------------------------------------------------
-# ⚠️ קריטיים — אם חסר אחד מהם, לא ניתן לנקד (Unscored)
-# -------------------------------------------------------------------
-# אפשר להתאים בווריאנטים: למשל ב-Upper להפוך depth לקריטי עם מרפק/כתף.
-critical: [posture, depth]
+  # Hooks למדיניות ייחודית (יורחבו בווריאנטים)
+  top_quality_hook:   { requires: [rep.pause_top_s, spine_flexion_deg, torso_forward_deg] }
+  grip_width_hook:    { requires: [shoulders_width_px] }   # לשימוש עתידי ב-barbell/neutral
 
-# -------------------------------------------------------------------
-# ⚖️ SCORING — מדיניות + כללי ניקוד לכל קריטריון
-# -------------------------------------------------------------------
+# ------------------------------------------------------------
+# ⚠️ קריטיים — תנאי סף לניקוד חזרה (הווריאנט יוכל לדרוס)
+# ------------------------------------------------------------
+critical:
+  # ברירת מחדל ניטרלית:
+  - posture
+  # אחד ממדדי ROM חייב להיות זמין (המערכת בוחרת אוטומטית לפי המשפחה/וריאנט):
+  - any_of: [depth_knee, rom_joint_lower, rom_joint_upper]
+
+# ------------------------------------------------------------
+# ⚖️ SCORING — כללי ניקוד + תקרות בטיחות
+# ------------------------------------------------------------
 scoring:
-
-  # מדיניות כללית
   policy:
-    missing: skip                    # קריטריון חסר שאינו קריטי → מדלגים עליו בשקלול
-    min_criteria_for_full_quality: 3 # <3 קריטריונים זמינים → נרשמת איכות חלקית (לוג/דוח)
+    missing: skip
+    min_criteria_for_full_quality: 3
 
-  # שופטים לפי קריטריונים
   criteria:
 
-    # --- בטיחות (משקל גבוה) ---
+    # --- בטיחות (גבוה) ---
     spine_rounding:
       weight: 1.6
-      rule:
-        kind: symmetric_threshold
-        input: spine_flexion_deg     # כיפוף/עגילה: קטן=טוב
-        ok:   10                     # ≤10° → טוב
-        warn: 20                     # 10–20° → בינוני
-        bad:  30                     # ≥30° → גרוע (0)
+      rule: { kind: symmetric_threshold, input: spine_flexion_deg, ok: 10, warn: 20, bad: 30 }
 
     lateral_bend:
       weight: 1.2
-      rule:
-        kind: symmetric_threshold
-        input: spine_curvature_side_deg
-        ok:   5
-        warn: 10
-        bad:  20
-
-    knee_valgus:
-      weight: 1.4
-      rule:
-        kind: symmetric_threshold
-        input: max(abs(knee_foot_alignment_left_deg), abs(knee_foot_alignment_right_deg))
-        ok:   5                      # |סטייה| ≤5° → טוב
-        warn: 10
-        bad:  20
-
-    heel_contact:
-      weight: 0.8
-      rule:
-        kind: boolean_flag           # דגל בוליאני: true→ענישה קלה, false→טוב
-        input: (heel_lift_left or heel_lift_right)
-        good_when: false             # אנחנו רוצים שהדגל לא ידלוק (אין הרמת עקב)
-        penalty: 0.30                # הורדת ציון הקריטריון כשהדגל true
-
-    foot_contact:
-      weight: 0.6
-      rule:
-        kind: boolean_flag
-        input: not (foot_contact_left and foot_contact_right)
-        good_when: false             # טוב כשיש מגע מלא (ולכן הביטוי צריך להיות false)
-        penalty: 0.25
-
-    # --- טכניקה/ביצוע ---
-    posture:
-      weight: 1.0
-      rule:
-        kind: linear_band
-        input: torso_forward_deg
-        good_max: 15                 # ≤15° → 1.0
-        ok_max:   25                 # 15–25° → שלב ביניים
-        bad_max:  45                 # ≥45° → 0.0
+      rule: { kind: symmetric_threshold, input: spine_curvature_side_deg, ok: 5, warn: 10, bad: 20 }
 
     head_spine:
       weight: 0.8
-      rule:
-        kind: symmetric_threshold
-        input: abs(head_pitch_deg - torso_forward_deg)  # ראש בקו עם הגו
-        ok:   10
-        warn: 20
-        bad:  30
+      rule: { kind: symmetric_threshold, input: "abs(head_pitch_deg - torso_forward_deg)", ok: 10, warn: 20, bad: 30 }
 
-    depth:
-      weight: 1.2
-      rule:
-        kind: threshold_window
-        input: min(knee_left_deg, knee_right_deg)
-        # נמוך=עמוק=טוב עד 90° (ציון מלא); מעבר ל-90° לא מוסיף עוד ניקוד:
-        target_max:  90
-        cutoff_max: 150              # ≥150° → 0
-        direction: lower_is_better
-
-    tempo:
-      weight: 0.6
-      rule:
-        kind: tempo_window
-        input: rep.timing_s
-        min: 0.7
-        max: 2.5
-        cutoff_min: 0.4
-        cutoff_max: 4.0
+    # --- תבנית תחתון (ידולג ב-Upper/Core) ---
+    knee_valgus:
+      weight: 1.4
+      rule: { kind: symmetric_threshold, input: "max(abs(knee_foot_alignment_left_deg),abs(knee_foot_alignment_right_deg))", ok: 5, warn: 10, bad: 20 }
 
     stance_width:
       weight: 0.5
-      rule:
-        kind: band_center
-        input: features.stance_width_ratio
-        min_ok: 0.90
-        max_ok: 1.20
-        cutoff_min: 0.70
-        cutoff_max: 1.50
+      rule: { kind: band_center, input: features.stance_width_ratio, min_ok: 0.90, max_ok: 1.20, cutoff_min: 0.70, cutoff_max: 1.50 }
 
     toe_angle:
       weight: 0.4
-      rule:
-        kind: symmetric_band_pair
-        input: (toe_angle_left_deg, toe_angle_right_deg)
-        pair_ok_min: 5               # 5–20° לכל רגל → "פישון מתון" רצוי
-        pair_ok_max: 20
-        asymmetry_max: 10            # עד 10° הבדל בין הצדדים נסבל
-        cutoff_total_max: 40
+      rule: { kind: symmetric_band_pair, input: "(toe_angle_left_deg,toe_angle_right_deg)", pair_ok_min: 5, pair_ok_max: 20, asymmetry_max: 10, cutoff_total_max: 40 }
 
-  # שקלול לציון סופי (ממוצע משוקלל של הקריטריונים הזמינים)
+    heel_contact:
+      weight: 0.8
+      rule: { kind: boolean_flag, input: "(heel_lift_left or heel_lift_right)", good_when: false, penalty: 0.30 }
+
+    foot_contact:
+      weight: 0.6
+      rule: { kind: boolean_flag, input: "not (foot_contact_left and foot_contact_right)", good_when: false, penalty: 0.25 }
+
+    # --- ROM Lower ---
+    depth_knee:
+      weight: 1.2
+      rule: { kind: threshold_window, input: "min(knee_left_deg,knee_right_deg)", target_max: 90, cutoff_max: 150, direction: lower_is_better }
+
+    rom_joint_lower:
+      weight: 1.5
+      rule: { kind: dual_angle_rom, hip: "(hip_left_deg,hip_right_deg)", torso: torso_forward_deg, target_hip_deg: 60, target_torso_deg: 35 }
+
+    # --- ROM Upper ---
+    rom_joint_upper:
+      weight: 1.4
+      rule: { kind: paired_rom, elbow_ok: 70, shoulder_ok: 45 }  # דוגמתי; הווריאנטים יעדכנו
+
+    # --- טמפו ופאזות (כולם) ---
+    tempo:
+      weight: 0.6
+      rule: { kind: tempo_window, input: rep.timing_s, min: 0.7, max: 2.5, cutoff_min: 0.4, cutoff_max: 4.0 }
+
+    phase_control:
+      weight: 1.0
+      rule: { kind: phase_balance, ecc_min: 0.3, con_min: 0.2 }
+
+    turn_quality:
+      weight: 0.5
+      rule: { kind: jerk_guard, allow_bounce: false }
+
+    # --- Hooks (ימופו בווריאנטים) ---
+    top_quality_hook:
+      weight: 1.0
+      rule: { kind: passthrough }
+
+    grip_width_hook:
+      weight: 0.4
+      rule: { kind: passthrough }  # ימומש כשיתווסף מדד רוחב אחיזה אמיתי
+
   aggregate:
     method: weighted_mean
     weights_source: inline
 
-  # תקרות בטיחות (מגבילות ציון סופי כשבטיחות נמוכה — לא מוחקות הישגים אחרים)
   safety_caps:
-    - when: "spine_rounding <= 0.6" # גב מעוגל בצורה מורגשת
-      cap: 0.85
-    - when: "knee_valgus   <= 0.6"  # קריסת ברכיים מורגשת
-      cap: 0.90
-    - when: "heel_contact  <= 0.5"  # עקבים עולים לעיתים תכופות
-      cap: 0.90
+    - { when: "spine_rounding <= 0.6", cap: 0.85 }
+    - { when: "knee_valgus   <= 0.6", cap: 0.90 }
+    - { when: "heel_contact  <= 0.5", cap: 0.90 }
+    - { when: "head_spine    <= 0.5", cap: 0.90 }
 
-# -------------------------------------------------------------------
-# 🧭 רמזים למסווג — בסיס בלבד (ווריאנטים ירחיבו)
-# -------------------------------------------------------------------
+# ------------------------------------------------------------
+# 🧭 רמזים למסווג — בסיס דק; הווריאנטים ירחיבו
+# ------------------------------------------------------------
 match_hints:
   must_have: [pose.available]
-  # בווריאנטים (exercise YAML) תגדיר:
-  #   meta.equipment: "none" | "dumbbell" | "barbell" | "kettlebell"
-  #   must_have:     [objdet.<equip>_present] כשיש ציוד
-  #   must_not_have: [objdet.<other>_present] לפסילה מהירה
-  #   pose_view:     ["front","front_left","front_right"] (או זווית אחרת)
-  #   any_of:        [<signals...>] אם יש דגלים חלופיים שמספיק אחד מהם
-  #   ranges:        { key: [lo,hi], ... } לאפיונים קינמטיים דקים
-  #   weight:        1.0 (חיזוק/החלשה של מועמד בתוך אותה חבורה)
 
-# -------------------------------------------------------------------
-# 🔁 איתות חזרות — ברירת מחדל (ניתן להחליף בווריאנט)
-# -------------------------------------------------------------------
+# ------------------------------------------------------------
+# 🔁 אות חזרה (Rep Signal) — angle-first עם Auto-Pick
+# ------------------------------------------------------------
 rep_signal:
-  source: "value|min|wrist_left_y_px,wrist_right_y_px"  # עוגני ידיים נוחים לספירה
+  # מקור ברירת מחדל: זוויות; הווריאנט יכול לדרוס (למשל bar_y_px/hand_y אם מועיל)
+  source: "angle|auto|min"
+  # auto: עבור Lower → hip/knee; עבור Upper → elbow/shoulder; Core → torso
+  candidates:
+    lower:  ["hip_left_deg","hip_right_deg","knee_left_deg","knee_right_deg","torso_forward_deg"]
+    upper:  ["elbow_left_deg","elbow_right_deg","shoulder_left_deg","shoulder_right_deg"]
+    core:   ["torso_forward_deg","spine_flexion_deg"]
   thresholds:
-    min_rom_good: 30            # מינימום ROM כדי להיחשב חזרה
-    min_rep_ms: 400             # קצר מדי → פסילה
-    max_rep_ms: 6000            # ארוך מדי → פסילה
+    phase_delta: 5         # שינוי מינ’ כדי להתחיל פאזה
+    min_turn_ms: 100       # השהיה מינ’ כדי לאשר turn
+    min_rep_ms: 500
+    max_rep_ms: 6000
+    min_rom_good: 25       # דרישת ROM מינימלית ל-good
+    min_rom_partial: 18    # מתחת ל-good אך נספר partial
 
-# -------------------------------------------------------------------
-# ❌ אין grade_bands — לא משתמשים ב-A/B/C
-# -------------------------------------------------------------------
+# ------------------------------------------------------------
+# 🔄 מקורות גיבוי לפאזות/ספירה אם אין זוויות יציבות
+# ------------------------------------------------------------
+fallback_sources:
+  any_of: ["object_y","hands_center_y","hip_y_px"]
 
-# ===================================================================
-# 📌 הסבר קצר על זיהוי תרגיל (מה קורה בזמן ריצה) — לעיון מהיר
-# ===================================================================
-# • ה-Normalizer+Aliases מחזיר payload קנוני (מפתחות כמו: pose.available, knee_left_deg, objdet.dumbbell_present).
-# • המסווג:
-#   1) מסיק ציוד: אם objdet.bar_present → "barbell"; אם objdet.dumbbell_present → "dumbbell"; אחרת "none"
-#      (ויש גם fallback תנוחתי למוט אם הוגדר בהגדרות המנוע).
-#   2) מסנן ספרייה: נשארים רק תרגילים עם meta.equipment תואם (selectable:true).
-#   3) מנקד כל מועמד: must_have/not/any_of/ranges/pose_view → ציון 0..1 (עם weight).
-#   4) מחליט יציב עם hysteresis/freeze: מרווחים לשמירת תרגיל קודם/החלפה ודאית.
-#
-# • איפה כותבים את "מי זה התרגיל הזה"? — בקובץ הווריאנט:
-#   meta.equipment + match_hints (כולל must_not_have/pose_view/ranges).
-#   הבסיס כאן נשאר כללי ומדגיש את כללי הציון/בטיחות.
+# ------------------------------------------------------------
+# 📌 הערות מימוש
+# • הווריאנט קובע: equipment, pose_view, start_mode, rom_policy, top_policy.
+# • כל כלל כאן ניתן לדריסה בווריאנט (targets/weights/rules/thresholds).
+# • שמור את ה-phrases בשם namespace ייחודי לווריאנט: <family>.<variant>.*
+# ------------------------------------------------------------

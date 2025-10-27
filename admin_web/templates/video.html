@@ -19,11 +19,12 @@
 {% block content %}
 <div class="max-w-7xl mx-auto space-y-6" dir="rtl">
 
-  <!-- A) סטרים MJPEG + בקרות איכות/תצוגה -->
+  <!-- A) סטרים MJPEG (מקור יחיד לכל המערכת) -->
   <section class="card">
     <div class="card-h flex items-center justify-between">
       <div class="font-semibold">זרם וידאו מהשרת (MJPEG)</div>
-      <div class="text-sm text-gray-500 flex items-center gap-2">
+      <div class="text-sm text-gray-500 flex items-center gap-3">
+        <span>מקור: <b data-id="v-source">—</b></span>
         <span id="vs-dot" class="status-dot" title="חיבור"></span>
         <span id="vs-txt">—</span>
       </div>
@@ -32,18 +33,6 @@
     <div class="card-b space-y-3">
       <!-- פס בקרות לסטרים -->
       <div class="flex flex-wrap items-end gap-3 text-sm">
-        <div class="flex flex-col">
-          <label class="text-gray-600 mb-1">מקור סטרים</label>
-          <div class="flex items-center gap-2">
-            <button type="button" class="px-3 py-2 rounded-lg bg-gray-100 hover:bg-gray-200"
-                    onclick="window.useCameraStream && window.useCameraStream()">מצלמה</button>
-            <button type="button" class="px-3 py-2 rounded-lg bg-gray-100 hover:bg-gray-200"
-                    onclick="window.useFileStream && window.useFileStream()">קובץ</button>
-            <button type="button" class="px-3 py-2 rounded-lg bg-gray-50 hover:bg-gray-100"
-                    onclick="window.stopFileStream && window.stopFileStream()">עצור קובץ</button>
-          </div>
-        </div>
-
         <div class="flex flex-col">
           <label class="text-gray-600 mb-1">HUD בסטרים</label>
           <label class="inline-flex items-center gap-2">
@@ -61,19 +50,6 @@
           </select>
         </div>
 
-        <!-- בקרה איכות/קצב לסטרים קובץ (דרך API צד שרת) -->
-        <div class="flex flex-col">
-          <label class="text-gray-600 mb-1">FPS (קובץ)</label>
-          <input id="vs-file-fps" type="number" min="1" max="60" value="25" class="form w-28">
-        </div>
-        <div class="flex flex-col">
-          <label class="text-gray-600 mb-1">JPEG Q (קובץ, 2–31)</label>
-          <input id="vs-file-q" type="number" min="2" max="31" value="8" class="form w-28">
-        </div>
-        <button id="vs-apply-file" class="px-3 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700">
-          החל על סטרים קובץ
-        </button>
-
         <a class="ml-auto px-3 py-2 rounded-lg bg-gray-50 hover:bg-gray-100 text-sm"
            href="/video/stream.mjpg?hud=1" target="_blank" rel="noopener">פתח סטרים ↗</a>
       </div>
@@ -85,7 +61,7 @@
           אין זרם פעיל
         </div>
       </div>
-      <div class="text-xs text-gray-500">טיפ: אם HUD מסומן – ה-URL יעודכן עם <code>?hud=1</code>.</div>
+      <div class="text-xs text-gray-500">טיפ: אם HUD מסומן – ה-URL יתעדכן עם <code>?hud=1</code>.</div>
     </div>
   </section>
 
@@ -125,7 +101,6 @@
           <button id="cap-stop"  class="px-4 py-2 rounded-lg bg-gray-200 text-gray-700 hover:bg-gray-300 text-sm" disabled>עצור</button>
         </div>
 
-        <!-- חדש: הצגת/הסתרת פריוויו Capture -->
         <label class="flex items-center gap-2">
           <input id="cap-show-preview" type="checkbox" class="scale-110" checked>
           הצג פריוויו Capture
@@ -162,13 +137,10 @@
       <h4 class="font-semibold mb-3">סטטוס וידאו</h4>
       <dl class="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
         <dt class="text-gray-500">מצב:</dt><dd data-id="v-state" class="font-medium">—</dd>
-        <dt class="text-gray-500">פתוח:</dt><dd data-id="v-opened">—</dd>
         <dt class="text-gray-500">רץ:</dt><dd data-id="v-running">—</dd>
         <dt class="text-gray-500">FPS:</dt><dd data-id="v-fps">—</dd>
         <dt class="text-gray-500">גודל פריים:</dt><dd data-id="v-size">—</dd>
-        <dt class="text-gray-500">מקור:</dt><dd data-id="v-source">—</dd>
-        <dt class="text-gray-500">תאורה:</dt><dd data-id="v-light">—</dd>
-        <dt class="text-gray-500">Preview פתוח:</dt><dd data-id="v-preview">—</dd>
+        <dt class="text-gray-500">age(ms):</dt><dd data-id="v-age">—</dd>
         <dt class="text-gray-500">שגיאה:</dt><dd data-id="v-error" class="text-red-600">—</dd>
         <dt class="text-gray-500">עודכן:</dt><dd data-id="v-updated">—</dd>
       </dl>
@@ -203,5 +175,63 @@
 {% endblock %}
 
 {% block scripts %}
-<script defer src="{{ url_for('static', filename='js/video.js') }}?v={{ app_version|default('dev', true) }}"></script>
+<script defer src="{{ url_for('static', filename='js/video_stream.js') }}?v={{ app_version|default('dev', true) }}"></script>
+<script defer src="{{ url_for('static', filename='js/capture_sender.js') }}?v={{ app_version|default('dev', true) }}"></script>
+
+<!-- Poll קטן לסטטוסים ול-Payload -->
+<script>
+(function () {
+  'use strict';
+  const $ = s => document.querySelector(s);
+  function set(el, v){ if (el) el.textContent = (v==null?'—':v); }
+  function setStateColor(ageMs, running){
+    const dot = document.getElementById('vs-dot');
+    if (!dot) return;
+    dot.classList.remove('ok','warn','err');
+    if (!running || ageMs >= 7000) dot.classList.add('err');
+    else if (ageMs >= 2000)        dot.classList.add('warn');
+    else                           dot.classList.add('ok');
+  }
+  async function getJson(url){
+    try{ const r = await fetch(url,{cache:'no-store'}); if(!r.ok) return null; return await r.json(); }catch(_){ return null; }
+  }
+  async function refresh(){
+    const s = await getJson('/api/video/status');
+    if (s){
+      set(document.querySelector('[data-id="v-source"]'), s.active_source || 'none');
+      set(document.querySelector('[data-id="v-state"]'),  s.active_source ? 'ACTIVE' : 'IDLE');
+      set(document.querySelector('[data-id="v-running"]'), s.running ? 'כן' : 'לא');
+      set(document.querySelector('[data-id="v-fps"]'),    s.fps!=null ? s.fps.toFixed ? s.fps.toFixed(1) : s.fps : '—');
+      set(document.querySelector('[data-id="v-size"]'),   Array.isArray(s.size)? (s.size[0]+'×'+s.size[1]) : '—');
+      const age = (s.frame && s.frame.age_ms) || (s.age_ms) || null;
+      set(document.querySelector('[data-id="v-age"]'), age);
+      set(document.querySelector('[data-id="v-error"]'), s.error || (s.errors && s.errors.last) || '—');
+      set(document.querySelector('[data-id="v-updated"]'), new Date().toLocaleTimeString());
+      const txt = document.getElementById('vs-txt'); if (txt) txt.textContent = (s.running && age<7000)? 'זרם פעיל' : 'אין זרם';
+      setStateColor(age||99999, !!s.running);
+    }
+    const p = await getJson('/api/payload_last');
+    if (p){
+      set(document.querySelector('[data-id="p-ver"]'), p.version || p.payload_version || '—');
+      set(document.querySelector('[data-id="p-ts"]'),  p.ts || p.timestamp || '—');
+      set(document.querySelector('[data-id="p-obj"]'), p.objdet && p.objdet.objects!=null ? p.objdet.objects : '—');
+      set(document.querySelector('[data-id="p-trk"]'), p.objdet && p.objdet.tracks!=null ? p.objdet.tracks : '—');
+      set(document.querySelector('[data-id="p-lms"]'), p.mp && p.mp.landmarks!=null ? p.mp.landmarks : '—');
+      set(document.querySelector('[data-id="p-fps"]'), p.fps!=null ? p.fps : '—');
+      const pre = document.querySelector('[data-id="p-json"]'); if (pre) pre.textContent = JSON.stringify(p,null,2);
+    }
+    const h = await getJson('/healthz');
+    if (h){
+      set(document.querySelector('[data-id="h-ok"]'),  'OK');
+      set(document.querySelector('[data-id="h-ver"]'), h.version || '—');
+      set(document.querySelector('[data-id="h-now"]'), h.now || '—');
+      set(document.querySelector('[data-id="h-uptime"]'), h.uptime_sec!=null ? h.uptime_sec : '—');
+    } else {
+      set(document.querySelector('[data-id="h-ok"]'), '—');
+    }
+  }
+  setInterval(refresh, 1500);
+  refresh();
+})();
+</script>
 {% endblock %}

@@ -1,20 +1,24 @@
 # -*- coding: utf-8 -*-
 """
 routes_upload_video.py — העלאת וידאו + סטרים MJPEG מקובץ (ללא OpenCV)
-עם FFmpeg Resolver פנימי + ת׳רד שמדמה מצלמה ושולח payload ל-/api/payload_push.
+----------------------------------------------------------------------
+• FFmpeg בלבד (subprocess), מתאים לענן.
+• "אפמרלי" כברירת מחדל: הקובץ נמחק מיד כשהסטרים מתחיל (בלינוקס), או בסיום (ב-Windows).
+• מזרים JPEG-ים בצינור ומגיש אותם כ-/video/stream_file.mjpg.
+• במקביל, ת’רד payload_emitter שולח payload "סינתטי" ל-/api/payload_push לבדיקה.
 
 Endpoints:
 - GET  /admin/upload-video
 - POST /api/upload_video
 - GET  /api/upload_video/status
-- POST /api/video/use_file            [args: fps(int?), quality(int?2..31)]
+- POST /api/video/use_file           { "fps": 25, "quality": 5 }  (אופציונלי)
 - POST /api/video/stop_file
 - GET  /video/stream_file.mjpg
 - GET  /api/debug/ffmpeg
 """
 
 from __future__ import annotations
-import os, time, glob, math, shutil, threading, subprocess, json, tempfile
+import os, time, glob, shutil, threading, subprocess, json, tempfile
 from collections import deque
 from pathlib import Path
 from typing import Dict, Any, Optional, List
@@ -26,7 +30,7 @@ from flask import (
 
 # ===== Logger =====
 try:
-    from core.logs import logger  # אם יש לך core.logs
+    from core.logs import logger  # אם קיימת שכבת לוגים שלך
 except Exception:
     import logging
     logging.basicConfig(level=logging.INFO, format="%(asctime)s | %(levelname)s | %(message)s")
@@ -34,7 +38,38 @@ except Exception:
 
 upload_video_bp = Blueprint("upload_video", __name__)
 
-# ============================== FFmpeg Resolver ==============================
+# ============================ Config / Env ============================
+
+SERVER_BASE_URL = os.getenv("SERVER_BASE_URL", "http://127.0.0.1:5000").rstrip("/")
+ALLOWED_EXT = {".mp4", ".mov", ".avi", ".mkv", ".mjpg", ".mjpeg", ".webm"}
+MAX_UPLOAD_MB = int(os.getenv("MAX_UPLOAD_MB", "500"))
+
+# האם למחוק את הקובץ מיד כשהסטרים מתחיל (ללא שמירה)?
+EPHEMERAL_UPLOADS = (os.getenv("EPHEMERAL_UPLOADS", "1") == "1")
+
+_LAST_UPLOAD: Dict[str, Any] = {
+    "path": None,
+    "file_name": None,
+    "size": 0,
+    "ts": 0.0,
+    "last_ok": False,
+    "last_err": None,
+    "delete_when_done": None,  # מחיקה מאוחרת ב-Windows אם אי אפשר למחוק בזמן שהקובץ פתוח
+}
+
+_FILE_STREAM = {
+    "proc": None, "lock": threading.Lock(),
+    "stderr_tail": deque(maxlen=100), "started_ts": 0.0,
+}
+
+_PAY_EMIT = {  # payload-emitter (דימוי מצלמה חיה)
+    "thr": None,
+    "stop": threading.Event(),
+    "fps": 25,
+    "last_frame_id": 0,
+}
+
+# ============================ FFmpeg Resolver ============================
 
 def _try_run(cmd: List[str]) -> bool:
     try:
@@ -111,53 +146,24 @@ def ffmpeg_debug_info() -> Dict[str, Any]:
 FFMPEG_BIN = resolve_ffmpeg()
 logger.info(f"[FFMPEG] resolved path: {FFMPEG_BIN!r}")
 
-# ================================ Config/State ================================
+# ================ Stream mode hook (לשימוש חיצוני אם צריך) ================
 
-SERVER_BASE_URL = os.getenv("SERVER_BASE_URL", "http://127.0.0.1:5000").rstrip("/")
-
-# ✨ לא שומרים בפרויקט. קובץ אחרון נשמר זמנית ב-/tmp ונמחק כשמחליפים/עוצרים
-ALLOWED_EXT = {".mp4", ".mov", ".avi", ".mkv", ".mjpg", ".mjpeg", ".webm"}
-MAX_UPLOAD_MB = int(os.getenv("MAX_UPLOAD_MB", "500"))
-
-_LAST_UPLOAD: Dict[str, Any] = {
-    "path": None,             # נתיב זמני (ב-/tmp)
-    "file_name": None,
-    "size": 0,
-    "ts": 0.0,
-    "last_ok": False,
-    "last_err": None,
-}
-
-_FILE_STREAM = {
-    "proc": None, "lock": threading.Lock(),
-    "stderr_tail": deque(maxlen=100), "started_ts": 0.0,
-}
-
-# ---- payload emitter (דימוי מצלמה) ----
-_PAY_EMIT = {
-    "thr": None,           # threading.Thread
-    "stop": threading.Event(),
-    "fps": 25,             # קצב ברירת מחדל (ניתן לשינוי ב-use_file)
-    "last_frame_id": 0,
-}
-
-# ---------- stream mode helper (נדרש ע"י routes_video) ----------
 def _ffmpeg_proc_running() -> bool:
     with _FILE_STREAM["lock"]:
         p = _FILE_STREAM.get("proc")
         return bool(p and (p.poll() is None))
 
 def get_stream_mode() -> str:
-    """
-    מחזיר 'file' אם יש קובץ שהועלה ויש תהליך ffmpeg פעיל להזנה,
-    אחרת 'camera' — כך /video/stream.mjpg ידע אם להפנות ל-/video/stream_file.mjpg.
-    """
+    """ 'file' אם ffmpeg רץ על קובץ; אחרת 'camera'. """
     path = _LAST_UPLOAD.get("path")
     if path and os.path.exists(str(path)) and _ffmpeg_proc_running():
         return "file"
+    # אם הקובץ נמחק אפמרלית: עדיין 'file' אם התהליך פעיל
+    if _ffmpeg_proc_running():
+        return "file"
     return "camera"
 
-# ================================= Helpers ===================================
+# ============================== Helpers ==============================
 
 def _ffmpeg_available() -> bool:
     return _verify_ffmpeg(FFMPEG_BIN)
@@ -201,8 +207,8 @@ def _start_ffmpeg_pipe(path: str, fps: Optional[int] = None, quality: int = 5) -
     args = [
         FFMPEG_BIN, "-hide_banner", "-loglevel", "error",
         "-re", "-i", path, "-an",
-        "-vf", vf, "-q:v", str(max(2, min(31, int(quality)))),
-        "-f", "image2pipe", "-vcodec", "mjpeg", "pipe:1",
+        "-vf", vf, "-q:v", str(max(2, min(31, int(quality))))  # 2=איכות גבוהה, 31=נמוכה
+        , "-f", "image2pipe", "-vcodec", "mjpeg", "pipe:1",
     ]
     logger.info(f"[file_stream] starting ffmpeg | bin={FFMPEG_BIN!r} | path={path} | vf={vf} | q={quality}")
     p = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.PIPE, bufsize=0)
@@ -210,6 +216,20 @@ def _start_ffmpeg_pipe(path: str, fps: Optional[int] = None, quality: int = 5) -
     with _FILE_STREAM["lock"]:
         _FILE_STREAM["proc"] = p; _FILE_STREAM["started_ts"] = time.time()
     threading.Thread(target=_stderr_pump, args=(p,), daemon=True).start()
+
+    # --- אפמרלי: נסה למחוק מייד (Linux/Unix תומך unlink-while-open) ---
+    try:
+        if EPHEMERAL_UPLOADS:
+            src = _LAST_UPLOAD.get("path")
+            if src and os.path.exists(src):
+                if os.name != "nt":
+                    Path(src).unlink(missing_ok=True)
+                    _LAST_UPLOAD["path"] = None
+                else:
+                    _LAST_UPLOAD["delete_when_done"] = src
+    except Exception as _e:
+        logger.debug(f"[upload] ephemeral delete attempt failed: {_e!r}")
+
     return p
 
 def _mjpeg_from_pipe(p: subprocess.Popen, boundary: str = "frame", chunk_size: int = 4096):
@@ -239,9 +259,17 @@ def _mjpeg_from_pipe(p: subprocess.Popen, boundary: str = "frame", chunk_size: i
             )
     finally:
         _stop_ffmpeg()
+        # מחיקה מאוחרת (Windows) + ניקוי מצביע
+        try:
+            pending = _LAST_UPLOAD.get("delete_when_done")
+            if pending and os.path.exists(pending):
+                Path(pending).unlink(missing_ok=True)
+            _LAST_UPLOAD["delete_when_done"] = None
+            _LAST_UPLOAD["path"] = None
+        except Exception as _e:
+            logger.debug(f"[upload] deferred delete failed: {_e!r}")
 
 def _cleanup_last_upload():
-    """מוחק את הקובץ הזמני הקודם אם קיים."""
     try:
         p = _LAST_UPLOAD.get("path")
         if p and Path(p).exists():
@@ -251,29 +279,25 @@ def _cleanup_last_upload():
 
 def _save_upload(file_storage) -> Dict[str, Any]:
     """
-    לא שומר בפרויקט! כותב לקובץ זמני ב-/tmp ומחליף את הקודם.
+    לא שומר קבוע — כותב לקובץ זמני בלבד (יימחק מייד כשיתחיל סטרים, או בסיום/עצירה).
     """
     name = file_storage.filename or "video.bin"
     ext = Path(name).suffix.lower()
     if ext not in ALLOWED_EXT:
         return {"ok": False, "error": f"extension_not_allowed: {ext}"}
 
-    # כתיבה לקובץ זמני ב-/tmp עם סיומת הקובץ
     size = 0
     try:
         tmp = tempfile.NamedTemporaryFile(prefix="upload_", suffix=ext, delete=False)
         tmp_path = tmp.name
         with tmp:
-            # כתיבה בזרם + בדיקת גודל
             for chunk in file_storage.stream:
-                if not chunk:
-                    continue
+                if not chunk: continue
                 size += len(chunk)
                 if size > MAX_UPLOAD_MB * 1024 * 1024:
                     raise RuntimeError("file_too_large")
                 tmp.write(chunk)
     except RuntimeError as e:
-        # אם חריגה בגלל גודל — מחק את הקובץ שנוצר
         try:
             if 'tmp_path' in locals():
                 Path(tmp_path).unlink(missing_ok=True)
@@ -288,7 +312,6 @@ def _save_upload(file_storage) -> Dict[str, Any]:
             pass
         return {"ok": False, "error": f"save_failed:{e!r}"}
 
-    # מחליפים את הקודם ומנקים
     _cleanup_last_upload()
     _LAST_UPLOAD.update({
         "path": str(tmp_path),
@@ -297,11 +320,12 @@ def _save_upload(file_storage) -> Dict[str, Any]:
         "ts": time.time(),
         "last_ok": True,
         "last_err": None,
+        "delete_when_done": None,
     })
     logger.info(f"[upload] saved (temp) | {name} | {size} bytes | {tmp_path}")
     return {"ok": True, "path": str(tmp_path), "file_name": name, "size": size}
 
-# =========================== Payload Emitter (CAM SIM) ========================
+# =========================== Payload Emitter ===========================
 
 def _post_payload(payload: Dict[str, Any]) -> bool:
     try:
@@ -318,23 +342,15 @@ def _post_payload(payload: Dict[str, Any]) -> bool:
         return False
 
 def _synthetic_measurements(t: float) -> Dict[str, float]:
-    # תנועה חלקה (סינוס/קוסינוס) כדי לראות ערכים משתנים בלייב
     import math
-    sh_l = 25 + 15*math.sin(t*0.9)
-    sh_r = 28 + 12*math.cos(t*1.1)
-    el_l = 45 + 20*math.sin(t*1.3+0.7)
-    el_r = 42 + 22*math.cos(t*1.2+0.3)
-    kn_l = 50 + 18*math.sin(t*0.8+1.2)
-    kn_r = 49 + 16*math.cos(t*0.85+0.5)
-    torso= 10 +  8*math.sin(t*0.6+0.9)
     return {
-        "shoulder_left_deg":  round(sh_l, 1),
-        "shoulder_right_deg": round(sh_r, 1),
-        "elbow_left_deg":     round(el_l, 1),
-        "elbow_right_deg":    round(el_r, 1),
-        "knee_left_deg":      round(kn_l, 1),
-        "knee_right_deg":     round(kn_r, 1),
-        "torso_tilt_deg":     round(torso, 1),
+        "shoulder_left_deg":  round(25 + 15*math.sin(t*0.9), 1),
+        "shoulder_right_deg": round(28 + 12*math.cos(t*1.1), 1),
+        "elbow_left_deg":     round(45 + 20*math.sin(t*1.3+0.7), 1),
+        "elbow_right_deg":    round(42 + 22*math.cos(t*1.2+0.3), 1),
+        "knee_left_deg":      round(50 + 18*math.sin(t*0.8+1.2), 1),
+        "knee_right_deg":     round(49 + 16*math.cos(t*0.85+0.5), 1),
+        "torso_tilt_deg":     round(10 +  8*math.sin(t*0.6+0.9), 1),
     }
 
 def _emit_payload_loop():
@@ -359,6 +375,8 @@ def _emit_payload_loop():
             "mp": {"landmarks": [], "mirror_x": False},
             "metrics": dict(meas),
             "detections": [],
+            "payload_version": "1.2.0",
+            "ts": now,
         }
 
         _post_payload(payload)
@@ -367,7 +385,7 @@ def _emit_payload_loop():
 
 def _start_payload_emitter(fps: Optional[int]):
     try:
-        _PAY_EMIT["stop"].set()        # ודא שהקודם נעצר
+        _PAY_EMIT["stop"].set()
         thr = _PAY_EMIT.get("thr")
         if thr and thr.is_alive():
             try: thr.join(timeout=0.2)
@@ -387,7 +405,7 @@ def _stop_payload_emitter():
     except Exception:
         pass
 
-# ================================== Pages ====================================
+# ================================ Pages ================================
 
 @upload_video_bp.route("/admin/upload-video", methods=["GET"])
 def upload_video_page():
@@ -399,7 +417,7 @@ def upload_video_page():
         max_mb=MAX_UPLOAD_MB,
     )
 
-# =================================== API =====================================
+# ================================= API =================================
 
 @upload_video_bp.route("/api/upload_video", methods=["POST"])
 def api_upload_video():
@@ -415,8 +433,8 @@ def api_upload_video():
         file_name=res["file_name"],
         size_bytes=res["size"],
         size_mb=round(res["size"] / (1024 * 1024), 2),
-        path=res["path"],              # נתיב זמני (ב-/tmp)
-        persisted=False                # חיווי: לא נשמר קבוע
+        path=res["path"],      # נתיב זמני בלבד
+        persisted=False        # חיווי: לא נשמר קבוע
     ), 200
 
 @upload_video_bp.route("/api/upload_video/status", methods=["GET"])
@@ -436,15 +454,16 @@ def api_upload_status():
             "last_frame_id": _PAY_EMIT["last_frame_id"],
         },
         "persisted": False,
-        "storage": "tmpfs",            # אינדיקציה שהקובץ זמני
+        "storage": "tmpfs",   # אינדיקציה שזמני
+        "ephemeral": EPHEMERAL_UPLOADS,
     })
     return jsonify(d)
 
 @upload_video_bp.route("/api/video/use_file", methods=["POST"])
 def api_video_use_file():
     """
-    מפעיל סטרים מהקובץ דרך ffmpeg + מפעיל ת׳רד שמזרים payloadים כאילו מצלמה חיה.
-    גוף אופציונלי: { "fps": 25, "quality": 5 }
+    התחלת סטרים דרך FFmpeg + התחלת payload emitter.
+    גוף JSON אופציונלי: { "fps": 25, "quality": 5 }
     """
     if not _LAST_UPLOAD["path"]:
         return jsonify(ok=False, error="no_file_uploaded"), 400
@@ -462,7 +481,8 @@ def api_video_use_file():
         _start_payload_emitter(fps or 25)
         return jsonify(ok=True, message="file_stream_started",
                        file_name=_LAST_UPLOAD["file_name"], url="/video/stream_file.mjpg",
-                       resolved_ffmpeg=FFMPEG_BIN), 200
+                       resolved_ffmpeg=FFMPEG_BIN,
+                       ephemeral=EPHEMERAL_UPLOADS), 200
     except FileNotFoundError as e:
         logger.error(f"[file_stream] start error: {e!r}")
         return jsonify(ok=False, error="input_file_missing", detail=str(e)), 400
@@ -476,24 +496,29 @@ def api_video_use_file():
 def api_video_stop_file():
     _stop_payload_emitter()
     _stop_ffmpeg()
-    # מנקה את הקובץ הזמני אחרי עצירה
     _cleanup_last_upload()
-    _LAST_UPLOAD.update({"path": None, "file_name": None, "size": 0, "last_ok": False})
+    _LAST_UPLOAD.update({
+        "path": None, "file_name": None, "size": 0,
+        "last_ok": False, "delete_when_done": None
+    })
     return jsonify(ok=True, stopped=True, cleaned_temp=True)
 
 @upload_video_bp.route("/video/stream_file.mjpg", methods=["GET"])
 def video_stream_file_mjpg():
-    if not _LAST_UPLOAD["path"]:
-        return Response('{"ok":false,"error":"no_file_uploaded"}\n', status=503, mimetype="application/json")
-    if not _ffmpeg_available():
-        return Response(f'{{"ok":false,"error":"ffmpeg_not_found","resolved":{FFMPEG_BIN!r}}}\n',
-                        status=500, mimetype="application/json")
-
+    # גם אם הקובץ כבר נמחק (אפמרלי), אם ffmpeg כבר רץ — נמשיך להזרים
     with _FILE_STREAM["lock"]:
         p = _FILE_STREAM.get("proc")
     if (not p) or (p.poll() is not None):
+        # אם אין תהליך רץ — ננסה להפעיל מחדש (רק אם יש path זמני קיים)
+        tmp_path = _LAST_UPLOAD.get("path")
+        if not tmp_path:
+            return Response('{"ok":false,"error":"no_stream_running_or_ephemeral_path_gone"}\n',
+                            status=503, mimetype="application/json")
+        if not _ffmpeg_available():
+            return Response(f'{{"ok":false,"error":"ffmpeg_not_found","resolved":{FFMPEG_BIN!r}}}\n',
+                            status=500, mimetype="application/json")
         try:
-            p = _start_ffmpeg_pipe(_LAST_UPLOAD["path"])
+            p = _start_ffmpeg_pipe(tmp_path)
             _start_payload_emitter(_PAY_EMIT["fps"] or 25)
         except Exception as e:
             logger.exception("[file_stream] autostart failed")
@@ -533,5 +558,6 @@ def api_debug_ffmpeg():
         "last_upload": dict(_LAST_UPLOAD),
         "server_base": SERVER_BASE_URL,
         "persisted": False,
-        "storage": "tmpfs"
+        "storage": "tmpfs",
+        "ephemeral": EPHEMERAL_UPLOADS,
     })
