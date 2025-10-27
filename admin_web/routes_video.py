@@ -1,18 +1,6 @@
 # -*- coding: utf-8 -*-
 # =============================================================================
 # routes_video.py — וידאו: ingest ← דפדפן/טלפון → סטרים MJPEG עם HUD
-# -----------------------------------------------------------------------------
-# מטרת הקובץ (בקצרה):
-# • לקלוט פריימים ב-/api/ingest_frame (raw image/jpeg או multipart 'frame')
-# • להזרים /video/stream.mjpg (עם HUD) — ממקור מצלמה (streamer) או ingest (fallback)
-# • לחשוף /api/video/start|stop|status + /api/camera/settings + /api/video/params|resolution
-#
-# חיבור לפייפליין:
-# • בכל POST /api/ingest_frame אנחנו גם קוראים ל-s.ingest_jpeg(jpeg) (אם קיים) —
-#   כדי שהפייפליין (MediaPipe/OD/מדידות) ירוץ על הפריימים מהדפדפן, ו-/payload יתעדכן.
-#
-# תלות: get_streamer() מתוך app.ui.video (יש בו ingest_jpeg, push_bgr_frame, push_jpeg).
-# HUD: מצוייר עם Pillow אם זמין; אם לא — הסטרים עובד בלי HUD.
 # =============================================================================
 
 from __future__ import annotations
@@ -23,6 +11,11 @@ from io import BytesIO
 
 from flask import Blueprint, Response, jsonify, request, redirect, stream_with_context
 
+# ---------- Hard guard: no camera on serverless ----------
+# אם אין התקן מצלמה, ננטרל פתיחת מצלמה כבר בזמן import של שאר המודולים
+if not os.path.exists("/dev/video0"):
+    os.environ.setdefault("NO_CAMERA", "1")   # בלי לגעת בהגדרות שרת
+
 # ---------- Logger ----------
 logger = logging.getLogger("routes_video")
 if not logger.handlers:
@@ -32,14 +25,22 @@ if not logger.handlers:
     logger.addHandler(_h)
 logger.setLevel(logging.INFO)
 
-# ---------- Video streamer (אם זמין) ----------
-try:
-    from app.ui.video import get_streamer  # כולל ingest_jpeg(), push_jpeg(), get_jpeg_generator()
-    _HAS_STREAMER = True
-except Exception:
-    _HAS_STREAMER = False
-    def get_streamer():
-        raise RuntimeError("get_streamer() unavailable")
+# ---------- Lazy streamer import ----------
+# לא מייבאים בזמן טעינת הקובץ כדי למנוע side-effects של פתיחת מצלמה
+_HAS_STREAMER = None
+def _get_streamer_safe():
+    global _HAS_STREAMER
+    if _HAS_STREAMER is False:
+        raise RuntimeError("streamer unavailable")
+    try:
+        # import כאן כדי לא להפעיל מצלמה בעת עלייה
+        from app.ui.video import get_streamer  # type: ignore
+        s = get_streamer()
+        _HAS_STREAMER = True
+        return s
+    except Exception:
+        _HAS_STREAMER = False
+        raise
 
 # מצב מקור 'file' (אם מודול העלאת וידאו קיים)
 try:
@@ -175,7 +176,7 @@ class _IngestState:
 
 INGEST = _IngestState()
 
-# JPEG placeholder קטן (תקין מבחינת padding)
+# JPEG placeholder
 _PLACEHOLDER_B64 = (
     b"/9j/4AAQSkZJRgABAQAAAQABAAD/2wCEAAkGBxISEhUTEhMVFRUVFRUVFRUVFRUVFRUWFxUVFRUY"
     b"HSggGBolGxUVITEhJSkrLi4uFx8zODMsNygtLisBCgoKDg0OGxAQGi0fHyUtLS0tLS0tLS0tLS0t"
@@ -204,9 +205,8 @@ def _read_jpeg_from_request() -> Tuple[Optional[bytes], Optional[str]]:
 @video_bp.post("/api/ingest_frame")
 def api_ingest_frame():
     """
-    קולט פריים בודד כ-JPEG (raw או multipart). בנוסף:
-    • מעדכן INGEST להצגה (fallback)
-    • מזריק ל-Streamer (ingest_jpeg) כדי שהפייפליין ירוץ ו-/payload יתעדכן
+    קולט פריים בודד כ-JPEG (raw או multipart), מעדכן INGEST,
+    ואם יש Streamer מזרים לו את ה-JPEG כדי שהפייפליין ירוץ.
     """
     try:
         jpeg, err = _read_jpeg_from_request()
@@ -228,16 +228,14 @@ def api_ingest_frame():
 
         # >>> החיבור לפייפליין: להזרים ל-Streamer <<<
         try:
-            if _HAS_STREAMER:
-                s = get_streamer()
-                ing = getattr(s, "ingest_jpeg", None)
-                if callable(ing):
-                    ing(jpeg)   # מפענח → push_bgr_frame → payload/OD רצים
-                else:
-                    # לפחות נציג במפלג ה-MJPEG:
-                    push = getattr(s, "push_jpeg", None)
-                    if callable(push):
-                        push(jpeg, size=INGEST.size)
+            s = _get_streamer_safe()
+            ing = getattr(s, "ingest_jpeg", None)
+            if callable(ing):
+                ing(jpeg)
+            else:
+                push = getattr(s, "push_jpeg", None)
+                if callable(push):
+                    push(jpeg, size=INGEST.size)
         except Exception:
             logger.exception("ingest → streamer failed")
 
@@ -280,9 +278,11 @@ def api_video_start():
     j = request.get_json(silent=True) or {}
     cam_idx = j.get("camera_index", DEFAULT_CAMERA_INDEX)
     show_preview = bool(j.get("show_preview", False))
-    if not _HAS_STREAMER:
+    try:
+        s = _get_streamer_safe()
+    except Exception:
         return jsonify(ok=False, error="streamer_unavailable"), 501
-    s = get_streamer()
+
     logger.info(f"/api/video/start (camera_index={cam_idx}, preview={show_preview})")
 
     try:
@@ -300,7 +300,7 @@ def api_video_start():
         pass
 
     try:
-        s.start_auto_capture()
+        s.start_auto_capture()            # נפתח מצלמה רק כאן, לא בזמן import
         try: s.enable_preview(show_preview)
         except Exception: pass
         return jsonify(ok=True, source=s.source_desc()), 200
@@ -310,9 +310,10 @@ def api_video_start():
 
 @video_bp.post("/api/video/stop")
 def api_video_stop():
-    if not _HAS_STREAMER:
+    try:
+        s = _get_streamer_safe()
+    except Exception:
         return jsonify(ok=True)
-    s = get_streamer()
     try:
         try: s.stop_auto_capture()
         except Exception: pass
@@ -336,25 +337,24 @@ def api_video_status():
     preview_window_open = False
     state = "ACTIVE"
 
-    if _HAS_STREAMER:
+    try:
+        s = _get_streamer_safe()
+        opened = bool(s.is_open())
+        running = bool(s.is_running()) and opened
+        size = s.last_frame_size()
+        fps = s.last_fps()
+        source = s.source_desc()
+        try: light_mode = s.get_light_mode()
+        except Exception: light_mode = None
+        try: preview_window_open = bool(getattr(s, "_preview", False))
+        except Exception: preview_window_open = False
         try:
-            s = get_streamer()
-            opened = bool(s.is_open())
-            running = bool(s.is_running()) and opened
-            size = s.last_frame_size()
-            fps = s.last_fps()
-            source = s.source_desc()
-            try: light_mode = s.get_light_mode()
-            except Exception: light_mode = None
-            try: preview_window_open = bool(getattr(s, "_preview", False))
-            except Exception: preview_window_open = False
-            try:
-                if bool(getattr(s, "_frozen", False)) or getattr(s, "_freeze_until", None):
-                    state = "FROZEN"
-            except Exception:
-                pass
+            if bool(getattr(s, "_frozen", False)) or getattr(s, "_freeze_until", None):
+                state = "FROZEN"
         except Exception:
             pass
+    except Exception:
+        pass
 
     ingest_state = {
         "has_frame": INGEST.jpeg is not None,
@@ -382,49 +382,48 @@ def video_stream_mjpg():
     except Exception:
         pass
 
-    if _HAS_STREAMER:
-        try:
-            s = get_streamer()
-            if s.is_open() and s.is_running():
-                gen = getattr(s, "get_jpeg_generator", None)
-                if callable(gen):
-                    base_gen = gen()
-
-                    if hud and _HAS_PIL:
-                        def _wrap_with_hud() -> Iterator[bytes]:
-                            for frame in base_gen:
-                                try:
-                                    extra = {
-                                        "ingest_fps": f"{INGEST.rx_fps.fps():.1f}",
-                                        "encode_fps": f"{INGEST.enc_fps.fps():.1f}",
-                                        "size": f"{getattr(s, 'width', 0)}x{getattr(s, 'height', 0)}",
-                                        "lat_ms": None,
-                                        "source": s.source_desc(),
-                                        "state": "STREAMER",
-                                        "jpeg_quality": getattr(s, "jpeg_quality", 80),
-                                    }
-                                    frame = _overlay_hud(frame, label="BodyPlus_XPro", extra=extra)
-                                except Exception:
-                                    pass
-                                yield (
-                                    _BOUNDARY + b"\r\n"
-                                    + b"Content-Type: image/jpeg\r\n"
-                                    + f"Content-Length: {len(frame)}\r\n\r\n".encode("ascii")
-                                    + frame + b"\r\n"
-                                )
-                        return _make_mjpeg_response(_wrap_with_hud())
-                    else:
-                        def _wrap_plain() -> Iterator[bytes]:
-                            for frame in base_gen:
-                                yield (
-                                    _BOUNDARY + b"\r\n"
-                                    + b"Content-Type: image/jpeg\r\n"
-                                    + f"Content-Length: {len(frame)}\r\n\r\n".encode("ascii")
-                                    + frame + b"\r\n"
-                                )
-                        return _make_mjpeg_response(_wrap_plain())
-        except Exception:
-            logger.warning("streamer not available; falling back to ingest")
+    # אם ה-streamer רץ — נזרום ממנו; אחרת נשתמש ב-ingest
+    try:
+        s = _get_streamer_safe()
+        if s.is_open() and s.is_running():
+            gen = getattr(s, "get_jpeg_generator", None)
+            if callable(gen):
+                base_gen = gen()
+                if hud and _HAS_PIL:
+                    def _wrap_with_hud() -> Iterator[bytes]:
+                        for frame in base_gen:
+                            try:
+                                extra = {
+                                    "ingest_fps": f"{INGEST.rx_fps.fps():.1f}",
+                                    "encode_fps": f"{INGEST.enc_fps.fps():.1f}",
+                                    "size": f"{getattr(s, 'width', 0)}x{getattr(s, 'height', 0)}",
+                                    "lat_ms": None,
+                                    "source": s.source_desc(),
+                                    "state": "STREAMER",
+                                    "jpeg_quality": getattr(s, "jpeg_quality", 80),
+                                }
+                                frame = _overlay_hud(frame, label="BodyPlus_XPro", extra=extra)
+                            except Exception:
+                                pass
+                            yield (
+                                _BOUNDARY + b"\r\n"
+                                + b"Content-Type: image/jpeg\r\n"
+                                + f"Content-Length: {len(frame)}\r\n\r\n".encode("ascii")
+                                + frame + b"\r\n"
+                            )
+                    return _make_mjpeg_response(_wrap_with_hud())
+                else:
+                    def _wrap_plain() -> Iterator[bytes]:
+                        for frame in base_gen:
+                            yield (
+                                _BOUNDARY + b"\r\n"
+                                + b"Content-Type: image/jpeg\r\n"
+                                + f"Content-Length: {len(frame)}\r\n\r\n".encode("ascii")
+                                + frame + b"\r\n"
+                            )
+                    return _make_mjpeg_response(_wrap_plain())
+    except Exception:
+        logger.warning("streamer not available; falling back to ingest")
 
     return _make_mjpeg_response(_ingest_mjpeg_generator(hud=hud))
 
@@ -436,10 +435,8 @@ def video_stream_legacy():
 @video_bp.route("/api/video/params", methods=["GET", "POST"])
 def api_video_params():
     if request.method == "GET":
-        if not _HAS_STREAMER:
-            return jsonify(ok=True, params={"jpeg_quality": 70, "encode_fps": 12, "target_fps": 20, "decimation": 1}), 200
-        s = get_streamer()
         try:
+            s = _get_streamer_safe()
             out = {
                 "jpeg_quality": int(getattr(s, "jpeg_quality", 70)),
                 "encode_fps":   int(getattr(s, "encode_fps", 15)),
@@ -447,16 +444,17 @@ def api_video_params():
                 "decimation":   int(getattr(s, "_decimation", 1)),
             }
             return jsonify(ok=True, params=out), 200
-        except Exception as e:
-            return jsonify(ok=False, error=str(e)), 500
+        except Exception:
+            return jsonify(ok=True, params={"jpeg_quality": 70, "encode_fps": 12, "target_fps": 20, "decimation": 1}), 200
 
     # POST
     j = request.get_json(silent=True) or {}
-    if not _HAS_STREAMER:
+    try:
+        s = _get_streamer_safe()
+    except Exception:
         return jsonify(ok=False, error="streamer_unavailable"), 501
-    s = get_streamer()
-    profile = (j.get("profile") or "").strip().lower()
 
+    profile = (j.get("profile") or "").strip().lower()
     profiles = {
         "eco":      {"jpeg_quality": 55, "encode_fps": 8,  "target_fps": 10, "decimation": 2},
         "balanced": {"jpeg_quality": 70, "encode_fps": 12, "target_fps": 20, "decimation": 1},
@@ -488,17 +486,20 @@ def api_video_params():
 
 @video_bp.post("/api/video/resolution")
 def api_video_resolution():
-    if not _HAS_STREAMER:
+    try:
+        s = _get_streamer_safe()
+    except Exception:
         return jsonify(ok=False, error="streamer_unavailable"), 501
-    s = get_streamer()
+
     j = request.get_json(silent=True) or {}
     preset = (j.get("preset") or "").strip().lower()
 
     if preset:
-        if preset == "low":    width, height = 640, 360
+        if preset == "low":      width, height = 640, 360
         elif preset == "medium": width, height = 1280, 720
-        elif preset == "high": width, height = 1920, 1080
-        else: return jsonify(ok=False, error="unknown_preset"), 400
+        elif preset == "high":   width, height = 1920, 1080
+        else:
+            return jsonify(ok=False, error="unknown_preset"), 400
     else:
         try:
             width, height = int(j.get("width")), int(j.get("height"))
