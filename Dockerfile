@@ -1,4 +1,4 @@
-# -------- Dockerfile (Proxy-only) --------
+# -------- Dockerfile (App mode) --------
 FROM python:3.11-slim
 
 # סביבה בסיסית
@@ -10,15 +10,15 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     GUNICORN_THREADS=8 \
     GUNICORN_TIMEOUT=120
 
-# חבילות מערכת נדרשות (curl ל-healthcheck, ffmpeg אם תצטרך בעתיד)
+# חבילות מערכת נדרשות
 RUN apt-get update && apt-get install -y --no-install-recommends \
       curl ca-certificates tzdata ffmpeg libgl1 libglib2.0-0 \
     && rm -rf /var/lib/apt/lists/*
 
-# תיקייה לעבודה
+# תיקיית עבודה
 WORKDIR /app
 
-# דרישות פייתון (אם יש requirements.txt—העתק והתקן; אחרת נתקין מינימום)
+# דרישות פייתון
 COPY requirements.txt /app/requirements.txt
 RUN pip install --no-cache-dir -r requirements.txt || \
     pip install --no-cache-dir flask gunicorn requests
@@ -26,12 +26,12 @@ RUN pip install --no-cache-dir -r requirements.txt || \
 # קוד האפליקציה
 COPY . /app
 
-# נחשוף את 5000
+# חשיפת פורט
 EXPOSE 5000
 
-# Healthcheck (אם יש לך /health—מצוין; נוסיף גם /ping למקרה ש־RunPod בודק שם)
+# בדיקת בריאות
 HEALTHCHECK --interval=30s --timeout=5s --retries=5 \
   CMD curl -fsS "http://127.0.0.1:${PORT}/health" || curl -fsS "http://127.0.0.1:${PORT}/ping" || exit 1
 
-# הפקודה שמרימה את הפרוקסי
-CMD ["bash","-lc","gunicorn -b 0.0.0.0:${PORT} --workers ${GUNICORN_WORKERS} --threads ${GUNICORN_THREADS} --timeout ${GUNICORN_TIMEOUT} admin_web.runpod_proxy:app"]
+# ✨ נקודת הרצה: חושף את Flask שמוגדר בתוך main.py
+CMD ["gunicorn", "-b", "0.0.0.0:5000", "main:app"]

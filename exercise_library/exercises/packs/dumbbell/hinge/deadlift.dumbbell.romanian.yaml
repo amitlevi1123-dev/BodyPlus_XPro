@@ -1,75 +1,74 @@
 # =============================================================================
-# deadlift.barbell.romanian.yaml — Romanian Deadlift (RDL) עם מוט
-# נתיב מומלץ: exercise_library/exercises/packs/hinge/barbell/deadlift.barbell.romanian.yaml
-# -----------------------------------------------------------------------------
-# דגשים:
-# • start_mode: from_standing — מתחילים בעמידה, לא מהרצפה
-# • תבנית Hinge (לא סקוואט), ברך "פתוחה" יחסית
-# • ROM קריטי ונמדד מזוויות ירך/גו בלבד (לא פיקסלים)
-# • ספירת חזרה מלאה: ≥95% מהעלייה (אין דרישת "נעילה מלאה" כמו DL קונבנציונלי)
-# • שהייה ממושכת מדי למעלה מורידה ניקוד (RDL שומר מתח)
-# • בטיחות הגב מודגשת במיוחד
-# • עדכון: כפות רגליים ישרות (≈0°) תקינות — אין חובה לפתוח החוצה
+# deadlift.dumbbell.romanian.yaml — Romanian Deadlift (RDL) עם דאמבלים
+# נתיב מומלץ:
+#   exercise_library/exercises/packs/dumbbell/deadlift.dumbbell.romanian.yaml
+# משפחה: hinge | וריאנט: דאמבלים | דגש: טווח זוויתי (ירך/גו), שמירת מתח למעלה
 # =============================================================================
 
-id: "deadlift.barbell.romanian"
+id: "deadlift.dumbbell.romanian"
 family: "hinge"
 extends: "hinge.base"
 
 meta:
   selectable: true
-  display_name: "Romanian Deadlift — Barbell (RDL)"
-  equipment: "barbell"
+  display_name: "Romanian Deadlift — Dumbbells (RDL)"
+  equipment: "dumbbell"
   start_mode: "from_standing"
   version: "1.0.1"
   notes: >
-    RDL מן העמידה: דחיפת אגן לאחור, הדגשת טווח אקצנטרי ושמירת מתח.
-    אין צורך "לנעול" למעלה — חזרה מלאה נספרת בהשלמת ≥95% מהעלייה.
-    שהייה ארוכה למעלה מעידה על אובדן מתח ולכן מנוקדת מטה.
-    עומק/ROM מחושבים מזוויות ירך/גו ולכן עמידים למרחק מצלמה.
+    RDL עם דאמבלים מן העמידה: דחיפת אגן לאחור, דגש אקצנטרי ושמירת מתח.
+    חזרה מלאה נספרת בהשלמת ≥95% מהעלייה — אין חובה לנעילה מלאה למעלה.
+    שהייה ארוכה מדי למעלה מורידה ניקוד (RDL שומר מתח).
+    עומק/ROM מחושבים מזוויות ירך/גו ולא מפיקסלים — עמיד למרחק מצלמה.
     כפות רגליים ישרות (≈0°) תקינות — אין חובה לסיבוב החוצה.
 
 # -----------------------------------------------------------------------------
 # 🧭 רמזי זיהוי למסווג (Classifier Hints)
+#  - מסנן ציוד חד: חייב דאמבלים; אין מוט/טרפ-בר.
 # -----------------------------------------------------------------------------
 match_hints:
-  must_have: [pose.available]
-  any_of: [objdet.bar_present, objdet.object_present]
+  must_have: [pose.available, objdet.object_present]
+  must_not_have: [objdet.bar_present, objdet.trapbar_present]
+  any_of: [objdet.dumbbell_present]
   ranges:
-    objdet.object_kind: ["barbell"]
+    objdet.object_kind: ["dumbbell"]
   pose_view: ["side", "front_left", "front_right"]
   motion_pattern: ["hip_hinge"]
   joints_focus: ["hips", "spine", "knees"]
   weight: 1.0
 
 # -----------------------------------------------------------------------------
-# 🎯 יעדים לווריאנט: ROM מזוויות (Hip/Torso), וקונטרול למעלה
+# 🎯 יעדים לווריאנט
 # -----------------------------------------------------------------------------
 targets:
+  # ROM זוויתי (חישוב דלתא זוויות ירך/גו)
   rom_joint:
-    hip_rom_deg: 48         # יעד ROM בירך
-    torso_rom_deg: 30       # יעד ROM בגו
+    hip_rom_deg: 48
+    torso_rom_deg: 30
+
+  # שליטה בזמן החלק העליון (לשמור מתח; אין “נעילה” ארוכה)
   top_time_control:
-    hold_good_max_s: 0.50   # עד כאן אידאלי (שומר מתח)
-    hold_ok_max_s:   1.00   # עדיין טוב
-    hold_hard_cap_s: 2.50   # מעבר לכך — קנס ברור
+    hold_good_max_s: 0.50
+    hold_ok_max_s:   1.00
+    hold_hard_cap_s: 2.50
 
 # -----------------------------------------------------------------------------
-# ⏱️ חלונות טמפו (הדרכתיים; הניקוד בפועל דרך הקריטריונים)
+# ⏱️ חלונות טמפו (הדרכתיים; הניקוד בפועל נקבע ב־scoring)
 # -----------------------------------------------------------------------------
 tempo_targets:
   rep_t_s:   [1.0, 4.0]
   ecc_s:     [0.8, 3.0]
   con_s:     [0.6, 2.5]
-  pause_bot: [0.0, 0.8]   # סט־אפ קצר בתחתית
-  pause_top: [0.0, 1.0]   # אין צורך בהחזקה; עדיף קצר כדי לשמור מתח
+  pause_bot: [0.0, 0.8]
+  pause_top: [0.0, 1.0]
 
 # -----------------------------------------------------------------------------
-# 🦶 מנח רגליים (הכוונה) — עודכן ל-0–20°
+# 🦶 מנח רגליים (הכוונה)
+#  - עדכון חשוב: 0–20° תקין (0° = כפות רגליים ישרות זה בסדר!)
 # -----------------------------------------------------------------------------
 stance_targets:
   stance_width_ratio: [0.85, 1.15]
-  toe_angle_deg:      [0, 20]      # ← קדימה (0°) תקין לחלוטין
+  toe_angle_deg:      [0, 20]      # ← יישור קדימה מותר לחלוטין
   knee_toe_alignment_ok_abs_deg: 5
 
 # -----------------------------------------------------------------------------
@@ -77,11 +76,19 @@ stance_targets:
 # -----------------------------------------------------------------------------
 rep_detection_hints:
   prefer_angles: true            # פאזות/ROM מזוויות ירך/גו
-  use_object_y_as_aux: true      # עזר למסלול/יציבות
-  min_full_up_fraction: 0.95     # ≥95% מהעלייה נספר כחזרה "מלאה"
+  use_object_y_as_aux: true      # עזר למסלול/יציבות (גובה הדאמבלים = ידיים)
+  min_full_up_fraction: 0.95     # ≥95% מהעלייה = חזרה מלאה
+  # ניתן לכייל בערוץ הסיגנל אם צריך (לא חובה):
+  # thresholds:
+  #   min_rom_good: 0.22
+  #   min_rep_ms: 400
+  #   max_rep_ms: 6000
 
 # -----------------------------------------------------------------------------
-# ⚖️ דריסות ניקוד (scoring) — משקלים 0–2 והגדרות כלליות
+# ⚖️ דריסות ניקוד (scoring)
+# הערה: שמות הקריטריונים חייבים להתאים לשמות שקיימים ב־hinge.base.
+# אם בבסיס הקריטריון נקרא אחרת (למשל head_alignment במקום head_spine),
+# עדכן כאן לשם התואם.
 # -----------------------------------------------------------------------------
 scoring:
 
@@ -92,7 +99,7 @@ scoring:
   criteria:
 
     # -------------------------
-    # בטיחות (דגש מוגבר לגב)
+    # בטיחות (גב/ראש)
     # -------------------------
     spine_rounding:                # עגילת גב (סגיטלי)
       weight: 2.0
@@ -100,7 +107,7 @@ scoring:
     lateral_bend:                  # עיקום צדדי
       weight: 1.2
 
-    head_spine:                    # ראש בקו הגו
+    head_spine:                    # ראש בקו הגו (אם בבסיס זה head_alignment — שנה לשם התואם)
       weight: 1.0
 
     # -------------------------
@@ -109,23 +116,23 @@ scoring:
     hinge_posture:                 # יחס גו/ברך — הינג' אמיתי (לא סקוואט)
       weight: 1.6
 
-    knee_flex_limit:               # ברך "פתוחה" (למנוע סקוואט)
+    knee_flex_limit:               # ברך "פתוחה" יחסית — למנוע דפוס סקוואט
       weight: 1.0
 
     # -------------------------
     # ROM מזוויות (קריטי)
     # -------------------------
-    rom_joint:                     # Hip/Torso ROM, ציון שמרני = המינ' מבין השניים
+    rom_joint:
       weight: 1.8
       rule:
         kind: rom_joint_min_target
-        input: { hip_rom_deg: "auto", torso_rom_deg: "auto" }   # מנוע מחשב Δזוויות
+        input: { hip_rom_deg: "auto", torso_rom_deg: "auto" }
         target_hip_deg:   48
         target_torso_deg: 30
-        small_rep_min:    0.30   # <0.30 → לא נספר
-        partial_min:      0.50   # 0.30–0.50 → חזרה חלקית
-        full_up_fraction: 0.95   # השלמת ≥95% עלייה נחשבת מלאה
-        clamp_full_range: [0.95, 1.00]  # טולרנס מלא — לא "קופץ" 99→100
+        small_rep_min:    0.30
+        partial_min:      0.50
+        full_up_fraction: 0.95
+        clamp_full_range: [0.95, 1.00]
 
     # -------------------------
     # קצב/שליטה
@@ -133,8 +140,11 @@ scoring:
     tempo:
       weight: 1.0
 
-    phase_control:                 # איכות פאזות/היפוך
+    phase_control:                 # איכות היפוך/פאזות
       weight: 1.2
+
+    turn_quality:
+      weight: 0.6
 
     # -------------------------
     # רגליים/מנח
@@ -148,7 +158,7 @@ scoring:
     stance_width:
       weight: 0.6
 
-    # עדכון חשוב: לוודא שאין ענישה על 0°
+    # עדכון: לא להעניש על 0° — טווח יעד 0–20° מגדיר "טוב".
     toe_angle:
       weight: 0.5
       rule:
@@ -157,33 +167,29 @@ scoring:
         input_right: toe_angle_right_deg
         target_min:  0
         target_max:  20
-        soft_margin: 3
+        soft_margin: 3   # עדינות סביב הקצה
 
     # -------------------------
-    # היפוך/"טופ" ייחודי ל-RDL
+    # עליון (שהייה למעלה) — שמירת מתח
     # -------------------------
-    turn_quality:
-      weight: 0.6
-
-    top_time_control:              # שהייה למעלה — הורדה רכה לפי זמן
+    top_time_control:
       weight: 0.6
       rule:
         kind: top_hold_penalty
         input: rep.pause_top_s
-        good_max_s:   0.50   # ללא הורדה
-        ok_max_s:     1.00   # הורדה זעירה/ליניארית
-        hard_cap_s:   2.50   # מעבר לכך — הורדה ברורה
+        good_max_s:   0.50
+        ok_max_s:     1.00
+        hard_cap_s:   2.50
 
-  # תקרות בטיחות (מגבילות ציון סופי כשהבטיחות נפגעת)
+  # תקרות בטיחות (Caps)
   safety_caps:
-    - when: "spine_rounding <= 0.60"   # גב מעוגל — קפדני יותר
+    - when: "spine_rounding <= 0.60"
       cap: 0.80
     - when: "knee_valgus   <= 0.60"
       cap: 0.90
     - when: "head_spine    <= 0.60"
       cap: 0.92
 
-  # שקלול סופי
   aggregate:
     method: weighted_mean
     weights_source: inline
@@ -203,15 +209,15 @@ phrases:
       rep_weak: "hinge.common.turn.rep_weak"
       rep_good: "hinge.common.turn.rep_good"
     top_time_control:
-      long_hold: "hinge.rdl.top_tension.rep_long_hold"
+      long_hold:  "hinge.rdl.top_tension.rep_long_hold"
       too_locked: "hinge.rdl.top_tension.rep_too_locked"
 
 # -----------------------------------------------------------------------------
 # 🧪 בדיקות מומלצות (QA)
 # -----------------------------------------------------------------------------
 qa_notes:
-  - "סט א׳ ללא עצירה למעלה מול סט ב׳ עם 2–3s עצירה: ציון ב׳ צריך לרדת דרך top_time_control."
-  - "בדוק שחזרות עם 95–100% עלייה נחשבות מלאות (ללא 'קפיצה' בין 99→100)."
+  - "סט א׳ ללא עצירה למעלה מול סט ב׳ עם 2–3s עצירה: ב׳ צריך לרדת דרך top_time_control."
+  - "בדוק שחזרות עם 95–100% עלייה נחשבות מלאות (ללא קפיצה 99→100)."
   - "ודא ש-ROM מזוויות עובד זהה ממרחקי מצלמה שונים."
-  - "וודא שהקריטריונים של הינג' (hinge_posture/knee_flex_limit) מונעים 'סקוואט'."
+  - "ודא שהקריטריונים של הינג' (hinge_posture/knee_flex_limit) מונעים 'סקוואט'."
   - "עגילת גב מחמירה: spine_rounding<0.60 מפעיל cap=0.80 על ציון הסופי."

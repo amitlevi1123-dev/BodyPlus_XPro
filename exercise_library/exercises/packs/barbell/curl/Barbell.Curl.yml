@@ -1,0 +1,224 @@
+# -*- coding: utf-8 -*-
+# ===================================================================
+# curl.barbell.yaml — וריאציית "כפיפות מרפקים עם מוט" (Barbell Curl)
+# ===================================================================
+# מבוסס על <family>.base (Upper). דגשים: ללא סווינג, ללא הרמות כתף,
+# שליטה בטמפו ובהיפוך, ROM מרפק סביר, ברכיים "רכות" ליציבות, כף־יד ניטרלית.
+# ===================================================================
+
+id: curl.barbell
+family: curl
+
+meta:
+  selectable: true
+  display_name: "כפיפות מרפקים עם מוט"
+  notes: >
+    זיהוי מותנה בנוכחות מוט. משקל ניקוד גבוה לבטיחות ושליטה (סווינג/כתף),
+    משקל מתון ל-ROM מרפק. ברכיים רכות מזכות בבונוס קטן ליציבות.
+
+inherits: curl.base   # אם קיים base למשפחת curl. אם לא — מחק שורה זו.
+
+# ------------------------------------------------------------
+# 🗣️ מרחב מסרים
+# ------------------------------------------------------------
+phrases:
+  namespace: "curl.barbell"
+
+# ------------------------------------------------------------
+# 🧭 רמזים למסווג (Classifier)
+# ------------------------------------------------------------
+match_hints:
+  must_have: [pose.available, objdet.bar_present]
+  pose_view: [front, front_left, front_right]
+  # ציוד:
+  equipment_kind: barbell
+
+# ------------------------------------------------------------
+# 🎯 יעדי ROM/טמפו (דריסת ברירות־מחדל ל־Upper)
+# ------------------------------------------------------------
+targets:
+  upper:
+    press:  { elbow_rom_deg: 85, shoulder_rom_deg: 0 }  # כתף לא אמורה "לגנוב"
+    pull:   { elbow_rom_deg: 85, shoulder_rom_deg: 0 }
+  tempo:
+    rep_time_s_min: 0.7
+    rep_time_s_max: 2.5
+    fast_cutoff_s:  0.5
+    long_bottom_pause_s: 0.6
+
+# ------------------------------------------------------------
+# 🧪 קריטריונים (מפתחות קנוניים בלבד — ע"פ aliases.yaml)
+# ------------------------------------------------------------
+criteria:
+
+  # --- בטיחות/שליטה עיקריים ---
+  swing_torso:                  { requires: [torso_forward_deg, torso_forward_vel_deg_s, torso_forward_acc_deg_s2] }
+  shoulder_stability:           { requires: [shoulder_left_deg, shoulder_right_deg, elbow_left_deg, elbow_right_deg] }
+
+  # --- טמפו ושליטה בהיפוך ---
+  tempo:                        { requires: [rep.timing_s] }
+  turn_quality:                 { requires: [rep.dir, rep.state, rep.phase] }
+
+  # --- ROM מרפק (מבוסס על rep.rom שנמדד ע"י מנוע החזרות) ---
+  rom_elbow:                    { requires: [rep.rom] }
+
+  # --- ברכיים רכות ליציבות ---
+  knees_soft:                   { requires: [knee_left_deg, knee_right_deg] }
+
+  # --- שורש כף־יד/אחיזה ---
+  wrist_neutral:                { requires: [wrist_flex_ext_left_deg, wrist_flex_ext_right_deg, wrist_radial_ulnar_left_deg, wrist_radial_ulnar_right_deg] }
+
+  # --- רוחב אחיזה (hook לעתיד; כרגע passthrough/optional) ---
+  grip_width_hook:              { requires: [shoulders_width_px] }
+
+  # --- ענישה לעצירה ארוכה בתחתית (מפחיתה עומס) ---
+  bottom_pause_penalty:         { requires: [rep.pause_bottom_s] }
+
+  # --- שמירת גב ניטרלי (תקרת בטיחות) ---
+  spine_rounding:               { requires: [spine_flexion_deg] }
+
+# ------------------------------------------------------------
+# ⚠️ קריטיים — תנאי סף לניקוד חזרה
+# ------------------------------------------------------------
+critical:
+  - posture                      # מגיע מה-base; אם אין base אפשר להסיר
+  - any_of: [rom_elbow, tempo]   # חייב להיות לפחות אחד: ROM או טמפו תקין
+
+# ------------------------------------------------------------
+# ⚖️ SCORING — כללי ניקוד + חוקים
+# ------------------------------------------------------------
+scoring:
+  policy:
+    missing: skip
+    min_criteria_for_full_quality: 3
+
+  criteria:
+
+    # ===== בטיחות/שליטה (הכי חשובים) =====
+    swing_torso:
+      weight: 2.2
+      rule:
+        kind: jerk_guard
+        input: "(torso_forward_vel_deg_s, torso_forward_acc_deg_s2)"
+        vel_ok: 35       # deg/s
+        acc_ok: 300      # deg/s^2
+        allow_bounce: false
+
+    shoulder_stability:
+      weight: 2.0
+      rule:
+        kind: symmetric_threshold
+        # כתף אמורה להישאר יציבה יחסית; חריגה משמעותית מרמזת על "גניבה" מהכתף
+        input: "max(shoulder_left_deg, shoulder_right_deg)"
+        ok: 25
+        warn: 35
+        bad: 45
+
+    # ===== טמפו ושליטה בהיפוך =====
+    tempo:
+      weight: 1.8
+      rule:
+        kind: tempo_window
+        input: rep.timing_s
+        min: 0.7
+        max: 2.5
+        cutoff_min: 0.5
+        cutoff_max: 4.0
+
+    turn_quality:
+      weight: 1.6
+      rule:
+        kind: jerk_guard
+        allow_bounce: false
+        min_turn_ms: 100
+
+    # ===== ROM מרפק (משני בתרגיל הזה) =====
+    rom_elbow:
+      weight: 1.0
+      rule:
+        kind: threshold_window
+        input: rep.rom      # ROM זוויתי לחזרה (deg) כפי שמדווח ע"י מנוע החזרות
+        target_min: 85
+        cutoff_min: 70
+        direction: higher_is_better
+
+    # ===== יציבות כללית =====
+    knees_soft:
+      weight: 0.5
+      rule:
+        kind: band_center
+        # ברך "רכה": יעד סביב 165°–177° (180° = נעילה; <150° = כפיפה גדולה מדי)
+        input: "min(knee_left_deg, knee_right_deg)"
+        min_ok: 165
+        max_ok: 177
+        cutoff_min: 150
+        cutoff_max: 180
+
+    wrist_neutral:
+      weight: 0.4
+      rule:
+        kind: symmetric_threshold
+        input: "max(abs(wrist_flex_ext_left_deg), abs(wrist_flex_ext_right_deg), abs(wrist_radial_ulnar_left_deg), abs(wrist_radial_ulnar_right_deg))"
+        ok: 15
+        warn: 25
+        bad: 35
+
+    grip_width_hook:
+      weight: 0.5
+      rule:
+        kind: passthrough   # כאשר יתווסף grip_width_px/ratio — נהפוך ל-band_center
+
+    bottom_pause_penalty:
+      weight: 0.4
+      rule:
+        kind: boolean_flag
+        input: "rep.pause_bottom_s > 0.6"
+        good_when: false
+        penalty: 0.25
+
+    # ===== תקרות בטיחות (נספרים באגרגציה למטה) =====
+    spine_rounding:
+      weight: 0.0
+      rule:
+        kind: symmetric_threshold
+        input: spine_flexion_deg
+        ok: 10
+        warn: 20
+        bad: 30
+
+  aggregate:
+    method: weighted_mean
+    weights_source: inline
+
+  safety_caps:
+    - { when: "swing_torso      <= 0.6", cap: 0.85 }
+    - { when: "shoulder_stability<= 0.6", cap: 0.88 }
+    - { when: "spine_rounding   <= 0.6", cap: 0.90 }
+
+# ------------------------------------------------------------
+# 🔁 אות חזרה (Rep Signal) — Upper (elbow-first) עם Auto-Pick
+# ------------------------------------------------------------
+rep_signal:
+  source: "angle|auto|min"
+  candidates:
+    upper: ["elbow_left_deg","elbow_right_deg","shoulder_left_deg","shoulder_right_deg"]
+  thresholds:
+    phase_delta: 5
+    min_turn_ms: 100
+    min_rep_ms: 500
+    max_rep_ms: 6000
+    min_rom_good: 70     # עבור חיווי איכות; הסף לציון נמצא ב-rom_elbow
+    min_rom_partial: 55
+
+# ------------------------------------------------------------
+# 🔄 מקורות גיבוי (אם זוויות לא יציבות)
+# ------------------------------------------------------------
+fallback_sources:
+  any_of: ["object_y","hands_center_y"]
+
+# ------------------------------------------------------------
+# 📌 הערות מימוש
+# • אפשר להרחיב shoulder_stability בעזרת מדד יחס שינוי כתף/מרפק (בעתיד).
+# • grip_width_hook יופעל כאשר יוגדר grip_width_px/ratio בנורמליזר.
+# • ההודעות יבואו מ-phrases (namespace: curl.barbell + כללי).
+# ------------------------------------------------------------
