@@ -3,7 +3,7 @@
 # 🔁 RunPod Proxy — שימוש בטוח ב-Serverless (ללא הצפות)
 # -------------------------------------------------------
 # GET  /                → עמוד סטטוס (לא יוצר Job)
-# GET  /health          → healthcheck (אליאס)
+# GET  /health, /ping   → healthchecks
 # GET  /_proxy/health   → healthcheck מפורט
 # POST /run-submit      → יוצר Job ב-/run (async)
 # POST /run-sync        → מריץ /run-sync (sync)
@@ -12,12 +12,11 @@
 # -------------------------------------------------------
 
 from flask import Flask, request, Response, jsonify
-import os
-import requests
+import os, requests
 
-# עדכן כאן אם יצרת Endpoint חדש (או דרך ENV RUNPOD_BASE)
-RUNPOD_BASE = os.getenv("RUNPOD_BASE", "https://api.runpod.ai/v2/1fmkdasa1l0x06").rstrip("/")
-API_KEY = os.getenv("RUNPOD_API_KEY", "rpa_H63HWWYQPHFPTDDOY81DSRONUWZI0RAMOXE5B6P91rt4mu")
+# קבע את ה-Endpoint וה-API Key דרך משתני סביבה (בלי dotenv)
+RUNPOD_BASE = (os.getenv("RUNPOD_BASE") or "https://api.runpod.ai/v2/1fmkdasa1l0x06").rstrip("/")
+API_KEY = os.getenv("RUNPOD_API_KEY") or "REPLACE_WITH_YOUR_KEY"
 
 app = Flask(__name__)
 
@@ -54,7 +53,7 @@ def _get(url: str, timeout=(5, 60)):
     }
     return requests.get(url, headers=headers, timeout=timeout)
 
-# ---------- דף בית (לא יוצר Job) ----------
+# ---------- Home ----------
 @app.get("/")
 def home_page():
     return jsonify(
@@ -66,12 +65,16 @@ def home_page():
 # ---------- Health ----------
 @app.get("/health")
 def health_alias():
-    return jsonify(ok=True, upstream=RUNPOD_BASE), 200
+    return jsonify(ok=True, upstream=RUNPOD_BASE, api_key_set=bool(API_KEY and API_KEY != "REPLACE_WITH_YOUR_KEY")), 200
+
+@app.get("/ping")
+def ping():
+    return "pong", 200
 
 @app.get("/_proxy/health")
 def proxy_health():
-    ok = bool(RUNPOD_BASE) and bool(API_KEY)
-    return jsonify(ok=ok, upstream=RUNPOD_BASE, api_key_set=bool(API_KEY)), (200 if ok else 503)
+    ok = bool(RUNPOD_BASE) and bool(API_KEY) and API_KEY != "REPLACE_WITH_YOUR_KEY"
+    return jsonify(ok=ok, upstream=RUNPOD_BASE, api_key_set=bool(API_KEY and API_KEY != "REPLACE_WITH_YOUR_KEY")), (200 if ok else 503)
 
 @app.get("/_proxy/whoami")
 def proxy_whoami():
@@ -80,7 +83,6 @@ def proxy_whoami():
 
 @app.get("/favicon.ico")
 def favicon_noop():
-    # דפדפנים מבקשים את זה אוטומטית – נמנע לוגים/טראפיק
     return Response(status=204)
 
 # ---------- יצירת Job (async) ----------
@@ -123,6 +125,6 @@ def no_stream_serverless():
 
 # ---------- הרצה מקומית ----------
 if __name__ == "__main__":
-    print("🔁 Proxy running at http://0.0.0.0:5000 → RunPod Serverless Endpoint")
-    print(f"🔗 Base: {RUNPOD_BASE}")
-    app.run(host="0.0.0.0", port=5000, debug=False, threaded=True)
+    port = int(os.getenv("PORT", "5000"))
+    print(f"🔁 Proxy running at http://0.0.0.0:{port} → {RUNPOD_BASE}")
+    app.run(host="0.0.0.0", port=port, debug=False, threaded=True)

@@ -94,8 +94,13 @@ canonical_keys:
   objdet.object_kind:
     unit: text
     aliases: [objdet.object_kind, equipment.kind, object.kind]
-    # תיעוד: ערכים מומלצים כיום:barbell, dumbbell, kettlebell, trapbar, plate, band, bodyweight, unknown
+    # תיעוד: ערכים מומלצים כיום: barbell, dumbbell, kettlebell, trapbar, plate, band, bodyweight, unknown
     # ניתן להרחבה עתידית (cable, sandbag, machine, smith_machine, וכו')
+
+  # ציוד: טרפ-בר (לשימוש עתידי)
+  objdet.trapbar_present:
+    unit: bool
+    aliases: [objdet.trapbar_present, trapbar.present]
 
   # סיגנל גובה כלל-מערכתי לאובייקט (מוט/דאמבלים/קטלבל/גוף) — קל לזכור
   object_y:
@@ -136,7 +141,7 @@ canonical_keys:
 
   spine_flexion_deg:
     unit: deg
-    aliases: [spine_flexion_deg]  # ⬅️ תיקון: הוסר alias שגוי של spine_curvature_side_deg
+    aliases: [spine_flexion_deg]  # ⬅️ הוסר alias שגוי של spine_curvature_side_deg
 
   spine_curvature_side_deg:
     unit: deg
@@ -151,7 +156,7 @@ canonical_keys:
     aliases: [torso_forward_acc_deg_s2]
 
   spine_curvature_side_vel_deg_s:
-    unit: deg_s
+    unit: deg
     aliases: [spine_curvature_side_vel_deg_s]
 
   spine_curvature_side_acc_deg_s2:
@@ -298,6 +303,11 @@ canonical_keys:
     unit: px
     aliases: [hips_delta_px]
 
+  # עקבים נעוצים (לתנאי נעילה)
+  heels_grounded:
+    unit: bool
+    aliases: [heels_grounded, heels.on_floor, heels_contact_ok]
+
   # ────────────────────────────────────────────────────────────────────────────
   # ראש (Head)
   # ────────────────────────────────────────────────────────────────────────────
@@ -373,6 +383,15 @@ canonical_keys:
     unit: s
     aliases: [rep.rest_s]
 
+  # עצירות (לנעילה/סט-אפ)
+  rep.pause_top_s:
+    unit: s
+    aliases: [rep.pause_top_s, rep_hold_top_s, top_hold_s]
+
+  rep.pause_bottom_s:
+    unit: s
+    aliases: [rep.pause_bottom_s, rep_hold_bottom_s, bottom_hold_s]
+
   # טווח תנועה/התקדמות
   rep.rom:
     unit: deg
@@ -438,7 +457,7 @@ tolerances:
 # 🛠️ רעיונות עתידיים (תיעוד בלבד)
 # =============================================================================
 # 1) ROM מפורק למפרקים: knee_rom_deg / hip_rom_deg / elbow_rom_deg (deg)
-# 2) שליטה בטמפו מורחב: rep.pause_bottom_s / rep.pause_top_s (s)
+# 2) שליטה בטמפו מורחב: rep.pause_bottom_s / rep.pause_top_s (s) — (כבר הוגדרו כאן)
 # 3) מדדי סימטריה: symmetry.knee_diff_deg / symmetry.hip_diff_deg / symmetry.shoulder_diff_deg
 # 4) Hinge Ratio: torso_forward_deg / avg(knee_left/right_deg) (ratio)
 # 5) balance_score מתנועה צדית מנורמלת (shoulders_delta_px / hips_delta_px)
