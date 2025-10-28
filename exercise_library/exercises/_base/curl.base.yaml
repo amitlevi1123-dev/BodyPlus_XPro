@@ -2,15 +2,6 @@
 # ===================================================================
 # curl.base.yaml — בסיס למשפחת כפיפות מרפק (Curl / Elbow Flexion)
 # ===================================================================
-# זרימה: Camera → Pose/ObjDet → Normalizer+Aliases → Canonical Payload
-#                                 └→ Classifier (משפחה+ווריאנטים)
-# עקרונות:
-# • קובץ בסיס: selectable:false — לא נבחר ישירות; הווריאנטים יורשים.
-# • משתמשים רק במפתחות קנוניים (ראה aliases.yaml).
-# • policy.missing=skip → קריטריון חסר לא מפיל את החזרה; הוא פשוט לא נספר בניקוד.
-# • “hooks” למדיניות ייחודית למשפחה/וריאנט (posture_fixed, grip, top).
-# • המדידה חכמה: סופרים רק תנועה אמיתית (ROM מינימלי וזמן חזרה סביר).
-# ===================================================================
 
 id: curl.base
 family: curl
@@ -22,64 +13,59 @@ meta:
     משפחת כפיפות מרפק (DB/EZ/Cable/Preacher/Incline/Hammer/Concentration).
     מדגישים ROM במרפק, יציבות גו, הימנעות מתנועת כתף קדימה, טמפו נשלט,
     ושורש כף־יד ניטרלי. הווריאנטים ידרסו ציוד/תנוחה/טווחים בהתאם.
-    "יציבה" אינה חייבת להיות עמידה — העיקר שהיא יציבה (Stable Posture).
+    "יציבה" אינה חייבת להיות עמידה — העיקר יציבות (Stable Posture).
 
-# ------------------------------------------------------------
-# 🗣️ מרחב מסרים
-# ------------------------------------------------------------
 phrases:
-  namespace: "curl.common"
+  namespace: "curl.common"   # לא נדרשת הוספה בקובץ phrases.yaml; משתמשים בקטגוריות קיימות
 
-# ------------------------------------------------------------
-# 🎯 יעדי ROM ברירת מחדל (ניתן לדרוס בווריאנטים)
-# ------------------------------------------------------------
 targets:
   upper:
     pull:
-      elbow_rom_deg_target: 90     # יעד אפקטיבי (90–110° מקובל בחדר כושר)
-      elbow_rom_deg_partial: 60    # partial
-      elbow_rom_deg_cutoff: 40     # מתחת לזה לא נספר
-      shoulder_flexion_ok: 10      # יעד שמרני למניעת "מרפק בורח קדימה"
+      elbow_rom_deg_target: 90
+      elbow_rom_deg_partial: 60
+      elbow_rom_deg_cutoff: 40
+      shoulder_flexion_ok: 10
       shoulder_flexion_warn: 15
       shoulder_flexion_bad: 20
 
 # ------------------------------------------------------------
-# 🧪 קריטריונים — המנוע ידלג על לא-רלוונטיים/חסרים
+# 🧪 קריטריונים — שימוש בשמות שיש להם פרייזים קיימים כשאפשר
 # ------------------------------------------------------------
 criteria:
-  # יציבה/גו/ראש
-  posture:            { requires: [torso_forward_deg] }
-  spine_rounding:     { requires: [spine_flexion_deg] }
-  head_spine:         { requires: [head_pitch_deg, torso_forward_deg] }
+  # יציבה/גו/ראש (קיימים ב-phrases)
+  posture:            { requires: [torso_forward_deg] }                         # phrases.posture
+  spine_rounding:     { requires: [spine_flexion_deg] }                         # phrases.spine_rounding
+  head_alignment:     { requires: [head_pitch_deg, torso_forward_deg] }         # phrases.head_alignment
 
-  # כתף/מרפק — עיקריים למשפחה
-  rom_joint_upper:    { requires: [elbow_left_deg, elbow_right_deg, shoulder_left_deg, shoulder_right_deg] }
+  # ROM עליון (שם כללי עם פרייזים קיימים)
+  range_of_motion:    { requires: [elbow_left_deg, elbow_right_deg] }          # phrases.range_of_motion
+
+  # כתף (ענישה ייעודית; ללא פרייז ייעודי – לא נדרש שינוי ב-phrases)
   shoulder_stillness: { requires: [shoulder_left_deg, shoulder_right_deg] }
 
-  # טמפו/פאזות
-  tempo:              { requires: [rep.timing_s] }
-  phase_control:      { requires: [rep.ecc_s, rep.con_s] }
-  turn_quality:       { requires: [rep.dir, rep.state, rep.phase] }
+  # טמפו/פאזות (קיימים ב-phrases)
+  tempo:              { requires: [rep.timing_s] }                              # phrases.tempo
+  tempo_control:      { requires: [rep.ecc_s, rep.con_s] }                      # phrases.tempo_control
+  turn_quality:       { requires: [rep.dir, rep.state, rep.phase] }             # אין טקסט ייעודי – מותר
 
-  # שורש כף־יד (רצוי; יידלג אם חסר)
-  wrist_neutral:      { requires: [wrist_flex_ext_left_deg, wrist_flex_ext_right_deg] }
+  # שורש כף־יד (קיים ב-phrases)
+  wrist_position:     { requires: [wrist_flex_ext_left_deg, wrist_flex_ext_right_deg] }  # phrases.wrist_position
 
-  # ברכיים רכות (רלוונטי בעיקר בעמידה; וריאנטים בישיבה/שיפוע ידלגו)
+  # ברכיים רכות (קטן; אין פרייז ייעודי – לא חובה טקסט)
   knees_soft:
     requires: [knee_left_deg, knee_right_deg]
-    enable_when: "not variant.posture_fixed"    # וריאנט יכול להגדיר posture_fixed=true
+    enable_when: "not variant.posture_fixed"
 
-  # Hooks
+  # Hooks (ללא צורך בפרייז)
   top_quality_hook:   { requires: [rep.pause_top_s, spine_flexion_deg, torso_forward_deg] }
-  grip_width_hook:    { requires: [shoulders_width_px] }  # ימומש בוריאנטים עם מוט/EZ
+  grip_width_hook:    { requires: [shoulders_width_px] }
 
 # ------------------------------------------------------------
 # ⚠️ קריטיים — תנאי סף לניקוד חזרה
 # ------------------------------------------------------------
 critical:
-  # חייבים יציבות בסיסית ומדדי ROM עליונים זמינים
   - posture
-  - rom_joint_upper
+  - range_of_motion        # חייבים מדידת ROM במרפק כדי למדוד Curl
 
 # ------------------------------------------------------------
 # ⚖️ SCORING — כללי ניקוד + תקרות בטיחות
@@ -92,23 +78,21 @@ scoring:
   criteria:
 
     # --- עיקריים למשפחה ---
-    # ROM מרפק — לב הניקוד
-    rom_joint_upper:
+    range_of_motion:
       weight: 2.0
       rule:
         kind: threshold_window
-        # מודדים ROM מצטבר בפועל (מזוג מכל מרפק; המנוע יודע להפיק rep.rom מהזוויות)
-        input: rep.rom
+        input: rep.rom          # מחושב מתוך זוויות המרפק ברמת החזרה
         target: 90
         partial: 60
         cutoff_min: 40
 
-    # כתף לא "בורחת" קדימה לאורך החזרה
+    # כתף לא "בורחת" קדימה
     shoulder_stillness:
       weight: 1.2
       rule:
         kind: symmetric_threshold
-        input: "max(abs(shoulder_left_deg - baseline.shoulder_left_deg),abs(shoulder_right_deg - baseline.shoulder_right_deg))"
+        input: "max(abs(shoulder_left_deg - mean(shoulder_left_deg)), abs(shoulder_right_deg - mean(shoulder_right_deg)))"
         ok: 10
         warn: 15
         bad: 20
@@ -118,7 +102,7 @@ scoring:
       weight: 1.4
       rule:
         kind: symmetric_threshold
-        input: "abs(delta.torso_forward_deg)"  # שינוי נטיית גו לאורך החזרה
+        input: "abs(torso_forward_deg - mean(torso_forward_deg))"
         ok: 6
         warn: 10
         bad: 15
@@ -127,7 +111,7 @@ scoring:
       weight: 1.2
       rule: { kind: symmetric_threshold, input: spine_flexion_deg, ok: 10, warn: 20, bad: 30 }
 
-    head_spine:
+    head_alignment:
       weight: 0.8
       rule: { kind: symmetric_threshold, input: "abs(head_pitch_deg - torso_forward_deg)", ok: 10, warn: 20, bad: 30 }
 
@@ -136,7 +120,7 @@ scoring:
       weight: 0.6
       rule: { kind: tempo_window, input: rep.timing_s, min: 0.8, max: 2.5, cutoff_min: 0.6, cutoff_max: 6.0 }
 
-    phase_control:
+    tempo_control:
       weight: 0.6
       rule: { kind: phase_balance, ecc_min: 0.6, con_min: 0.4, ecc_con_ratio_min: 1.2 }
 
@@ -145,7 +129,7 @@ scoring:
       rule: { kind: jerk_guard, allow_bounce: false }
 
     # --- יד/אחיזה/ברכיים ---
-    wrist_neutral:
+    wrist_position:
       weight: 0.3
       rule:
         kind: band_center
@@ -166,7 +150,7 @@ scoring:
         cutoff_min: 0
         cutoff_max: 25
 
-    # --- Hooks (ימופו בווריאנטים) ---
+    # --- Hooks (לא מציגים טקסט; ניקוד בלבד) ---
     top_quality_hook:
       weight: 0.5
       rule: { kind: passthrough }
@@ -180,41 +164,40 @@ scoring:
     weights_source: inline
 
   safety_caps:
-    - { when: "posture        <= 0.6", cap: 0.85 }  # סווינג/גו חלש
-    - { when: "rom_joint_upper<= 0.6", cap: 0.85 }  # ROM חלקי/חסר
-    - { when: "head_spine     <= 0.5", cap: 0.90 }
-    - { when: "wrist_neutral  <= 0.5", cap: 0.90 }
+    - { when: "posture          <= 0.6", cap: 0.85 }  # סווינג/גו חלש
+    - { when: "range_of_motion  <= 0.6", cap: 0.85 }  # ROM חלקי/חסר
+    - { when: "head_alignment   <= 0.5", cap: 0.90 }
+    - { when: "wrist_position   <= 0.5", cap: 0.90 }
 
 # ------------------------------------------------------------
-# 🧭 רמזים למסווג — בסיס; הווריאנטים ירחיבו
+# 🧭 רמזים למסווג — רק מפתחות שקיימים ב-aliases
 # ------------------------------------------------------------
 match_hints:
   must_have: [pose.available]
   any_of:
     - objdet.dumbbell_present
     - objdet.bar_present
-    - objdet.cable_handle_present
   pose_view: [front, front_left, side_light]
 
 # ------------------------------------------------------------
-# 🔁 אות חזרה (Rep Signal) — angle-first עם Auto-Pick
+# 🔁 אות חזרה (Rep Signal)
 # ------------------------------------------------------------
 rep_signal:
-  source: "angle|auto|min"   # יעדיף מרפק; יבחר אוטומטית את האמין ביותר
+  source: "angle|auto|min"
   candidates:
     upper: ["elbow_left_deg","elbow_right_deg","shoulder_left_deg","shoulder_right_deg"]
     lower: ["hip_left_deg","hip_right_deg","knee_left_deg","knee_right_deg","torso_forward_deg"]
     core:  ["torso_forward_deg","spine_flexion_deg"]
   thresholds:
-    phase_delta: 5         # שינוי מינ’ כדי להתחיל פאזה
-    min_turn_ms: 120       # השהיה מינ’ לאישור turn (נגד "במפ")
+    phase_delta: 5
+    min_turn_ms: 120
     min_rep_ms: 600
     max_rep_ms: 6000
-    min_rom_good: 25       # דרישת ROM מינימלית כדי לספור good
-    min_rom_partial: 18    # partial (לא נחשב מלא)
+    min_rom_good: 25
+    min_rom_partial: 18
 
 # ------------------------------------------------------------
-# 🔄 מקורות גיבוי לפאזות/ספירה אם אין זוויות יציבות
+# 🔄 מקורות גיבוי לפאזות/ספירה
 # ------------------------------------------------------------
 fallback_sources:
   any_of: ["object_y","hands_center_y"]
@@ -224,5 +207,7 @@ fallback_sources:
 # • הווריאנט קובע: equipment, pose_view, start_mode, rom_policy, top_policy, posture_fixed.
 # • curl.preacher / curl.incline יגדירו posture_fixed: true (מדלג על knees_soft).
 # • אפשר לדרוס טווחי ROM/כתף/שורש־כף־יד לכל וריאנט בנפרד.
-# • שמור את ה-phrases בשם namespace ייחודי לווריאנט: curl.<variant>.*
+# • שימוש רק במפתחות קנוניים הקיימים כבר ב-aliases.yaml.
+# • שימוש בקטגוריות פרייזים קיימות: range_of_motion, posture, spine_rounding,
+#   head_alignment, tempo, tempo_control, wrist_position.
 # ------------------------------------------------------------

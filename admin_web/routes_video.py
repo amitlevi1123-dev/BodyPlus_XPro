@@ -3,7 +3,7 @@
 admin_web/routes_video.py — וידאו: ingest מהדפדפן + סטרים MJPEG + סטטוס
 -----------------------------------------------------------------------
 Endpoints:
-- GET  /video/stream.mjpg        — סטרים MJPEG מתוך הזיכרון (ingest)
+- GET  /video/stream.mjpg        — סטרים MJPEG מתוך הזיכרון (ingest בלבד; לא מפעיל מקור)
 - POST /api/ingest_frame         — קבלת JPEG מהדפדפן/טלפון (raw או multipart)
 - GET  /api/video/status         — אינדיקציות מצב (camera/file, opened, running, fps, size, payload_age_sec, ffmpeg)
 - POST /api/video/stop           — עצירת מקור פעיל (file/camera) עם לוגים ברורים
@@ -11,15 +11,13 @@ Endpoints:
 הערות:
 - אין שימוש ב-OpenCV. הכל מבוסס JPEG ingest.
 - אם routes_upload_video קיים, נשלוף ממנו מצב FFmpeg וסוג מקור ("file" / "camera").
-- לוגים מפורטים לכל אירוע משמעותי.
+- **חשוב:** לא מפעילים מקור וידאו אוטומטית כשנכנסים ל-/video/stream.mjpg.
 """
 
 from __future__ import annotations
 import os
-import io
 import time
 import json
-import traceback
 from typing import Any, Dict, Optional, Tuple
 
 from flask import Blueprint, Response, jsonify, request, stream_with_context
@@ -44,7 +42,6 @@ video_bp = Blueprint("video", __name__)
 # ===== Optional integrations (upload-from-file via FFmpeg) =====
 _HAS_UPLOAD = False
 _get_stream_mode = None
-_ffmpeg_debug_fn = None
 
 try:
     # get_stream_mode() מחזיר "file" אם ffmpeg פעיל
@@ -55,7 +52,6 @@ try:
 except Exception:
     logger.info("[video] routes_upload_video not present; file-mode will be unavailable")
 
-# נקרא ל-/api/video/stop_file דרך HTTP כדי לא להיכנס לתלויות פנימיות
 _LOCAL_BASE = os.getenv("SERVER_BASE_URL", "http://127.0.0.1:5000").rstrip("/")
 
 
@@ -66,7 +62,6 @@ def _read_request_bytes() -> Optional[bytes]:
     קורא את גוף הבקשה כ-bytes. תומך גם ב-multipart (field: 'frame').
     """
     # multipart
-    f = None
     try:
         if request.files:
             f = request.files.get("frame")
@@ -159,7 +154,8 @@ def _stop_file_mode_via_http() -> Tuple[bool, str]:
 @video_bp.get("/video/stream.mjpg")
 def video_stream_mjpg():
     """
-    סטרים MJPEG מתוך הזיכרון (ingest). אם אין עדיין פריימים — ישלח placeholder תקופתי.
+    סטרים MJPEG מתוך הזיכרון (ingest). **לא מפעיל מקור**.
+    אם אין producer פעיל/אין פריימים — מחזיר 503 ולא מתחיל מצלמה.
     """
     if get_streamer is None:
         logger.error("❌ stream.mjpg requested but get_streamer is unavailable")
@@ -167,11 +163,43 @@ def video_stream_mjpg():
                         status=500, mimetype="application/json")
 
     s = get_streamer()
-    logger.info("[video] /video/stream.mjpg opened; source=%s", getattr(s, "source_desc", lambda: "?")())
+
+    # ── בלם Auto-Start: נבדוק אם יש מקור פעיל/פריימים בלי להפעיל כלום ──
+    try:
+        has_frames = False
+        if hasattr(s, "buffer_len") and callable(getattr(s, "buffer_len")):
+            try:
+                has_frames = (s.buffer_len() or 0) > 0
+            except Exception:
+                has_frames = False
+        is_running = False
+        if hasattr(s, "is_running") and callable(getattr(s, "is_running")):
+            try:
+                is_running = bool(s.is_running())
+            except Exception:
+                is_running = False
+        elif hasattr(s, "running"):
+            is_running = bool(getattr(s, "running", False))
+
+        if not (has_frames or is_running):
+            logger.warning("[video] /video/stream.mjpg requested but no active producer (ingest mode)")
+            return Response('{"ok":false,"error":"no_active_producer"}\n',
+                            status=503, mimetype="application/json")
+    except Exception:
+        logger.debug("[video] status probe failed; assuming inactive")
+        return Response('{"ok":false,"error":"inactive_streamer"}\n',
+                        status=503, mimetype="application/json")
+
+    # יש מקור פעיל → אפשר להזרים
+    try:
+        src_desc = getattr(s, "source_desc", lambda: "?")()
+    except Exception:
+        src_desc = "?"
+    logger.info(f"[video] /video/stream.mjpg opened; source={src_desc}")
 
     def _gen():
         try:
-            for chunk in s.get_jpeg_generator():  # iter_mjpeg alias
+            for chunk in s.get_jpeg_generator():  # לא יפעיל מקור אם כבר רץ
                 yield chunk
         except GeneratorExit:
             logger.info("[video] client disconnected from /video/stream.mjpg")
@@ -181,7 +209,6 @@ def video_stream_mjpg():
     boundary = "frame"
     resp = Response(stream_with_context(_gen()),
                     mimetype=f"multipart/x-mixed-replace; boundary={boundary}")
-    # כותרות חשובות כדי לא לעשות buffering בדרך
     resp.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
     resp.headers["Pragma"] = "no-cache"
     resp.headers["Expires"] = "0"
@@ -210,7 +237,6 @@ def api_ingest_frame():
     try:
         s = get_streamer()
         s.ingest_jpeg(b)
-        # נרשום גודל JPEG כדי לעזור בדיבוג
         logger.debug("ingest_frame: %d bytes | fps=~%s | size=%s",
                      len(b), getattr(s, "last_fps", lambda: None)(), getattr(s, "last_frame_size", lambda: None)())
         return jsonify(ok=True), 200
@@ -222,7 +248,7 @@ def api_ingest_frame():
 @video_bp.get("/api/video/status")
 def api_video_status():
     """
-    סטטוס וידאו מאוחד (מוצג ב-upload_video.html):
+    סטטוס וידאו מאוחד:
     - mode: 'file' (סטרים מקובץ) או 'camera' (ingest)
     - opened/running/fps/size: ממצב הסטרימר (ingest)
     - payload_age_sec: גיל payload האחרון (אם יש)
@@ -279,7 +305,6 @@ def api_video_status():
         except Exception:
             out["ffmpeg"] = {"available": False, "bin": None}
 
-    # לוג קצר ברמת DEBUG כדי לא להציף
     logger.debug("[video] status | mode=%s opened=%s running=%s fps=%.2f size=%s age=%s ffmpeg=%s",
                  out["mode"], out["opened"], out["running"], out["fps"], out["size"],
                  out["payload_age_sec"], _safe_json(out.get("ffmpeg")))
@@ -292,7 +317,7 @@ def api_video_stop():
     """
     עוצר מקור פעיל:
     - אם מצב 'file' → קורא ל-/api/video/stop_file (HTTP פנימי) כדי לעצור ffmpeg וה-emitter.
-    - אחרת (camera/ingest) → מקפיא את הסטרימר / מאפס ריצה.
+    - אחרת (camera/ingest) → מקפיא את הסטרימר / מאפס ריצה (לוגי בלבד).
     """
     mode = _current_mode()
     logger.info("[video] stop requested | mode=%s", mode)
@@ -303,13 +328,12 @@ def api_video_stop():
         logger.info("[video] stop_file result: %s | %s", "OK" if ok else "FAIL", msg)
         return jsonify(ok=bool(ok), mode="file", detail=msg), (200 if ok else 500)
 
-    # ingest/camera: אין ממש capture בצד השרת — רק מסמנים "לא רץ" (אופציונלי)
+    # ingest/camera: אין capture בצד השרת — רק "עצירה לוגית"
     try:
         if get_streamer:
             s = get_streamer()
-            # אין לנו start/stop אמיתיים — נסמן running=False
             try:
-                s.stop_auto_capture()  # no-op ב-ingest-only, אבל נשאיר לצורך תאימות
+                s.stop_auto_capture()  # no-op ברוב מימושי ingest-only; נשאיר לתאימות
             except Exception:
                 pass
         logger.info("[video] ingest stopped (logical)")

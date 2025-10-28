@@ -1,21 +1,25 @@
-import requests
+# admin_web/mini_proxy_test.py
+from flask import Flask, request, jsonify
+import os
 
-API_KEY = "rpa_H63HWWYQPHFPTDDOY81DSRONUWZI0RAMOXE5B6P91rt4mu"
-url = "https://api.runpod.ai/v2/pcw665a3g3k5pk/run"
+app = Flask(__name__)
 
-headers = {
-    "Content-Type": "application/json",
-    "Authorization": f"Bearer {API_KEY}"
-}
+@app.get("/")
+def home():
+    return jsonify(ok=True, msg="mini proxy alive"), 200
 
-data = {
-    "input": {
-        "prompt": "hello from BodyPlus_XPro test"
-    }
-}
+@app.get("/_proxy/health")
+def health():
+    return jsonify(ok=True, msg="health ok"), 200
 
-response = requests.post(url, headers=headers, json=data)
+@app.post("/run-sync")
+def run_sync():
+    data = request.get_json(silent=True) or {}
+    # רק מחזיר מה שקיבלנו — כדי לבדוק שהראוט עובד
+    return jsonify(ok=True, echo=data), 200
 
-print("Status:", response.status_code)
-print("Response:")
-print(response.text)
+if __name__ == "__main__":
+    port = int(os.getenv("PORT", "8000"))
+    print(f"Running mini proxy on http://127.0.0.1:{port}")
+    print("Routes:", app.url_map)  # הדפס רשימת ראוטים
+    app.run(host="127.0.0.1", port=port, debug=False, threaded=True)

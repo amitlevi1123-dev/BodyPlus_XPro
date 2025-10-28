@@ -13,7 +13,7 @@ Endpoints:
 - GET  /api/upload_video/status
 - POST /api/video/use_file           { "fps": 25, "quality": 5 }  (אופציונלי)
 - POST /api/video/stop_file
-- GET  /video/stream_file.mjpg
+- GET  /video/stream_file.mjpg       (לא מפעיל ffmpeg אוטומטית)
 - GET  /api/debug/ffmpeg
 """
 
@@ -158,7 +158,6 @@ def get_stream_mode() -> str:
     path = _LAST_UPLOAD.get("path")
     if path and os.path.exists(str(path)) and _ffmpeg_proc_running():
         return "file"
-    # אם הקובץ נמחק אפמרלית: עדיין 'file' אם התהליך פעיל
     if _ffmpeg_proc_running():
         return "file"
     return "camera"
@@ -191,7 +190,8 @@ def _stderr_pump(proc: subprocess.Popen):
 
 def _stop_ffmpeg():
     with _FILE_STREAM["lock"]:
-        p = _FILE_STREAM.get("proc"); _FILE_STREAM["proc"] = None
+        p = _FILE_STREAM.get("proc")
+        _FILE_STREAM["proc"] = None
     try:
         if p and p.poll() is None:
             logger.info("[file_stream] killing ffmpeg process")
@@ -207,8 +207,8 @@ def _start_ffmpeg_pipe(path: str, fps: Optional[int] = None, quality: int = 5) -
     args = [
         FFMPEG_BIN, "-hide_banner", "-loglevel", "error",
         "-re", "-i", path, "-an",
-        "-vf", vf, "-q:v", str(max(2, min(31, int(quality))))  # 2=איכות גבוהה, 31=נמוכה
-        , "-f", "image2pipe", "-vcodec", "mjpeg", "pipe:1",
+        "-vf", vf, "-q:v", str(max(2, min(31, int(quality)))),
+        "-f", "image2pipe", "-vcodec", "mjpeg", "pipe:1",
     ]
     logger.info(f"[file_stream] starting ffmpeg | bin={FFMPEG_BIN!r} | path={path} | vf={vf} | q={quality}")
     p = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.PIPE, bufsize=0)
@@ -217,7 +217,7 @@ def _start_ffmpeg_pipe(path: str, fps: Optional[int] = None, quality: int = 5) -
         _FILE_STREAM["proc"] = p; _FILE_STREAM["started_ts"] = time.time()
     threading.Thread(target=_stderr_pump, args=(p,), daemon=True).start()
 
-    # --- אפמרלי: נסה למחוק מייד (Linux/Unix תומך unlink-while-open) ---
+    # אפמרלי: נסה למחוק מייד (Linux/Unix) — ב-Windows מחיקה מאוחרת
     try:
         if EPHEMERAL_UPLOADS:
             src = _LAST_UPLOAD.get("path")
@@ -259,7 +259,6 @@ def _mjpeg_from_pipe(p: subprocess.Popen, boundary: str = "frame", chunk_size: i
             )
     finally:
         _stop_ffmpeg()
-        # מחיקה מאוחרת (Windows) + ניקוי מצביע
         try:
             pending = _LAST_UPLOAD.get("delete_when_done")
             if pending and os.path.exists(pending):
@@ -505,25 +504,15 @@ def api_video_stop_file():
 
 @upload_video_bp.route("/video/stream_file.mjpg", methods=["GET"])
 def video_stream_file_mjpg():
-    # גם אם הקובץ כבר נמחק (אפמרלי), אם ffmpeg כבר רץ — נמשיך להזרים
+    """
+    צפייה בסטרים מהקובץ. **לא** מפעיל ffmpeg אוטומטית.
+    אם ffmpeg לא רץ — מחזיר 503. הפעלה מתבצעת רק ב-POST /api/video/use_file.
+    """
     with _FILE_STREAM["lock"]:
         p = _FILE_STREAM.get("proc")
     if (not p) or (p.poll() is not None):
-        # אם אין תהליך רץ — ננסה להפעיל מחדש (רק אם יש path זמני קיים)
-        tmp_path = _LAST_UPLOAD.get("path")
-        if not tmp_path:
-            return Response('{"ok":false,"error":"no_stream_running_or_ephemeral_path_gone"}\n',
-                            status=503, mimetype="application/json")
-        if not _ffmpeg_available():
-            return Response(f'{{"ok":false,"error":"ffmpeg_not_found","resolved":{FFMPEG_BIN!r}}}\n',
-                            status=500, mimetype="application/json")
-        try:
-            p = _start_ffmpeg_pipe(tmp_path)
-            _start_payload_emitter(_PAY_EMIT["fps"] or 25)
-        except Exception as e:
-            logger.exception("[file_stream] autostart failed")
-            return Response(f'{{"ok":false,"error":"ffmpeg_autostart_failed","detail":{json.dumps(str(e))}}}\n',
-                            status=500, mimetype="application/json")
+        return Response('{"ok":false,"error":"no_file_stream_running"}\n',
+                        status=503, mimetype="application/json")
 
     boundary = "frame"
     gen = _mjpeg_from_pipe(p, boundary=boundary)

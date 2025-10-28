@@ -1,56 +1,116 @@
 # -*- coding: utf-8 -*-
 """
-server_monitor.py
-────────────────────────────
-קובץ ניטור מרכזי ל־BodyPlus_XPro
+server_monitor.py — ניטור + ביקורת AI ל־BodyPlus_XPro
 
-מה זה עושה:
-- מריץ את השרת שלך (Flask / Gunicorn)
-- צופה בזמן אמת בלוגים ובמצלמה
-- מזהה תקלות נפוצות (מצלמה, סטרים, Flask, Proxy)
-- מסביר לך בעברית למה זה קרה ואיך לתקן
-- אם מוגדר OPENAI_API_KEY → מקבל גם הסבר חכם ו-Patch מתוקן מ־ChatGPT
-- בודק אוטומטית ש־/video/stream.mjpg ו־/api/diagnostics עובדים
-
-איך להריץ:
-python server_monitor.py --cmd "python app.py" --health http://localhost:8000
-או
-python server_monitor.py --cmd "gunicorn app:app -w 2 -k gevent -b 0.0.0.0:8000" --health http://localhost:8000
-
-ב־PyCharm:
-1) Run → Edit Configurations
-2) Script path: server_monitor.py
-3) Parameters: (הפקודה למעלה)
-4) Environment variables: OPENAI_API_KEY=sk-xxxxx (אם יש)
+יכולות עיקריות:
+- מריץ שרת/פרוקסי לפי --cmd
+- אוסף לוגים ל- --startup_window (ברירת מחדל: 30 שניות)
+- בודק /video/stream.mjpg ו-/api/diagnostics (אם ניתנה --health)
+- מזהה תקלות לפי RULES ומפיק ביקורת מסכמת למסך + דוח Markdown בתיקייה --report_dir
+- אם ניתן --openai_api_key (או יש ב-.env/סביבה) → מבצע גם ביקורת AI ומציין זאת בלוגים
 """
 
-import argparse, os, sys, subprocess, threading, queue, time, re, pathlib, json
+from __future__ import annotations
+import argparse, os, sys, subprocess, threading, queue, time, re, pathlib, json, datetime
 from typing import List, Dict, Tuple, Optional
 import requests
 
-# ננסה לטעון משתני סביבה מקובץ .env (אם קיים)
-try:
-    from dotenv import load_dotenv  # type: ignore
-    load_dotenv()
-except Exception:
-    pass
+# ============ CLI ============
+def parse_args():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--cmd", required=True, help="פקודת ההרצה של השרת (למשל: python app/main.py)")
+    ap.add_argument("--health", default="", help="כתובת בסיס לבדיקה (למשל http://127.0.0.1:8000)")
+    ap.add_argument("--startup_window", type=int, default=30, help="משך חלון הבדיקה בשניות (ברירת מחדל: 30)")
+    ap.add_argument("--report_dir", default="report", help="תיקיית הדוחות (ברירת מחדל: report)")
+    ap.add_argument("--openai_api_key", default=None, help="מפתח OpenAI (עדיפות על .env/סביבה)")
+    ap.add_argument("--verbose", action="store_true", help="פלט מפורט יותר לקונסול")
+    return ap.parse_args()
 
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
-GPT_MODEL = "gpt-5-thinking"  # דגם GPT שבו משתמשים (לא חובה מפתח)
+# ============ ENV / .env ============
+def resolve_api_key(cli_key: Optional[str]) -> str:
+    # .env (אם קיים)
+    try:
+        from dotenv import load_dotenv  # type: ignore
+        load_dotenv()
+    except Exception:
+        pass
+    env_key = os.getenv("OPENAI_API_KEY", "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")
+    return cli_key or env_key
 
-# -----------------------------------------------------------------
-# כאן אני מדלג על פירוט כל החוקים כדי לחסוך מקום בתגובה
-# אבל נכניס לך בקובץ המלא בדיוק את אותם RULES מהקובץ הקודם
-# (החוקים של מצלמה ושרת)
-# -----------------------------------------------------------------
-# תדביק כאן את כל בלוק RULES המלא מקודם (מתחיל מ: RULES = [ ... ])
-# -----------------------------------------------------------------
+# ============ RULES ============
+RULES: List[Dict] = [
+    dict(
+        name="Address already in use (פורט תפוס)",
+        patterns=[r"Address already in use", r"OSError: \[Errno (98|10048)\]", r"Only one usage of each socket address"],
+        explanation="הפורט שעליו השרת מנסה להאזין כבר תפוס.",
+        fix="סגור תהליך קודם או שנה פורט (8001/8002). ב-Windows: netstat -ano | findstr :8000 → taskkill /PID <pid> /F.",
+        tags=["flask","proxy","port"],
+    ),
+    dict(
+        name="Import/Module Not Found",
+        patterns=[r"ModuleNotFoundError", r"ImportError: No module named", r"cannot import name"],
+        explanation="חסר מודול או import לא תקין.",
+        fix="pip install -r requirements.txt וודא PYTHONPATH תקין.",
+        tags=["python","deps"],
+    ),
+    dict(
+        name="RunPod Proxy Error",
+        patterns=[r"\[proxy\]", r"RUNPOD_BASE", r"Bad Gateway", r"502", r"upstream.*runpod", r"invalid api key", r"401 Unauthorized"],
+        explanation="שגיאה בפרוקסי RunPod (API/Upstream/הרשאות).",
+        fix="בדוק RUNPOD_BASE, API key, מצב הפוד. אמת ‎/_proxy/health‎.",
+        tags=["proxy","cloud"],
+    ),
+    dict(
+        name="Camera in use / cannot open camera",
+        patterns=[r"cannot open camera", r"Failed to open camera", r"VideoCapture\(.*\) failed", r"device busy"],
+        explanation="מצלמה תפוסה/נעולה או חסומה.",
+        fix="סגור ריצות מקבילות, העדף סטרים דרך דפדפן/FFmpeg במקום OpenCV מקומי.",
+        tags=["video","camera"],
+    ),
+    dict(
+        name="FFmpeg not found / path",
+        patterns=[r"ffmpeg.*not found", r"FileNotFoundError.*ffmpeg", r"\[FFMPEG\].*not resolved"],
+        explanation="FFmpeg לא נמצא/נתיב שגוי.",
+        fix="התקן FFmpeg והוסף ל-PATH; אמת שהנתיב שמודפס בלוג תקין.",
+        tags=["video","ffmpeg"],
+    ),
+    dict(
+        name="MJPEG stream 404/500",
+        patterns=[r"/video/stream\.mjpg.*(404|500)", r"GET /video/stream\.mjpg .* (404|500)"],
+        explanation="ראוט הסטרים לא זמין/שגוי.",
+        fix="ודא routes_video נטען, ושיש ייצור פריימים תקין בגנרטור MJPEG.",
+        tags=["video","mjpeg","flask"],
+    ),
+    dict(
+        name="Kinematics missing metrics",
+        patterns=[r"missing_critical", r"pose\.available.*False", r"not_enough_frames", r"low_pose_confidence", r"no payload", r"PAYLOAD_VERSION mismatch"],
+        explanation="חסרים מדדים לפוזה/קינמטיקה או איכות נמוכה.",
+        fix="שפר תאורה/זווית, אמת שצנרת payload פעילה וגרסאות תואמות.",
+        tags=["kinematics","payload"],
+    ),
+    dict(
+        name="Object detection not running",
+        patterns=[r"objdet\.(\w+)_present.*False", r"YOLO.*failed", r"onnxruntime.*error", r"model.*not found"],
+        explanation="זיהוי אובייקטים לא רץ/מודל לא נטען.",
+        fix="בדוק פרופיל דיטקטור, נתיבי מודלים, גרסת onnxruntime ולוג OD.",
+        tags=["objdet","models"],
+    ),
+    dict(
+        name="HTTP 500 / Exception",
+        patterns=[r"500 Internal Server Error", r"Traceback \(most recent call last\):", r"Exception:"],
+        explanation="חריגה בקוד השרת.",
+        fix="בדוק Traceback (קובץ/שורה) ותקן None/KeyError/TypeError וכו׳.",
+        tags=["flask","python"],
+    ),
+]
 
-# ⚙️ פונקציות עזר: התאמות, הדפסות, Tracebacks
+# ============ Utils ============
+def log(msg: str, verbose=False):
+    print(msg) if (verbose or True) else None
+
 def banner(title: str):
-    print("\n" + "="*100)
-    print(title)
-    print("="*100 + "\n")
+    line = "=" * 88
+    print(f"\n{line}\n{title}\n{line}\n")
 
 def match_rule(line: str) -> Optional[Dict]:
     for r in RULES:
@@ -75,38 +135,36 @@ def show_file_snippet(path: str, lineno: int, ctx: int = 4) -> str:
     except Exception as e:
         return f"⚠️ שגיאה בקריאת קובץ: {e}"
 
-# 🧠 פונקציות GPT
-def gpt_self_test() -> str:
-    if not OPENAI_API_KEY:
+# ============ GPT ============
+def gpt_self_test(api_key: str) -> str:
+    if not api_key:
         return "GPT: כבוי (אין OPENAI_API_KEY)"
     try:
-        prompt = "בדיקת חיבור קצרה: החזר OK בלבד."
         r = requests.post(
             "https://api.openai.com/v1/responses",
-            headers={"Authorization": f"Bearer {OPENAI_API_KEY}"},
-            json={"model": GPT_MODEL, "input": prompt, "max_output_tokens": 5},
+            headers={"Authorization": f"Bearer {api_key}"},
+            json={"model": "gpt-5-thinking", "input": "OK", "max_output_tokens": 5},
             timeout=15,
         )
         r.raise_for_status()
-        text = (r.json().get("output_text") or "").strip()
-        return "GPT: מוכן ✔️" if "OK" in text.upper() else "GPT: מחובר (בדיקה עברה)"
+        txt = (r.json().get("output_text") or "").strip().upper()
+        return "GPT: מוכן ✔️" if ("OK" in txt or txt) else "GPT: מחובר (בדיקה עברה)"
     except Exception as e:
         return f"GPT: שגיאה ({e})"
 
-def ask_gpt(title: str, payload: Dict) -> Optional[str]:
-    if not OPENAI_API_KEY:
+def ask_gpt(title: str, payload: Dict, api_key: str) -> Optional[str]:
+    if not api_key:
         return None
     try:
         prompt = (
             "אתה מבקר מערכת עבור BodyPlus_XPro (Flask/וידאו/MediaPipe/YOLO). "
-            "תחזיר 4 חלקים קצרים: 1) למה זה קרה, 2) איך לתקן, "
-            "3) צ'ק אימות, 4) patch קצר.\n\n"
-            f"-- EVENT --\n{json.dumps(payload, ensure_ascii=False, indent=2)}"
+            "החזר 4 סעיפים קצרים: 1) למה זה קרה, 2) איך לתקן, 3) בדיקת אימות אחרי תיקון, 4) Patch/כיוון קוד קצר.\n\n"
+            f"-- אירוע: {title} --\n{json.dumps(payload, ensure_ascii=False, indent=2)}"
         )
         r = requests.post(
             "https://api.openai.com/v1/responses",
-            headers={"Authorization": f"Bearer {OPENAI_API_KEY}"},
-            json={"model": GPT_MODEL, "input": prompt, "max_output_tokens": 700},
+            headers={"Authorization": f"Bearer {api_key}"},
+            json={"model": "gpt-5-thinking", "input": prompt, "max_output_tokens": 700},
             timeout=40,
         )
         r.raise_for_status()
@@ -114,13 +172,13 @@ def ask_gpt(title: str, payload: Dict) -> Optional[str]:
     except Exception as e:
         return f"⚠️ לא הצלחתי לקבל תשובה מ-GPT: {e}"
 
-# 🌐 בדיקת Health
+# ============ Health ============
 def health_check(base: str) -> Dict[str, Dict[str, Optional[int]]]:
     def _check(path: str, stream=False):
         try:
             u = base.rstrip("/") + path
             resp = requests.get(u, stream=stream, timeout=5)
-            return {"ok": resp.status_code == 200, "code": resp.status_code}
+            return {"ok": (resp.status_code == 200), "code": resp.status_code}
         except Exception:
             return {"ok": False, "code": None}
     return {
@@ -128,45 +186,114 @@ def health_check(base: str) -> Dict[str, Dict[str, Optional[int]]]:
         "/video/stream.mjpg": _check("/video/stream.mjpg", stream=True),
     }
 
+# ============ Logs Pump ============
 def pump(pipe, q: "queue.Queue[str]"):
     for b in iter(pipe.readline, b""):
         q.put(b.decode("utf-8", errors="replace").rstrip())
     pipe.close()
 
-# 🎯 MAIN
+# ============ Report ============
+def make_report_md(cmd: str, health_history: List[Dict[str, Dict[str, Optional[int]]]],
+                   lines: List[str], matched_events: List[Dict],
+                   output_dir: pathlib.Path, window_seconds: int, api_ok: bool, gpt_status: str) -> pathlib.Path:
+    output_dir.mkdir(parents=True, exist_ok=True)
+    ts = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+    fpath = output_dir / f"דוח_ביקורת_AI_{ts}.md"
+
+    last_health = health_history[-1] if health_history else {}
+
+    pose_seen = any("pose.available" in l.lower() for l in lines)
+    objdet_seen = any(re.search(r"objdet\.\w+_present.*(True|False)", l, re.I) for l in lines)
+    stream_ok = (last_health.get("/video/stream.mjpg", {}) or {}).get("ok") is True
+
+    md = []
+    md.append(f"# 📋 דוח ביקורת AI — BodyPlus_XPro\n")
+    md.append(f"- ⏱ חלון בדיקה: {window_seconds} שניות\n- 🧭 פקודה: `{cmd}`\n")
+    md.append(f"- 🤖 סטטוס AI: {'יש API' if api_ok else 'אין API'} | {gpt_status}\n")
+    md.append("## ✅ Health (מצב אחרון)")
+    if last_health:
+        for k, v in last_health.items():
+            md.append(f"- `{k}` → ok={v.get('ok')} code={v.get('code')}")
+    else:
+        md.append("- אין נתוני Health (לא בוצעה בדיקה).")
+
+    md.append("\n## 🎥 וידאו/קינמטיקה/זיהוי אובייקט — אינדיקציות")
+    md.append(f"- pose.available זוהה בלוגים: {'כן' if pose_seen else 'לא'}")
+    md.append(f"- objdet.*_present זוהה בלוגים: {'כן' if objdet_seen else 'לא'}")
+    md.append(f"- /video/stream.mjpg: {'OK' if stream_ok else 'לא OK'}")
+
+    if matched_events:
+        md.append("\n## ⚠️ תקלות שאובחנו")
+        for ev in matched_events:
+            rule = ev['rule']
+            md.append(f"### • {rule['name']}")
+            md.append(f"**למה זה קורה:** {rule['explanation']}")
+            md.append(f"**איך לתקן:** {rule['fix']}")
+            if ev.get("file_path") and ev.get("file_line"):
+                md.append(f"\n**מיקום בקוד:** `{ev['file_path']}` שורה {ev['file_line']}\n")
+                if ev.get("snippet"):
+                    md.append("```python")
+                    md.append(ev["snippet"])
+                    md.append("```")
+            if ev.get("gpt"):
+                md.append("\n**🧠 הסבר GPT:**")
+                md.append(ev["gpt"])
+            md.append("")
+    else:
+        md.append("\n## ✅ לא נמצאו תקלות קריטיות בחלון הבדיקה")
+
+    md.append("\n## 🧾 קטע לוג אחרון (עד 60 שורות)")
+    tail = lines[-60:] if len(lines) > 60 else lines
+    md.append("```text")
+    md.extend(tail)
+    md.append("```")
+
+    fpath.write_text("\n".join(md), encoding="utf-8")
+    return fpath
+
+# ============ Main ============
 def main():
-    ap = argparse.ArgumentParser()
-    ap.add_argument("--cmd", required=True, help="פקודת ההרצה של השרת")
-    ap.add_argument("--health", default="", help="כתובת לבדוק (למשל http://localhost:8000)")
-    args = ap.parse_args()
+    args = parse_args()
+    OPENAI_KEY = resolve_api_key(args.openai_api_key)
+    api_ok = bool(OPENAI_KEY)
 
-    banner("🚀 BodyPlus_XPro Server Monitor")
+    banner("🚀 BodyPlus_XPro Server Monitor — התחלה")
     print(f"פקודה: {args.cmd}")
-    if args.health:
-        print(f"כתובת בדיקה: {args.health}")
-    print(gpt_self_test())
+    print(f"תיקיית דוחות: {pathlib.Path(args.report_dir).resolve()}")
+    print(f"בריאות (base): {args.health or 'לא הוגדר'}")
+    print(f"API מצב: {'נמצא (CLI)' if args.openai_api_key else ('נמצא (.env/סביבה)' if api_ok else 'לא נמצא')}")
+    gpt_status = gpt_self_test(OPENAI_KEY) if api_ok else "GPT: כבוי"
+    print(gpt_status)
 
+    # הרצת תהליך היעד
     proc = subprocess.Popen(args.cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     q: "queue.Queue[str]" = queue.Queue()
     threading.Thread(target=pump, args=(proc.stdout, q), daemon=True).start()
     threading.Thread(target=pump, args=(proc.stderr, q), daemon=True).start()
 
-    last_lines: List[str] = []
-    last_health = 0
-    last_gpt = 0
+    lines: List[str] = []
+    matched_events: List[Dict] = []
+    health_history: List[Dict] = []
 
-    while True:
-        # HEALTH כל 10 שניות
-        if args.health and time.time() - last_health > 10:
-            last_health = time.time()
+    start = time.time()
+    last_health_t = 0.0
+    last_gpt = 0.0
+
+    print(f"⏳ אוסף לוגים ל-{args.startup_window} שניות הראשונות...")
+
+    while time.time() - start < args.startup_window:
+        # Health כל 10 שנ׳
+        if args.health and (time.time() - last_health_t) >= 10.0:
+            last_health_t = time.time()
             h = health_check(args.health)
+            health_history.append(h)
             bad = [p for p, v in h.items() if not v["ok"]]
             if bad:
-                banner(f"❌ Health Fail: {bad}")
-                print(json.dumps(h, indent=2, ensure_ascii=False))
-                if OPENAI_API_KEY and time.time() - last_gpt > 90:
-                    reply = ask_gpt("health_fail", {"health": h, "cmd": args.cmd})
-                    print("\n🔎 הסבר GPT:\n", reply)
+                print(f"❌ Health Fail: {bad} → {h}")
+                if api_ok and time.time() - last_gpt > 90:
+                    reply = ask_gpt("health_fail", {"health": h, "cmd": args.cmd}, OPENAI_KEY)
+                    if reply:
+                        print("\n🔎 הסבר GPT:\n", reply)
                     last_gpt = time.time()
             else:
                 print("✅ Health OK")
@@ -175,34 +302,77 @@ def main():
             line = q.get(timeout=0.2)
         except queue.Empty:
             if proc.poll() is not None:
-                banner(f"⛔ השרת נעצר (exit={proc.returncode})")
+                print(f"⛔ התהליך נעצר (exit={proc.returncode})")
                 break
             continue
 
         print(line)
-        last_lines.append(line)
-        if len(last_lines) > 500:
-            last_lines = last_lines[-500:]
+        lines.append(line)
+        if len(lines) > 2000:
+            lines = lines[-1000:]
 
         rule = match_rule(line)
         file_path, file_line = extract_file_from_trace(line)
 
         if rule:
-            banner(f"⚠️ תקלה: {rule['name']}")
-            print("למה זה קורה:", rule["explanation"])
-            print("איך לתקן:", rule["fix"])
+            ev = {
+                "rule": rule,
+                "time": time.time() - start,
+                "sample_line": line,
+            }
             if file_path and file_line:
-                print(show_file_snippet(file_path, file_line))
+                ev["file_path"] = file_path
+                ev["file_line"] = file_line
+                ev["snippet"] = show_file_snippet(file_path, file_line)
 
-            if OPENAI_API_KEY and time.time() - last_gpt > 90:
-                payload = {"rule": rule["name"], "logs": last_lines[-20:]}
-                reply = ask_gpt(rule["name"], payload)
-                print("\n🔎 הסבר GPT:\n", reply)
+            if api_ok and time.time() - last_gpt > 90:
+                payload = {"rule": rule["name"], "logs_tail": lines[-30:]}
+                reply = ask_gpt(rule["name"], payload, OPENAI_KEY)
+                if reply:
+                    ev["gpt"] = reply
                 last_gpt = time.time()
 
-        elif file_path and file_line:
-            banner("⚠️ חריגה עם קובץ")
-            print(show_file_snippet(file_path, file_line))
+            matched_events.append(ev)
+
+    # יצירת התיקייה מראש כדי לוודא לוג ברור
+    report_dir = pathlib.Path(args.report_dir)
+    try:
+        report_dir.mkdir(parents=True, exist_ok=True)
+        print(f"📁 תיקיית דוחות קיימת/נוצרה: {report_dir.resolve()}")
+    except Exception as e:
+        print(f"❌ כשל יצירת תיקיית דוחות: {e}")
+
+    # דוח
+    report_path = make_report_md(
+        cmd=args.cmd,
+        health_history=health_history,
+        lines=lines,
+        matched_events=matched_events,
+        output_dir=report_dir,
+        window_seconds=args.startup_window,
+        api_ok=api_ok,
+        gpt_status=gpt_status,
+    )
+
+    # ביקורת מסכמת למסך
+    banner("🧾 ביקורת מסכמת (30 שניות ראשונות)")
+    if health_history:
+        last = health_history[-1]
+        for k, v in last.items():
+            print(f"- {k}: ok={v.get('ok')} code={v.get('code')}")
+    else:
+        print("- לא בוצעה בדיקת Health (לא הועברה --health).")
+
+    issues = [ev['rule']['name'] for ev in matched_events]
+    if issues:
+        print("\n⚠️ תקלות שאובחנו:")
+        for i, name in enumerate(issues, 1):
+            print(f"  {i}. {name}")
+    else:
+        print("\n✅ לא נמצאו תקלות קריטיות בחלון הבדיקה.")
+
+    print(f"\n📄 דוח נשמר: {report_path.resolve()}")
+    print(f"🤖 סטטוס AI: {'פעיל' if api_ok else 'כבוי'} | {gpt_status}")
 
 if __name__ == "__main__":
     main()
