@@ -7,7 +7,7 @@ import requests
 
 # ========= קונפיג =========
 RUNPOD_BASE = (os.getenv("RUNPOD_BASE") or "https://api.runpod.ai/v2/1fmkdasa1l0x06").rstrip("/")
-API_KEY     = os.getenv("RUNPOD_API_KEY") or "REPLACE_WITH_YOUR_KEY"
+API_KEY     = os.getenv("RUNPOD_API_KEY") or "rpa_JMCLGONT7MUZLIX6CXDZWLOSR8VAS3RMD1MVRL0A19qjux"
 PORT        = int(os.getenv("PORT", "8000"))
 DEBUG_LOG   = (os.getenv("PROXY_DEBUG", "1") == "1")      # 1=on, 0=off
 
