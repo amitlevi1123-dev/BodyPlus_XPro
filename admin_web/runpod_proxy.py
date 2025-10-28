@@ -5,7 +5,7 @@ import os, requests
 # כתובת יחידה של ה־Endpoint שלך (Serverless)
 RUNPOD_BASE = (os.getenv("RUNPOD_BASE") or "https://api.runpod.ai/v2/1fmkdasa1l0x06").rstrip("/")
 # מפתח API (מומלץ לשים ב־ENV; אם לא קיים — יהיה ריק וזה יופיע ב-/ _proxy/health)
-API_KEY = os.getenv("rpa_JMCLGONT7MUZLIX6CXDZWLOSR8VAS3RMD1MVRL0A19qjux") or ""
+API_KEY = os.getenv("RUNPOD_API_KEY") or ""
 
 app = Flask(__name__)
 
