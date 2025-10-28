@@ -1,28 +1,42 @@
 # -*- coding: utf-8 -*-
 # -------------------------------------------------------
-# 🔁 RunPod Proxy — שימוש בטוח ב-Serverless (ללא הצפות)
+# 🔁 RunPod Proxy — טוען .env בלי תלות חיצונית
 # -------------------------------------------------------
-# GET  /                → עמוד סטטוס (לא יוצר Job)
-# GET  /health, /ping   → healthchecks
-# GET  /_proxy/health   → healthcheck מפורט
-# POST /run-submit      → יוצר Job ב-/run (async)
-# POST /run-sync        → מריץ /run-sync (sync)
-# GET  /status/<job_id> → סטטוס Job
-# ⚠️  סטרים MJPEG לא נתמך ב-Serverless (רק Pod)
-# -------------------------------------------------------
-
 from flask import Flask, request, Response, jsonify
 import os, requests
 
-# קבע את ה-Endpoint וה-API Key דרך משתני סביבה (בלי dotenv)
-RUNPOD_BASE = (os.getenv("RUNPOD_BASE") or "https://api.runpod.ai/v2/1fmkdasa1l0x06").rstrip("/")
-API_KEY = os.getenv("RUNPOD_API_KEY") or "REPLACE_WITH_YOUR_KEY"
+# --- טוען .env מקומי בלי python-dotenv ---
+def _load_env_file(path: str):
+    try:
+        if not os.path.isfile(path):
+            return
+        with open(path, "r", encoding="utf-8") as f:
+            for raw in f:
+                line = raw.strip()
+                if not line or line.startswith("#") or "=" not in line:
+                    continue
+                k, v = line.split("=", 1)
+                k, v = k.strip(), v.strip().strip('\'"')
+                # לא נדרוס ENV קיים
+                if k and k not in os.environ:
+                    os.environ[k] = v
+    except Exception:
+        pass
+
+# טען קודם .env בשורש הפרויקט ואז .venv/.env אם קיים
+_load_env_file(os.path.join(os.getcwd(), ".env"))
+_load_env_file(os.path.join(os.getcwd(), ".venv", ".env"))
+
+# --- ENV עם ברירות מחדל בטוחות ---
+RUNPOD_BASE = (os.getenv("RUNPOD_BASE") or "https://api.runpod.ai/v2/pcw665a3g3k5pk").rstrip("/")
+API_KEY     = os.getenv("RUNPOD_API_KEY") or ""
+PORT        = int(os.getenv("PORT") or "5000")
 
 app = Flask(__name__)
 
 HOP_BY_HOP = {
-    "connection", "keep-alive", "proxy-authenticate", "proxy-authorization",
-    "te", "trailer", "trailers", "upgrade", "transfer-encoding", "content-length"
+    "connection","keep-alive","proxy-authenticate","proxy-authorization",
+    "te","trailer","trailers","upgrade","transfer-encoding","content-length"
 }
 
 # ---------- CORS / OPTIONS ----------
@@ -53,28 +67,20 @@ def _get(url: str, timeout=(5, 60)):
     }
     return requests.get(url, headers=headers, timeout=timeout)
 
-# ---------- Home ----------
+# ---------- Home / Health ----------
 @app.get("/")
 def home_page():
-    return jsonify(
-        ok=True,
-        msg="RunPod proxy alive. Use POST /run-submit (async) or POST /run-sync (sync).",
-        upstream=RUNPOD_BASE
-    ), 200
+    return jsonify(ok=True, msg="RunPod proxy alive. Use POST /run-submit (async) or POST /run-sync (sync).",
+                   upstream=RUNPOD_BASE), 200
 
-# ---------- Health ----------
 @app.get("/health")
 def health_alias():
-    return jsonify(ok=True, upstream=RUNPOD_BASE, api_key_set=bool(API_KEY and API_KEY != "REPLACE_WITH_YOUR_KEY")), 200
-
-@app.get("/ping")
-def ping():
-    return "pong", 200
+    return jsonify(ok=True, upstream=RUNPOD_BASE, api_key_set=bool(API_KEY)), 200
 
 @app.get("/_proxy/health")
 def proxy_health():
-    ok = bool(RUNPOD_BASE) and bool(API_KEY) and API_KEY != "REPLACE_WITH_YOUR_KEY"
-    return jsonify(ok=ok, upstream=RUNPOD_BASE, api_key_set=bool(API_KEY and API_KEY != "REPLACE_WITH_YOUR_KEY")), (200 if ok else 503)
+    ok = bool(RUNPOD_BASE) and bool(API_KEY)
+    return jsonify(ok=ok, upstream=RUNPOD_BASE, api_key_set=bool(API_KEY)), (200 if ok else 503)
 
 @app.get("/_proxy/whoami")
 def proxy_whoami():
@@ -125,6 +131,6 @@ def no_stream_serverless():
 
 # ---------- הרצה מקומית ----------
 if __name__ == "__main__":
-    port = int(os.getenv("PORT", "5000"))
-    print(f"🔁 Proxy running at http://0.0.0.0:{port} → {RUNPOD_BASE}")
-    app.run(host="0.0.0.0", port=port, debug=False, threaded=True)
+    print(f"🔁 Proxy running at http://0.0.0.0:{PORT} → {RUNPOD_BASE}")
+    print(f"🔐 API key loaded? {'YES' if API_KEY else 'NO'}")
+    app.run(host="0.0.0.0", port=PORT, debug=False, threaded=True)
