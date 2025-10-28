@@ -12,7 +12,7 @@ Endpoints:
 - GET    /api/exercise/last
 - GET    /api/exercise/diag/stream
 - GET    /api/exercise/diag          ← חדש (Snapshot בשביל הכפתור)
-- GET    /api/connection/status
+- GET    /api/exercise/connection/status
 - GET    /api/exercise/last/json
 """
 
@@ -27,7 +27,7 @@ from admin_web.exercise_analyzer import (
     analyze_exercise,
     detect_once,
     get_last_report,
-    configure_engine_root,
+    configure_engine_root,  # לא חובה לשימוש כאן, נשאר לתאימות/הרחבות
 )
 
 bp_exercise = Blueprint("exercise", __name__, url_prefix="/api/exercise")
