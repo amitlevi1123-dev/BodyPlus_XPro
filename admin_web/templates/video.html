@@ -13,6 +13,12 @@
   .status-dot{width:10px;height:10px;border-radius:9999px;background:#94a3b8;display:inline-block}
   .status-dot.ok{background:#22c55e}.status-dot.warn{background:#f59e0b}.status-dot.err{background:#ef4444}
   .form{border:1px solid #e5e7eb;border-radius:.6rem;padding:.45rem .6rem}
+
+  /* מבטיח שהקנבס יהיה מעל התמונה גם אם ה-JS נטען אחרי */
+  #vs-canvas{
+    position:absolute;left:0;top:0;width:100%;height:100%;
+    pointer-events:none;display:block;
+  }
 </style>
 {% endblock %}
 
@@ -54,9 +60,11 @@
            href="/video/stream.mjpg?hud=1" target="_blank" rel="noopener">פתח סטרים ↗</a>
       </div>
 
-      <!-- חלון הסטרים -->
+      <!-- חלון הסטרים (קנבס נוצר אוטומטית ע"י ה-JS ומתווסף לתוך הקונטיינר) -->
       <div class="relative w-full bg-black rounded-xl overflow-hidden" style="height:420px;">
         <img id="vs-img" src="" class="absolute inset-0 w-full h-full object-contain select-none" alt="MJPEG">
+        <!-- קנבס ידני לגיבוי; ה-JS יאתר אותו או ייצור חדש אם חסר -->
+        <canvas id="vs-canvas" aria-hidden="true"></canvas>
         <div id="vs-ph" class="absolute inset-0 flex items-center justify-center text-gray-300 text-sm">
           אין זרם פעיל
         </div>
@@ -201,7 +209,7 @@
       set(document.querySelector('[data-id="v-source"]'), s.active_source || 'none');
       set(document.querySelector('[data-id="v-state"]'),  s.active_source ? 'ACTIVE' : 'IDLE');
       set(document.querySelector('[data-id="v-running"]'), s.running ? 'כן' : 'לא');
-      set(document.querySelector('[data-id="v-fps"]'),    s.fps!=null ? s.fps.toFixed ? s.fps.toFixed(1) : s.fps : '—');
+      set(document.querySelector('[data-id="v-fps"]'),    s.fps!=null ? (s.fps.toFixed ? s.fps.toFixed(1) : s.fps) : '—');
       set(document.querySelector('[data-id="v-size"]'),   Array.isArray(s.size)? (s.size[0]+'×'+s.size[1]) : '—');
       const age = (s.frame && s.frame.age_ms) || (s.age_ms) || null;
       set(document.querySelector('[data-id="v-age"]'), age);
