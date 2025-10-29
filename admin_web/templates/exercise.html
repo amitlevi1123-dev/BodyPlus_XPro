@@ -4,8 +4,13 @@
 
 {% block head %}
 <style>
+  :root{
+    --border:#e5e7eb; --muted:#6b7280; --ink:#111827; --bg:#fff;
+    --subtle:#f8fafc; --chip:#f1f5f9; --chip-border:#e5e7eb;
+    --ok:#22c55e; --warn:#f97316; --bad:#ef4444; --muted2:#9ca3af;
+  }
   .mono{font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono","Courier New",monospace}
-  .card{background:#fff;border:1px solid #e5e7eb;border-radius:1rem}
+  .card{background:var(--bg);border:1px solid var(--border);border-radius:1rem}
   .card-h{padding:.9rem 1.1rem;border-bottom:1px solid #eef2f7}
   .card-b{padding:1rem 1.1rem}
 
@@ -19,7 +24,11 @@
   /* Modal (פירוט חזרה/סט) */
   .modal-backdrop{ position:fixed; inset:0; background:rgba(0,0,0,.45); display:none; align-items:flex-start; justify-content:center; padding:4vh 1rem; z-index:60; }
   .modal-backdrop.show{ display:flex; }
-  .modal-card{ width:min(980px, 96vw); max-height:92vh; overflow:auto; background:#fff; border:1px solid #e5e7eb; border-radius:1rem; box-shadow:0 10px 25px rgba(0,0,0,.12); }
+  .modal-card{ width:min(1080px, 96vw); max-height:92vh; overflow:auto; background:#fff; border:1px solid #e5e7eb; border-radius:1rem; box-shadow:0 10px 25px rgba(0,0,0,.12); }
+  .modal-tabs{ display:flex; gap:.25rem; border-bottom:1px solid var(--border); padding:0 .5rem }
+  .modal-tab{ padding:.55rem .8rem; border:1px solid transparent; border-radius:.6rem .6rem 0 0; cursor:pointer; color:#475569 }
+  .modal-tab.active{ background:#fff; border-color:var(--border) var(--border) #fff var(--border); color:#111827; }
+
   .crit-list h5{ font-weight:600; margin:.5rem 0 .35rem; }
   .crit-item{ display:grid; grid-template-columns: 1fr auto auto; gap:.6rem; padding:.45rem .6rem; border-radius:.6rem; }
   .crit-bad   { background:#fff1f2; }
@@ -29,11 +38,22 @@
   .pill{ display:inline-flex; align-items:center; gap:.3rem; padding:.2rem .5rem; border-radius:9999px; font-size:.75rem; }
   .pill-k{ background:#eef2ff; color:#3730a3; }
   .pill-r{ background:#fee2e2; color:#991b1b; }
+  .chip{display:inline-flex;align-items:center;background:var(--chip);border:1px solid var(--chip-border);border-radius:9999px;padding:.2rem .55rem;font-size:.75rem;color:#334155}
 
-  /* תוספות */
   .status-dot{width:10px;height:10px;border-radius:9999px;background:#ef4444;display:inline-block}
   .status-dot.connected{background:#22c55e}
-  .chip{display:inline-flex;align-items:center;background:#f1f5f9;border:1px solid #e5e7eb;border-radius:9999px;padding:.2rem .55rem;font-size:.75rem;color:#334155}
+
+  /* Metrics tables */
+  .mtable{ width:100%; border-collapse:separate; border-spacing:0; border:1px solid var(--border); border-radius:.8rem; overflow:hidden }
+  .mtable th, .mtable td{ padding:.5rem .6rem; border-bottom:1px solid var(--border); font-size:.875rem }
+  .mtable thead th{ background:#f8fafc; color:#334155; font-weight:600 }
+  .mtable tr:last-child td{ border-bottom:none }
+  .kv-grid{ display:grid; grid-template-columns: 1fr auto; gap:.35rem .8rem }
+  .kv-key{ color:#475569 }
+  .kv-val{ font-weight:600; color:#1f2937; direction:ltr }
+
+  /* Helper */
+  .hint{ font-size:.8rem; color:#64748b }
 </style>
 {% endblock %}
 
@@ -176,23 +196,69 @@
 <!-- Modal: פירוט חזרה/סט -->
 <div id="details-modal" class="modal-backdrop" role="dialog" aria-modal="true">
   <div class="modal-card">
-    <div class="p-4 border-b flex items-center justify-between">
-      <div>
-        <div class="text-lg font-semibold">פירוט ביצוע</div>
-        <div id="details-sub" class="text-sm text-gray-500">—</div>
+    <div class="p-4 border-b">
+      <div class="flex items-center justify-between">
+        <div>
+          <div class="text-lg font-semibold">פירוט ביצוע</div>
+          <div id="details-sub" class="text-sm text-gray-500">—</div>
+        </div>
+        <button id="details-close" class="px-3 py-2 rounded-lg bg-gray-100 hover:bg-gray-200">סגור</button>
       </div>
-      <button id="details-close" class="px-3 py-2 rounded-lg bg-gray-100 hover:bg-gray-200">סגור</button>
+
+      <!-- Tabs -->
+      <div class="modal-tabs mt-3">
+        <div class="modal-tab active" data-tab="crit">קריטריונים</div>
+        <div class="modal-tab" data-tab="metrics">מדדים</div>
+        <div class="modal-tab" data-tab="raw">Raw</div>
+      </div>
     </div>
-    <div class="p-4 grid grid-cols-1 lg:grid-cols-3 gap-4">
-      <div class="space-y-1">
-        <div id="details-chips" class="flex flex-wrap items-center gap-2"></div>
-        <details class="mt-2">
-          <summary class="cursor-pointer text-sm text-gray-500">Raw</summary>
-          <pre id="details-raw" class="mono text-xs text-gray-600 max-h-64 overflow-auto border rounded-xl p-3 mt-2">—</pre>
-        </details>
-      </div>
-      <div class="lg:col-span-2">
+
+    <div class="p-4">
+      <!-- Tab: קריטריונים -->
+      <div id="tab-crit">
+        <div id="details-chips" class="flex flex-wrap items-center gap-2 mb-3"></div>
         <div id="details-lists" class="crit-list space-y-3"></div>
+      </div>
+
+      <!-- Tab: metrics_detail -->
+      <div id="tab-metrics" style="display:none">
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+          <div class="card">
+            <div class="card-h font-semibold">טמפו (per-rep)</div>
+            <div class="card-b">
+              <div id="md-tempo-table">—</div>
+              <div class="hint mt-2">מציג רק שדות זמינים מתוך ה־payload.</div>
+            </div>
+          </div>
+          <div class="lg:col-span-2 card">
+            <div class="card-h font-semibold">מדדים נבחרים</div>
+            <div class="card-b grid grid-cols-1 lg:grid-cols-3 gap-6">
+              <div>
+                <div class="font-semibold mb-2">מפרקים</div>
+                <div id="md-joints" class="kv-grid"></div>
+              </div>
+              <div>
+                <div class="font-semibold mb-2">עמידה</div>
+                <div id="md-stance" class="kv-grid"></div>
+              </div>
+              <div>
+                <div class="font-semibold mb-2">אחר</div>
+                <div id="md-other" class="kv-grid"></div>
+              </div>
+            </div>
+            <div class="px-4 pb-3">
+              <details>
+                <summary class="cursor-pointer text-sm text-gray-500">יעדים (targets)</summary>
+                <pre id="md-targets" class="mono text-xs text-gray-700 p-3 bg-gray-50 rounded-xl border mt-2">—</pre>
+              </details>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tab: Raw JSON -->
+      <div id="tab-raw" style="display:none">
+        <pre id="details-raw" class="mono text-xs text-gray-600 max-h-[55vh] overflow-auto border rounded-xl p-3 bg-gray-50">—</pre>
       </div>
     </div>
   </div>

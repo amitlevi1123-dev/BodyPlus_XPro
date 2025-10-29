@@ -12,6 +12,10 @@
 # • הוספת ui_ranges לפס הצבעוני (אדום/כתום/ירוק).
 # • NEW: criteria_breakdown_pct (מפה ידידותית ל-Tooltip).
 # • NEW: quality ברירת מחדל ל-"partial" אם לא ניתן.
+# • NEW: metrics_detail — תקציר מפורט של ערכים רלוונטיים (טמפו/זוויות/עמידה/יעדים).
+#    • איסוף חכם של מפתחות רלוונטיים לפי criteria.requires (משפחה + וריאציה)
+#    • סינון לפי מה שקיים בפועל ב-canonical (בלי “ידיים בתרגיל רגליים”)
+#    • טמפו לכל חזרה, אם קיים מבנה rep.*
 # -----------------------------------------------------------------------------
 
 from __future__ import annotations
@@ -155,6 +159,216 @@ def _compute_report_health(report: Dict[str, Any]) -> Dict[str, Any]:
             worst = "WARN" if worst != "FAIL" else worst
     return {"status": worst, "issues": issues}
 
+# ---------------------------- Metrics Detail (NEW) ----------------------------
+
+# מפתחות "תמיד מעניינים" להצגה אם קיימים ב-canonical
+_ALWAYS_KEYS = [
+    # טמפו/חזרות
+    "rep.timing_s", "rep.ecc_s", "rep.con_s", "rep.pause_top_s", "rep.pause_bottom_s",
+    # גו/עמוד שדרה
+    "torso_forward_deg", "spine_flexion_deg", "spine_curvature_side_deg",
+    # עמידה/כפות רגליים
+    "features.stance_width_ratio", "toe_angle_left_deg", "toe_angle_right_deg",
+    "knee_foot_alignment_left_deg", "knee_foot_alignment_right_deg",
+    "heels_grounded", "foot_contact_left", "foot_contact_right",
+]
+
+# קבוצות להצגה נעימה ב-UI
+_GROUPS = {
+    "tempo": [
+        "rep.timing_s", "rep.ecc_s", "rep.con_s", "rep.pause_top_s", "rep.pause_bottom_s"
+    ],
+    "joints": [
+        "knee_left_deg", "knee_right_deg",
+        "hip_left_deg", "hip_right_deg",
+        "torso_forward_deg", "spine_flexion_deg", "spine_curvature_side_deg",
+        "head_pitch_deg", "head_yaw_deg", "head_roll_deg",
+        "elbow_left_deg", "elbow_right_deg", "shoulder_left_deg", "shoulder_right_deg",
+        "ankle_dorsi_left_deg", "ankle_dorsi_right_deg",
+    ],
+    "stance": [
+        "features.stance_width_ratio",
+        "toe_angle_left_deg", "toe_angle_right_deg",
+        "knee_foot_alignment_left_deg", "knee_foot_alignment_right_deg",
+        "heels_grounded", "foot_contact_left", "foot_contact_right",
+    ],
+}
+
+def _gather_required_keys(exercise) -> List[str]:
+    """
+    מאחד את כל requires מכל הקריטריונים של התרגיל (כפי שהוא נטען — כולל ירושה מה-base).
+    """
+    out: List[str] = []
+    crit = getattr(exercise, "criteria", {}) or {}
+    if isinstance(crit, dict):
+        for cid, cdef in crit.items():
+            req = (cdef or {}).get("requires")
+            if isinstance(req, list):
+                for k in req:
+                    if isinstance(k, str):
+                        out.append(k)
+    # הוספת always
+    out.extend(_ALWAYS_KEYS)
+    # ייחוד ושמירת סדר (בסיסי)
+    seen = set()
+    uniq: List[str] = []
+    for k in out:
+        if k not in seen:
+            uniq.append(k); seen.add(k)
+    return uniq
+
+def _present_keys(canonical: Dict[str, Any], keys: List[str]) -> Dict[str, Any]:
+    """ מחזיר רק מפתחות שיש להם ערך ב-canonical (לא None). """
+    out: Dict[str, Any] = {}
+    for k in keys:
+        if k in canonical:
+            v = canonical.get(k)
+            if v is not None:
+                out[k] = v
+    return out
+
+def _extract_rep_series(rep_tree: Dict[str, Any]) -> List[Dict[str, Any]]:
+    """
+    בונה רשימה per-rep עבור טמפו אם יש מבנה rep.* היררכי.
+    תומך בשני מצבים:
+      • ערכים סקלריים — מחזיר חזרה אחת (אם אין אינדקסים)
+      • ערכים כרשימות/מילונים — מנסה ליישר על פי אינדקסים/מפתחות
+    """
+    if not isinstance(rep_tree, dict) or not rep_tree:
+        return []
+
+    # נאתר שדות עיקריים
+    timing = rep_tree.get("timing_s")
+    ecc = rep_tree.get("ecc_s")
+    con = rep_tree.get("con_s")
+    ptop = rep_tree.get("pause_top_s")
+    pbot = rep_tree.get("pause_bottom_s")
+    rep_id = rep_tree.get("rep_id")
+
+    # אם הכל סקלרי — מחזירים רשומה אחת
+    def _is_scalar(x):
+        return not isinstance(x, (list, dict))
+
+    all_fields = [timing, ecc, con, ptop, pbot, rep_id]
+    if any(f is not None for f in all_fields) and all((_is_scalar(f) or f is None) for f in all_fields):
+        return [{
+            "rep_id": rep_id if rep_id is not None else 1,
+            "timing_s": timing, "ecc_s": ecc, "con_s": con,
+            "pause_top_s": ptop, "pause_bottom_s": pbot,
+        }]
+
+    # אחרת — ננסה לאחד לפי אינדקס
+    # תמיכה בסיסית: אם שדה הוא list — משתמשים באינדקס; אם dict — לפי מפתחות ממוינים
+    def _to_indexed_list(x):
+        if isinstance(x, list):
+            return list(enumerate(x, start=1))
+        if isinstance(x, dict):
+            # ממיינים לפי מפתח אם ניתן
+            try:
+                items = sorted(x.items(), key=lambda kv: (str(kv[0])))
+            except Exception:
+                items = list(x.items())
+            return [(int(k) if str(k).isdigit() else k, v) for k, v in items]
+        if x is None:
+            return []
+        # סקלר → חזרה יחידה
+        return [(1, x)]
+
+    idx_fields = {
+        "timing_s": _to_indexed_list(timing),
+        "ecc_s": _to_indexed_list(ecc),
+        "con_s": _to_indexed_list(con),
+        "pause_top_s": _to_indexed_list(ptop),
+        "pause_bottom_s": _to_indexed_list(pbot),
+        "rep_id": _to_indexed_list(rep_id),
+    }
+
+    # איחוד כל האינדקסים האפשריים
+    all_idxs = set()
+    for pairs in idx_fields.values():
+        for i, _ in pairs:
+            all_idxs.add(i)
+    if not all_idxs:
+        return []
+
+    def _val(pairs, i):
+        for ii, vv in pairs:
+            if ii == i:
+                return vv
+        return None
+
+    rows: List[Dict[str, Any]] = []
+    for i in sorted(all_idxs, key=lambda z: (isinstance(z, int) is False, z)):
+        rows.append({
+            "rep_id": _val(idx_fields["rep_id"], i) or i,
+            "timing_s": _val(idx_fields["timing_s"], i),
+            "ecc_s": _val(idx_fields["ecc_s"], i),
+            "con_s": _val(idx_fields["con_s"], i),
+            "pause_top_s": _val(idx_fields["pause_top_s"], i),
+            "pause_bottom_s": _val(idx_fields["pause_bottom_s"], i),
+        })
+    return rows
+
+def build_auto_metrics_detail(*, exercise, canonical: Dict[str, Any], rep_tree: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    """
+    בונה בלוק "metrics_detail" להצגה ב-UI:
+    • איסוף מפתחות רלוונטיים לפי criteria.requires (כולל base+variant) + ALWAYS
+    • חלוקה לקבוצות: tempo / joints / stance
+    • סדר אלגנטי והסתרת שדות חסרי ערך
+    • פירוק טמפו per-rep אם rep_tree קיים
+    """
+    relevant_keys = _gather_required_keys(exercise)
+    present_all = _present_keys(canonical, relevant_keys)
+
+    # חלוקה לקבוצות
+    grouped: Dict[str, Dict[str, Any]] = {}
+    for gname, gkeys in _GROUPS.items():
+        grouped[gname] = _present_keys(present_all, gkeys)
+
+    # שאר השדות הרלוונטיים שלא נתפסו בקבוצות — נשמרים ב-"other"
+    grouped_keys_flat = set(k for lst in _GROUPS.values() for k in lst)
+    other_keys = [k for k in present_all.keys() if k not in grouped_keys_flat]
+    grouped["other"] = _present_keys(present_all, other_keys)
+
+    # פירוק חזרות (טמפו) אם יש rep.* היררכי
+    rep_series: List[Dict[str, Any]] = []
+    if isinstance(rep_tree, dict) and rep_tree:
+        rep_series = _extract_rep_series(rep_tree)
+
+    # יעדים (targets) — מציג רק מה שאפשר להבין ממנו מספרים “מעניינים”
+    targets_block: Dict[str, Any] = {}
+    try:
+        t = getattr(exercise, "targets", None)
+        if isinstance(t, dict) and t:
+            # שולפים רק תתי-שדות מספריים כדי לא להציף
+            def _num_only(d: Dict[str, Any]) -> Dict[str, Any]:
+                out = {}
+                for k, v in d.items():
+                    if isinstance(v, (int, float)):
+                        out[k] = v
+                    elif isinstance(v, dict):
+                        sub = _num_only(v)
+                        if sub:
+                            out[k] = sub
+                return out
+            targets_block = _num_only(t)
+    except Exception:
+        targets_block = {}
+
+    # סטטיסטיקה קטנה לתצוגה (כמה ערכים הוצגו)
+    stats = {
+        "keys_available": len(present_all),
+        "groups_non_empty": {k: bool(v) for k, v in grouped.items()},
+        "has_rep_series": bool(rep_series),
+    }
+
+    return {
+        "groups": grouped,
+        "rep_tempo_series": rep_series,
+        "targets": targets_block,
+        "stats": stats,
+    }
+
 # ---------------------------- Report Builder ----------------------------
 
 def build_payload(
@@ -252,9 +466,9 @@ def build_payload(
     }
 
     # canonical + rep tree
+    rep_block = {}
     try:
         canonical_block = {}
-        rep_block = {}
         for k, v in (canonical or {}).items():
             if isinstance(k, str):
                 canonical_block[k] = v
@@ -276,6 +490,17 @@ def build_payload(
         report["sets"] = sets
     if isinstance(reps, list) and reps:
         report["reps"] = reps
+
+    # NEW: metrics_detail (נבנה מהתרגיל וה-canonical + rep_tree אם יש)
+    try:
+        report["metrics_detail"] = build_auto_metrics_detail(
+            exercise=exercise,
+            canonical=report.get("canonical", {}) or report.get("measurements", {}) or {},
+            rep_tree=report.get("rep", None),
+        )
+    except Exception:
+        # לא מפילים את הדו"ח בגלל פירוט — בטיחותית מתעלמים בשקט
+        report["metrics_detail"] = {"error": "build_failed"}
 
     # health
     report["report_health"] = _compute_report_health(report)

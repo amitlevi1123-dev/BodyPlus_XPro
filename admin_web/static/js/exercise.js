@@ -8,6 +8,7 @@
   const escapeHtml = (s)=>String(s??'').replace(/[&<>"']/g,c=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
   const safeJSON   = (obj)=> { try{ return JSON.stringify(obj,null,2) } catch{ return '—' } };
   const clamp      = (v,min,max)=> Math.max(min, Math.min(max, v));
+  const fmtNum     = (v)=> (v==null || !isFinite(Number(v))) ? '—' : String(Number(v).toFixed(3)).replace(/\.?0+$/,'');
 
   // ---------- Elements ----------
   const el = {
@@ -47,6 +48,16 @@
     detailsChips: $('#details-chips'),
     detailsRaw:   $('#details-raw'),
     detailsLists: $('#details-lists'),
+    // Modal tabs & metrics detail
+    tabs:        $$('.modal-tab'),
+    tabCrit:     $('#tab-crit'),
+    tabMetrics:  $('#tab-metrics'),
+    tabRaw:      $('#tab-raw'),
+    mdTempo:     $('#md-tempo-table'),
+    mdJoints:    $('#md-joints'),
+    mdStance:    $('#md-stance'),
+    mdOther:     $('#md-other'),
+    mdTargets:   $('#md-targets'),
   };
 
   // ---------- State ----------
@@ -218,6 +229,89 @@
     }
   }
 
+  // ---------- Modal Tabs ----------
+  function activateTab(name){
+    el.tabs.forEach(t=>{
+      const n = t.getAttribute('data-tab');
+      const active = (n===name);
+      t.classList.toggle('active', active);
+    });
+    el.tabCrit.style.display    = name==='crit'    ? '' : 'none';
+    el.tabMetrics.style.display = name==='metrics' ? '' : 'none';
+    el.tabRaw.style.display     = name==='raw'     ? '' : 'none';
+  }
+  el.tabs.forEach(t=>{
+    t.addEventListener('click', ()=> activateTab(t.getAttribute('data-tab')));
+  });
+
+  // ---------- Metrics Detail renderers ----------
+  function renderKVGrid(container, obj){
+    if(!container) return;
+    container.innerHTML = '';
+    if(!obj || typeof obj!=='object' || !Object.keys(obj).length){
+      container.innerHTML = '<div class="text-sm text-gray-500">—</div>';
+      return;
+    }
+    const fr = new DocumentFragment();
+    for(const [k,v] of Object.entries(obj)){
+      const dvk = document.createElement('div'); dvk.className='kv-key'; dvk.textContent = k;
+      const dvv = document.createElement('div'); dvv.className='kv-val'; dvv.textContent = typeof v==='boolean' ? (v?'כן':'לא') : fmtNum(v);
+      fr.appendChild(dvk); fr.appendChild(dvv);
+    }
+    container.appendChild(fr);
+  }
+
+  function renderTempoTable(container, rows){
+    if(!container) return;
+    if(!Array.isArray(rows) || !rows.length){
+      container.innerHTML = '<div class="text-sm text-gray-500">אין נתוני טמפו per-rep.</div>';
+      return;
+    }
+    const table = document.createElement('table');
+    table.className='mtable';
+    table.innerHTML = `
+      <thead><tr>
+        <th class="text-right">חזרה</th>
+        <th class="text-right">timing_s</th>
+        <th class="text-right">ecc_s</th>
+        <th class="text-right">con_s</th>
+        <th class="text-right">pause_top_s</th>
+        <th class="text-right">pause_bottom_s</th>
+      </tr></thead>
+      <tbody></tbody>`;
+    const tb = table.querySelector('tbody');
+    rows.forEach(r=>{
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td>${escapeHtml(r.rep_id ?? '—')}</td>
+        <td class="mono">${fmtNum(r.timing_s)}</td>
+        <td class="mono">${fmtNum(r.ecc_s)}</td>
+        <td class="mono">${fmtNum(r.con_s)}</td>
+        <td class="mono">${fmtNum(r.pause_top_s)}</td>
+        <td class="mono">${fmtNum(r.pause_bottom_s)}</td>`;
+      tb.appendChild(tr);
+    });
+    container.innerHTML = '';
+    container.appendChild(table);
+  }
+
+  function renderMetricsDetail(rep){
+    try{
+      const md = rep?.metrics_detail || {};
+      renderTempoTable(el.mdTempo, md.rep_tempo_series || []);
+      renderKVGrid(el.mdJoints, md.groups?.joints || {});
+      renderKVGrid(el.mdStance, md.groups?.stance || {});
+      renderKVGrid(el.mdOther,  md.groups?.other  || {});
+      el.mdTargets.textContent = (md.targets && Object.keys(md.targets||{}).length)
+        ? safeJSON(md.targets)
+        : '—';
+    }catch(e){
+      el.mdTempo.innerHTML  = '<div class="text-sm text-gray-500">שגיאה בהצגה.</div>';
+      el.mdJoints.innerHTML = el.mdStance.innerHTML = el.mdOther.innerHTML = '<div class="text-sm text-gray-500">—</div>';
+      el.mdTargets.textContent = '—';
+    }
+  }
+
   // ---------- Details Modal ----------
   function openDetails(rep, meta){
     el.detailsSub.textContent = `סט ${meta?.setIdx||'—'} · חזרה ${meta?.repIdx||'—'}`;
@@ -268,6 +362,9 @@
     el.gaugeRep?.setAttribute('title', t);
     el.gaugeSet?.setAttribute('title', t);
 
+    // Metrics detail
+    renderMetricsDetail(rep);
+    activateTab('crit');
     el.detailsModal.classList.add('show');
   }
   function closeDetails(){ el.detailsModal.classList.remove('show'); }
@@ -281,7 +378,6 @@
       const blob = new Blob([JSON.stringify(obj, null, 2)], { type: 'application/json' });
       const url  = URL.createObjectURL(blob);
       window.open(url, '_blank');
-      // URL.revokeObjectURL(url);
     }catch(e){ alert('פתיחת JSON נכשלה: '+e); }
   }
   function downloadJSON(obj, filename='report.json'){
@@ -356,7 +452,6 @@
       const report = REP_STORE.get(id);
       if(!report) return;
       downloadJSON(report, `report_s${setIdx}_r${repIdx}.json`);
-      // לחלופין: openJSONInNewTab(report);
     });
 
     // Details button
@@ -421,6 +516,17 @@
     const hints = [];
     const bad = criteria.filter(c=>c.available && (c.score_pct??0)<70).sort((a,b)=>a.score_pct-b.score_pct);
     if(bad[0]) hints.push(`שפר ${bad[0].id} (כעת ${bad[0].score_pct}%)`);
+    // demo metrics_detail minimal
+    const metrics_detail = {
+      groups:{
+        joints:{ knee_left_deg:160, knee_right_deg:158, torso_forward_deg:15, spine_flexion_deg:8 },
+        stance:{ "features.stance_width_ratio":1.05, toe_angle_left_deg:8, toe_angle_right_deg:10, heels_grounded:true },
+        other:{}
+      },
+      rep_tempo_series:[{rep_id:1,timing_s:1.6,ecc_s:0.8,con_s:0.8,pause_top_s:0.0,pause_bottom_s:0.0}],
+      targets:{ upper:{}, tempo:{min_s:0.7,max_s:2.5} },
+      stats:{}
+    };
     return {
       ui_ranges: { color_bar: [{label:'red',from_pct:0,to_pct:60},{label:'orange',from_pct:60,to_pct:75},{label:'green',from_pct:75,to_pct:100}] },
       exercise: { id: SAMPLE_EX },
@@ -430,7 +536,8 @@
         criteria: criteria.map(c=>({ id:c.id, available:!!c.available, score_pct:c.score_pct, reason:c.reason||null })),
         criteria_breakdown_pct: Object.fromEntries(criteria.map(c=>[c.id, c.score_pct ?? null])),
       },
-      hints
+      hints,
+      metrics_detail
     };
   }
 
@@ -470,7 +577,8 @@
                 ? Object.fromEntries(criteria.map(c => [c.id, c.score_pct ?? (c.score!=null? Math.round(c.score*100): null)]))
                 : null),
             },
-            hints: (r.notes||[]).map(n=> n.text || n.crit || '')
+            hints: (r.notes||[]).map(n=> n.text || n.crit || ''),
+            metrics_detail: r.metrics_detail || null
           };
 
           pushRow(setIdx, r.rep ?? (repArr.indexOf(r)+1), repLike);
