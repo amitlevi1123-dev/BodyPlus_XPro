@@ -2,16 +2,16 @@
 """
 admin_web/routes_exercise.py
 ----------------------------
-ראוטים רזים ל-Exercise API, משתמשים בלוגיקה שב-admin_web/exercise_analyzer.py.
+ראוטים רזים ל-Exercise API, מבוססי הלוגיקה שב-admin_web/exercise_analyzer.py.
 
 Endpoints:
 - GET    /api/exercise/settings
 - POST   /api/exercise/simulate
-- POST   /api/exercise/score
+- POST   /api/exercise/score        ← כרגע ממופה ל-detect (עד שיתווסף analyze_offline)
 - POST   /api/exercise/detect
 - GET    /api/exercise/last
 - GET    /api/exercise/diag/stream
-- GET    /api/exercise/diag          ← חדש (Snapshot בשביל הכפתור)
+- GET    /api/exercise/diag
 - GET    /api/exercise/connection/status
 - GET    /api/exercise/last/json
 """
@@ -21,72 +21,125 @@ from typing import Optional, Dict, Any
 from flask import Blueprint, jsonify, request, Response, stream_with_context
 import json, time
 
+# ─────────────────────────────────────────────────────────────────────────────
+# ייבוא פונקציות מהמנתח
+# ─────────────────────────────────────────────────────────────────────────────
 from admin_web.exercise_analyzer import (
-    settings_dump,
-    simulate_exercise,
-    analyze_exercise,
     detect_once,
+    simulate_full_reports,
     get_last_report,
-    configure_engine_root,  # לא חובה לשימוש כאן, נשאר לתאימות/הרחבות
+    get_engine_library,   # לשימוש פנימי ב-settings
+    EXR_SETTINGS,         # יתכן None אם המנוע לא זמין
 )
 
 bp_exercise = Blueprint("exercise", __name__, url_prefix="/api/exercise")
 
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 🧩 עזר: settings_dump (ללא תלות חיצונית)
+# ─────────────────────────────────────────────────────────────────────────────
+def settings_dump() -> Dict[str, Any]:
+    """
+    מחזיר סטטוס מנוע ופרטי ספרייה (אם נטענה) בצורה ידידותית ל-UI.
+    """
+    out: Dict[str, Any] = {"ok": True, "engine": {}, "library": {}}
+    try:
+        engine_ok = EXR_SETTINGS is not None
+        out["engine"] = {
+            "available": engine_ok,
+            "settings_present": bool(EXR_SETTINGS is not None),
+        }
+
+        lib = None
+        lib_root = None
+        if engine_ok:
+            try:
+                lib = get_engine_library()
+                lib_root = getattr(lib, "root_dir", None) or getattr(lib, "root", None)
+            except Exception as e:
+                out["engine"]["available"] = False
+                out["engine"]["error"] = f"library_load_failed: {e}"
+
+        if lib:
+            # ננסה לסכם מידע בסיסי—שדות אופציונליים בלודר שלך
+            families = sorted(list(getattr(lib, "families", {}).keys())) if getattr(lib, "families", None) else []
+            exercises = sorted(list(getattr(lib, "exercises", {}).keys())) if getattr(lib, "exercises", None) else []
+            out["library"] = {
+                "loaded": True,
+                "root": str(lib_root) if lib_root else None,
+                "families_count": len(families),
+                "exercises_count": len(exercises),
+            }
+        else:
+            out["library"] = {"loaded": False}
+
+        return out
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # 🔹 תרגילי ניתוח וניקוד
 # ─────────────────────────────────────────────────────────────────────────────
-
 @bp_exercise.get("/settings")
 def exercise_settings():
-    """חשיפת הגדרות מנוע התרגילים (אם זמין)."""
+    """חשיפת הגדרות מנוע התרגילים ומצב טעינת הספרייה."""
     out = settings_dump()
-    code = 200 if out.get("ok") else (503 if out.get("error") == "engine_unavailable" else 500)
+    code = 200 if out.get("ok") else 500
+    if out.get("engine", {}).get("available") is False:
+        code = 503
     return jsonify(out), code
 
 
 @bp_exercise.post("/simulate")
 def exercise_simulate():
     """
-    סימולציית סטים/חזרות לצרכי UI.
+    סימולציית סטים/חזרות לצרכי UI (ללא מנוע).
     Body JSON:
-      { sets:int=1, reps:int=6, mean_score:float=0.75, std:float=0.1,
-        mode:str?, noise:float?, seed:int? }
+      {
+        "sets": int = 1,
+        "reps": int = 6,
+        "mode": "mixed" | "easy" | "hard",
+        "noise": float = 0.2
+      }
     """
     j = request.get_json(silent=True) or {}
     try:
         sets = int(j.get("sets", 1))
         reps = int(j.get("reps", 6))
-        mean = float(j.get("mean_score", 0.75))
-        std  = float(j.get("std", 0.10))
+        mode = j.get("mode", "mixed")
+        noise = float(j.get("noise", 0.2))
     except Exception:
         return jsonify(ok=False, error="bad_params"), 400
 
-    out = simulate_exercise(
-        sets=sets,
-        reps=reps,
-        mean_score=mean,
-        std=std,
-        mode=j.get("mode"),
-        noise=j.get("noise"),
-        seed=j.get("seed", 42),
-    )
+    out = simulate_full_reports(sets=sets, reps=reps, mode=mode, noise=noise)
     return jsonify(out), 200
 
 
 @bp_exercise.post("/score")
 def exercise_score():
     """
-    ניקוד דו"ח יחיד מתוך metrics (ללא מנוע runtime).
+    ניקוד דו"ח מתוך metrics.
+    כרגע: ממפה ל-detect_once (כלומר משתמש במנוע runtime אם זמין),
+    כדי לשמור עקביות עד שתתווסף פונקציה analyze_offline ייעודית.
     Body JSON:
-      { metrics: { ... }, exercise: { id?: str } }
+      { "metrics": { ... }, "exercise_id": str? }
     """
     j = request.get_json(silent=True) or {}
     metrics = j.get("metrics")
     if not isinstance(metrics, dict):
         return jsonify(ok=False, error="no_metrics"), 400
 
-    result = analyze_exercise({"metrics": metrics, "exercise": j.get("exercise") or {}})
-    return jsonify(result), 200
+    out = detect_once(raw_metrics=metrics, exercise_id=j.get("exercise_id"))
+    if out.get("ok"):
+        return jsonify(out), 200
+
+    err = (out.get("error") or "").lower()
+    if "engine_unavailable" in err:
+        return jsonify(out), 503
+    if "library_load_failed" in err or "runtime_failed" in err:
+        return jsonify(out), 500
+    return jsonify(out), 500
 
 
 @bp_exercise.post("/detect")
@@ -94,26 +147,16 @@ def exercise_detect():
     """
     זיהוי/ניתוח דרך מנוע ה-runtime (אם זמין).
     Body JSON:
-      { metrics: { ... }, exercise_id?: str }
+      { "metrics": { ... }, "exercise_id": str? }
     """
     j = request.get_json(silent=True) or {}
     metrics_raw = j.get("metrics")
     if not isinstance(metrics_raw, dict):
         return jsonify(ok=False, error="missing_metrics_object"), 400
 
-    # שמירה למסד (אם זמינה) כ-callback אופציונלי
-    persist_cb = None
-    try:
-        from db.persist import AVAILABLE as DB_ON, persist_report  # type: ignore
-        if DB_ON:
-            persist_cb = persist_report
-    except Exception:
-        persist_cb = None
-
     out = detect_once(
         raw_metrics=metrics_raw,
         exercise_id=j.get("exercise_id"),
-        persist_cb=persist_cb,
     )
 
     if out.get("ok"):
@@ -122,16 +165,14 @@ def exercise_detect():
     err = (out.get("error") or "").lower()
     if "engine_unavailable" in err:
         return jsonify(out), 503
-    if "library_load_failed" in err:
-        return jsonify(out), 500
-    if "runtime_failed" in err:
+    if "library_load_failed" in err or "runtime_failed" in err:
         return jsonify(out), 500
     return jsonify(out), 500
 
 
 @bp_exercise.get("/last")
 def exercise_last():
-    """החזרת הדו״ח האחרון שנשמר במודול."""
+    """החזרת הדו״ח האחרון שנשמר במודול (אם נשמר)."""
     rep = get_last_report()
     return jsonify(ok=bool(rep), report=rep), 200
 
@@ -139,10 +180,9 @@ def exercise_last():
 # ─────────────────────────────────────────────────────────────────────────────
 # 🔵 דיאגנוסטיקה חיה + Snapshot + JSON מלא
 # ─────────────────────────────────────────────────────────────────────────────
-
 @bp_exercise.get("/diag/stream")
 def api_exercise_diag_stream():
-    """SSE (Server Sent Events) להזרים דיאגנוסטיקה חיה – פעם בשנייה"""
+    """SSE (Server Sent Events) להזרים דיאגנוסטיקה חיה – פעם בשנייה."""
     from admin_web.state import get_payload as get_shared_payload
     try:
         ping_ms = int(request.args.get("ping_ms") or 15000)
@@ -182,7 +222,7 @@ def api_exercise_diag_stream():
 
 @bp_exercise.get("/diag")
 def api_exercise_diag_snapshot():
-    """Snapshot סינכרוני (כפתור 'Snapshot' ב־UI)"""
+    """Snapshot סינכרוני (כפתור 'Snapshot' ב־UI)."""
     try:
         from admin_web.state import get_payload as get_shared_payload
         snap = get_shared_payload() or get_last_report() or {}
@@ -201,7 +241,7 @@ def api_exercise_diag_snapshot():
 
 @bp_exercise.get("/last/json")
 def open_last_json():
-    """פותח את הדוח האחרון כ-JSON מלא (להצגה או הורדה)"""
+    """פותח את הדוח האחרון כ-JSON מלא (להצגה/הורדה)."""
     try:
         rep = get_last_report() or {}
         if not rep:
@@ -213,7 +253,12 @@ def open_last_json():
 
 @bp_exercise.get("/connection/status")
 def connection_status():
-    """בודק שהכול מחובר כמו שצריך (DB, מצלמה, payload)"""
+    """
+    בדיקת חיבוריות מהירה: payload/video/db + גרסאות.
+    דורש:
+      - admin_web.server: APP_VERSION, PAYLOAD_VERSION, _import_get_streamer()
+      - admin_web.state.get_payload()  (אופציונלי)
+    """
     try:
         from admin_web.server import _import_get_streamer, DB_PERSIST_AVAILABLE, APP_VERSION, PAYLOAD_VERSION
         from admin_web.state import get_payload as get_shared_payload
