@@ -2,13 +2,16 @@
 """
 admin_web/exercise_analyzer.py
 ==============================
-⚙️ ניתוח תרגיל + סימולציה מלאה + חיבור למנוע Runtime
+⚙️ ניתוח תרגיל + סימולציה מלאה + חיבור למנוע Runtime + תוויות UI
 
 מטרות:
 - יצירת דו"חות מלאים (score + hints + health + coverage)
 - הפקת דו"ח אמיתי ממדידות (detect_once)
 - סימולציה מלאה (simulate_full_reports)
 - שמירת דו"ח אחרון ל-UI
+- טעינת שמות תצוגה (exercises/family/equipment) + תוויות מדדים (metrics)
+- הזרקת שמות תצוגה לדו"ח שחוזר מהמנוע
+- API פנימי: get_ui_labels()/reload_ui_labels()
 """
 
 from __future__ import annotations
@@ -63,6 +66,101 @@ def get_engine_library():
         logger.info(f"[EXR] library loaded @ {lib_dir}")
         _ENGINE["lib"] = lib
         return lib
+
+# ─────────────────────────────────────────────────────────────
+# UI Labels (exercise_names.yaml + metrics_labels.yaml)
+# ─────────────────────────────────────────────────────────────
+import yaml
+
+_UI_LABELS: Dict[str, Any] = {"names": {}, "labels": {}}
+_UI_LABELS_LOCK = threading.Lock()
+
+def _ui_files_base() -> Path:
+    """
+    מיקום ברירת מחדל של קבצי התוויות:
+    exercise_engine/report/exercise_names.yaml
+    exercise_engine/report/metrics_labels.yaml
+    """
+    return (Path(__file__).resolve().parent.parent / "exercise_engine" / "report")
+
+def _load_ui_labels(root: Optional[Path] = None) -> Dict[str, Any]:
+    """
+    טוען את קבצי ה־YAML עם שמות התצוגה (exercises/families/equipment) ותוויות המדדים (labels).
+    """
+    base = (root or _ui_files_base())
+    out = {"names": {}, "labels": {}}
+    try:
+        with open(base / "exercise_names.yaml", "r", encoding="utf-8") as f:
+            d = yaml.safe_load(f) or {}
+            out["names"] = d.get("names", {})
+    except Exception as e:
+        logger.warning(f"[UI] failed to load exercise_names.yaml: {e}")
+
+    try:
+        with open(base / "metrics_labels.yaml", "r", encoding="utf-8") as f:
+            d = yaml.safe_load(f) or {}
+            out["labels"] = d.get("labels", {})
+    except Exception as e:
+        logger.warning(f"[UI] failed to load metrics_labels.yaml: {e}")
+    return out
+
+def get_ui_labels() -> Dict[str, Any]:
+    """החזרת המפות הטעונות (ל־API/UI)."""
+    with _UI_LABELS_LOCK:
+        # מחזיר עותק מבודד
+        return {"names": dict(_UI_LABELS.get("names", {})),
+                "labels": dict(_UI_LABELS.get("labels", {}))}
+
+def reload_ui_labels() -> Dict[str, Any]:
+    """טעינה מחדש של קבצי התוויות (ללא אתחול שרת)."""
+    global _UI_LABELS
+    new_maps = _load_ui_labels()
+    with _UI_LABELS_LOCK:
+        _UI_LABELS = new_maps
+        counts = {
+            "exercises": len((_UI_LABELS.get("names") or {}).get("exercises", {})),
+            "families":  len((_UI_LABELS.get("names") or {}).get("families", {})),
+            "equipment": len((_UI_LABELS.get("names") or {}).get("equipment", {})),
+            "metrics":   len(_UI_LABELS.get("labels", {})),
+        }
+    logger.info(f"[UI] labels reloaded: {counts}")
+    return {"ok": True, "counts": counts}
+
+def _apply_ui_names(report: Dict[str, Any], *, display_lang: str = "he") -> Dict[str, Any]:
+    """
+    מוסיף/מעדכן ui.lang_labels לדו״ח לפי exercise_names.yaml.
+    לא משנה מדידות/ציונים, רק תצוגה.
+    """
+    if not isinstance(report, dict):
+        return report
+
+    ui = report.setdefault("ui", {})
+    names = get_ui_labels().get("names", {}) or {}
+
+    ex = (report.get("exercise") or {})
+    ex_id = ex.get("id")
+    family = ex.get("family")
+    equipment = ex.get("equipment")
+
+    def _lbl(map_name: str, key: Optional[str]) -> Dict[str, str]:
+        if not key:
+            return {"he": "-", "en": "-"}
+        m = (names.get(map_name) or {})
+        d = (m.get(key) or {})
+        return {
+            "he": d.get("he", key),
+            "en": d.get("en", key),
+        }
+
+    ui["lang_labels"] = {
+        "exercise": _lbl("exercises", ex_id),
+        "family":   _lbl("families",  family),
+        "equipment":_lbl("equipment", equipment),
+    }
+
+    # שמירת שפה מועדפת (לא חובה)
+    report["display_lang"] = display_lang
+    return report
 
 # ─────────────────────────────────────────────────────────────
 # Utilities
@@ -140,6 +238,12 @@ def detect_once(raw_metrics: Dict[str, Any],
         logger.error(f"detect_once runtime failed: {e}")
         return {"ok": False, "error": f"runtime_failed: {e}"}
 
+    # 🔹 עיטור תצוגה — שמות יפים לדו״ח (לא נוגע בציונים/מדידות)
+    try:
+        report = _apply_ui_names(report, display_lang="he")
+    except Exception as e:
+        logger.warning(f"[UI] failed to apply ui names: {e}")
+
     took_ms = int((time.time() - t0) * 1000)
     return {"ok": True, "took_ms": took_ms, "report": report}
 
@@ -156,12 +260,12 @@ def simulate_full_reports(sets: int = 2,
     """
     stats = {"reports": 0, "ok": 0, "warn": 0, "fail": 0, "avg_score_pct": 0}
     sets_out = []
-    rng = random.Random(time.time())
+    import random as _rnd
+    rng = _rnd.Random(time.time())
 
     for s in range(1, sets + 1):
         reps_out = []
         for r in range(1, reps + 1):
-            # ציוני קריטריונים
             base = rng.uniform(0.6, 0.95)
             crit = [
                 {"id": "depth", "available": True, "score": base - rng.uniform(0, 0.2)},
@@ -181,7 +285,7 @@ def simulate_full_reports(sets: int = 2,
             elif overall < 0.8: hints.append("שפר קלות את היציבות והעומק")
 
             report = {
-                "exercise": {"id": "squat.bodyweight"},
+                "exercise": {"id": "squat.bodyweight", "family": "squat", "equipment": "none"},
                 "ui_ranges": _ui_ranges(),
                 "scoring": {
                     "score": round(overall, 3),
@@ -195,6 +299,9 @@ def simulate_full_reports(sets: int = 2,
                     "issues": [] if overall >= 0.7 else [{"code": "LOW_SCORE", "message": "ציון נמוך"}]
                 },
             }
+
+            # הזרקת שמות תצוגה גם בסימולציה
+            report = _apply_ui_names(report, display_lang="he")
 
             reps_out.append({"rep": r, "report": report})
             stats["reports"] += 1
@@ -222,3 +329,12 @@ def set_last_report(report: Dict[str, Any]) -> None:
 def get_last_report() -> Optional[Dict[str, Any]]:
     with _LAST_REPORT_LOCK:
         return _LAST_REPORT.copy() if isinstance(_LAST_REPORT, dict) else None
+
+
+# ─────────────────────────────────────────────────────────────
+# טעינה ראשונית של תוויות UI בעליית המודול
+# ─────────────────────────────────────────────────────────────
+try:
+    reload_ui_labels()
+except Exception as _e:
+    logger.warning(f"[UI] initial labels load failed: {_e}")

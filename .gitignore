@@ -1,11 +1,12 @@
-﻿.venv/
-venv/
-test_env/
+﻿.venv
+venv
 __pycache__/
 *.pyc
 *.pyo
 *.log
 .DS_Store
 Thumbs.db
-.idea/
+.idea
 .env
+report
+uploads

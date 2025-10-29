@@ -8,27 +8,31 @@ import requests
 RUNPOD_BASE = (os.getenv("RUNPOD_BASE") or "https://api.runpod.ai/v2/1fmkdasa1l0x06").rstrip("/")
 API_KEY     = os.getenv("RUNPOD_API_KEY") or "rpa_4PXVVU7WW1RON92M9VQTT5V2ZOA4T8FZMM68ZUOE0fsl21"
 PORT        = int(os.getenv("PORT", "8000"))
-DEBUG_LOG   = (os.getenv("PROXY_DEBUG", "1") == "1")      # 1=on, 0=off
+DEBUG_LOG   = (os.getenv("PROXY_DEBUG", "1") == "1")  # 1=on, 0=off
 
-_LAST = {"when": None, "path": None, "method": None, "status": None,
-         "upstream": None, "resp_head": {}, "resp_text": None}
+_LAST = {
+    "when": None, "path": None, "method": None, "status": None,
+    "upstream": None, "resp_head": {}, "resp_text": None
+}
 
 app = Flask(__name__)
 
 # ========= עזרי לוג =========
 def log(*args):
-    if not DEBUG_LOG: return
+    if not DEBUG_LOG:
+        return
     ts = time.strftime("[%H:%M:%S]")
     print(ts, *args, flush=True)
 
 def _mask_key(k: str) -> str:
-    if not k: return ""
+    if not k:
+        return ""
     return ("***" if len(k) <= 8 else f"{k[:6]}...{k[-5:]}")
 
-def _short_headers(h: dict, drop=set(("cookie","authorization"))):
+def _short_headers(h: dict, drop=set(("cookie", "authorization"))):
     out = {}
-    for k,v in h.items():
-        out[k] = "<hidden>" if k.lower() in drop else (v if len(str(v))<200 else str(v)[:200]+" ...")
+    for k, v in h.items():
+        out[k] = "<hidden>" if k.lower() in drop else (v if len(str(v)) < 200 else str(v)[:200] + " ...")
     return out
 
 def _json_or_text(r: requests.Response) -> str:
@@ -58,17 +62,21 @@ def _cors(resp):
 @app.route("/run-submit", methods=["OPTIONS"])
 @app.route("/run-sync", methods=["OPTIONS"])
 @app.route("/status/<job_id>", methods=["OPTIONS"])
+@app.route("/healthz", methods=["OPTIONS"])
 def _opts(job_id=None):
     return Response(status=204)
 
-# ========= דף בית / UI =========
+# ========= דפי בית / UI =========
 @app.get("/")
 def home():
     payload = {
-        "ok": True, "msg": "RunPod proxy alive. Use POST /run-submit (async) or /run-sync (sync).",
-        "port": PORT, "upstream": RUNPOD_BASE, "api_key_mask": _mask_key(API_KEY),
+        "ok": True,
+        "msg": "RunPod proxy alive. Use POST /run-submit (async) or /run-sync (sync).",
+        "port": PORT,
+        "upstream": RUNPOD_BASE,
+        "api_key_mask": _mask_key(API_KEY),
     }
-    log(">>> HOME GET /?")
+    log(">>> HOME GET /")
     log("    headers:", json.dumps(_short_headers(request.headers), ensure_ascii=False))
     return jsonify(payload), 200
 
@@ -79,7 +87,7 @@ def simple_ui():
 <style>
 body{{font-family:system-ui,Arial;margin:24px;line-height:1.5}}
 .card{{border:1px solid #e5e7eb;border-radius:12px;padding:16px;max-width:860px}}
-pre{{white-space:pre-wrap;word-break:break-word;background:#0a0a0a;color:#e5e7eb;padding:12px;border-radius:8px;max-height:50vh;overflow:auto}}
+pre{{white-space:pre-wrap;word-break:break-word;background:#0a0a0a;color:#e5e5e5;padding:12px;border-radius:8px;max-height:50vh;overflow:auto}}
 label, input, button{{font-size:16px}}
 input[type=text]{{width:420px}}
 small{{color:#6b7280}}
@@ -115,6 +123,13 @@ async function runSync(){{
     return make_response(html, 200)
 
 # ========= Health / WhoAmI / Last =========
+@app.get("/healthz")
+def healthz():
+    """
+    נקודת בריאות ל-RunPod: מחזירה 200 מהר מאוד ללא תלות בשום שירות חיצוני.
+    """
+    return jsonify(ok=True, ts=time.time(), upstream=RUNPOD_BASE), 200
+
 @app.get("/_proxy/health")
 def proxy_health():
     ok = bool(RUNPOD_BASE) and bool(API_KEY)
@@ -144,18 +159,25 @@ def run_sync():
         t0 = time.time()
         up = f"{RUNPOD_BASE}/run-sync"
         r  = _post(up, {"input": body})
-        dt = int((time.time()-t0)*1000)
+        dt = int((time.time() - t0) * 1000)
         text = _json_or_text(r)
         _LAST.update({
             "when": time.strftime("%Y-%m-%d %H:%M:%S"),
-            "path": "/run-sync", "method": "POST", "status": r.status_code,
-            "upstream": up, "resp_head": _short_headers(r.headers), "resp_text": text,
+            "path": "/run-sync",
+            "method": "POST",
+            "status": r.status_code,
+            "upstream": up,
+            "resp_head": _short_headers(r.headers),
+            "resp_text": text,
         })
         log(f"    → upstream {up} | HTTP {r.status_code} | {dt} ms")
         log("    resp.head:", json.dumps(_short_headers(r.headers), ensure_ascii=False))
         log("    resp.body:", text)
-        return Response(r.content, status=r.status_code,
-                        headers={"Content-Type": r.headers.get("Content-Type","application/json")})
+        return Response(
+            r.content,
+            status=r.status_code,
+            headers={"Content-Type": r.headers.get("Content-Type", "application/json")},
+        )
     except Exception as e:
         log("    EXC /run-sync:", repr(e))
         log(traceback.format_exc())
@@ -173,14 +195,21 @@ def run_submit():
         text = _json_or_text(r)
         _LAST.update({
             "when": time.strftime("%Y-%m-%d %H:%M:%S"),
-            "path": "/run-submit", "method": "POST", "status": r.status_code,
-            "upstream": up, "resp_head": _short_headers(r.headers), "resp_text": text,
+            "path": "/run-submit",
+            "method": "POST",
+            "status": r.status_code,
+            "upstream": up,
+            "resp_head": _short_headers(r.headers),
+            "resp_text": text,
         })
         log(f"    → upstream {up} | HTTP {r.status_code}")
         log("    resp.head:", json.dumps(_short_headers(r.headers), ensure_ascii=False))
         log("    resp.body:", text)
-        return Response(r.content, status=r.status_code,
-                        headers={"Content-Type": r.headers.get("Content-Type","application/json")})
+        return Response(
+            r.content,
+            status=r.status_code,
+            headers={"Content-Type": r.headers.get("Content-Type", "application/json")},
+        )
     except Exception as e:
         log("    EXC /run-submit:", repr(e))
         log(traceback.format_exc())
@@ -197,14 +226,21 @@ def status(job_id: str):
         text = _json_or_text(r)
         _LAST.update({
             "when": time.strftime("%Y-%m-%d %H:%M:%S"),
-            "path": f"/status/{job_id}", "method": "GET", "status": r.status_code,
-            "upstream": up, "resp_head": _short_headers(r.headers), "resp_text": text,
+            "path": f"/status/{job_id}",
+            "method": "GET",
+            "status": r.status_code,
+            "upstream": up,
+            "resp_head": _short_headers(r.headers),
+            "resp_text": text,
         })
         log(f"    → upstream {up} | HTTP {r.status_code}")
         log("    resp.head:", json.dumps(_short_headers(r.headers), ensure_ascii=False))
         log("    resp.body:", text)
-        return Response(r.content, status=r.status_code,
-                        headers={"Content-Type": r.headers.get("Content-Type","application/json")})
+        return Response(
+            r.content,
+            status=r.status_code,
+            headers={"Content-Type": r.headers.get("Content-Type", "application/json")},
+        )
     except Exception as e:
         log("    EXC /status:", repr(e))
         log(traceback.format_exc())
@@ -213,11 +249,16 @@ def status(job_id: str):
 # חסימת סטרים – Serverless לא תומך ב-MJPEG
 @app.get("/video/stream.mjpg")
 def no_stream():
-    return jsonify(ok=False, error="serverless_no_stream",
-                   detail="Serverless לא תומך ב-MJPEG. השתמש ב-Pod/שרת קבוע."), 400
+    return jsonify(
+        ok=False,
+        error="serverless_no_stream",
+        detail="Serverless לא תומך ב-MJPEG. השתמש ב-Pod/שרת קבוע."
+    ), 400
 
 # ========= main =========
 if __name__ == "__main__":
+    # מקומי בלבד. בענן מריצים עם gunicorn:
+    # gunicorn -k gthread -w 1 --threads 8 -t 120 --bind 0.0.0.0:8000 "admin_web.runpod_proxy:app"
     print(f"🔁 Proxy running at http://127.0.0.1:{PORT} → {RUNPOD_BASE}")
     print(f"🔐 API key loaded? {_mask_key(API_KEY) if API_KEY else 'NO'}")
     print(f"🪵 DEBUG_LOG={'True' if DEBUG_LOG else 'False'}")

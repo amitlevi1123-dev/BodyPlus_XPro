@@ -1,37 +1,62 @@
 # -*- coding: utf-8 -*-
 """
 app/ui/video.py — VideoStreamer ingest-only (ללא OpenCV)
-- ingest_jpeg(jpeg_bytes) מהדפדפן/טלפון
-- get_jpeg_generator() למתן MJPEG
-- get_latest_jpeg() לחשיפת הפריים האחרון למדידות
+---------------------------------------------------------
+🎥 תיאור:
+- מקבל פריימים JPEG (טלפון / דפדפן) ומזרימם לשרת כ-MJPEG.
+- ללא שימוש ב-OpenCV.
+- משמש מקור עיקרי ל-/video/stream.mjpg ולמדידות Live.
+
+⚙️ נקודות עיקריות:
+- ingest_jpeg(jpeg_bytes): קבלת פריים מהדפדפן.
+- get_jpeg_generator(): הפקת סטרים MJPEG.
+- get_latest_jpeg(): החזרת הפריים האחרון למדידות.
+- has_frames() / buffer_len(): תאימות מלאה לנתיב /video/stream.mjpg.
 """
 
 from __future__ import annotations
-import os, time, threading
+import os, time, threading, logging
 from typing import Optional, Tuple, List, Dict, Any
 from io import BytesIO
 
+# ===== Logger =====
+logger = logging.getLogger("VideoStreamer")
+if not logger.handlers:
+    handler = logging.StreamHandler()
+    handler.setFormatter(logging.Formatter("%(asctime)s | %(levelname)s | %(message)s"))
+    logger.addHandler(handler)
+    logger.setLevel(logging.INFO)
+
+# ===== PIL (לקריאת גודל פריים) =====
 try:
     from PIL import Image  # type: ignore
     PIL_OK = True
 except Exception:
     Image = None  # type: ignore
     PIL_OK = False
+    logger.warning("PIL not available — frame size will not be inferred.")
 
 def _safe_now() -> float:
-    try: return time.time()
-    except Exception: return float(int(time.time()))
+    try:
+        return time.time()
+    except Exception:
+        return float(int(time.time()))
 
+# ===== Placeholder image (אם אין פריימים) =====
 _MINI_JPEG = (
     b"\xff\xd8\xff\xe0\x00\x10JFIF\x00\x01\x01\x01\x00H\x00H\x00\x00"
-    b"\xff\xdb\x00C\x00" + b"\x08"*64 +
+    b"\xff\xdb\x00C\x00" + b"\x08" * 64 +
     b"\xff\xc0\x00\x11\x08\x00\x01\x00\x01\x03\x01\"\x00\x02\x11\x01\x03\x11\x01"
     b"\xff\xda\x00\x0c\x03\x01\x00\x02\x11\x03\x11\x00?\x00\xcf\xff\xd9"
 )
 
+
 class VideoStreamer:
+    """מקבל JPEG מבחוץ ומספק סטרים MJPEG לזיכרון — ללא OpenCV."""
+
     def __init__(self, camera_index: int = 0, width: int = 1280, height: int = 720,
-                 fps: int = 30, jpeg_quality: int = 70, show_preview_default: bool = False,
+                 fps: int = 30, jpeg_quality: int = 70,
+                 show_preview_default: bool = False,
                  window_name: str = "Preview"):
         self.camera_index = int(camera_index)
         self.width = int(width)
@@ -62,16 +87,38 @@ class VideoStreamer:
         self.on_open_metrics = None
         self.on_freeze_change = None
 
+        logger.info(f"VideoStreamer initialized | {width}x{height} @ {fps}fps | ingest-only mode")
+
     # -------- Status --------
-    def is_open(self) -> bool:       return bool(self._opened)
-    def is_running(self) -> bool:    return bool(self._running)
-    def last_fps(self) -> Optional[float]:       return float(self._last_fps) if self._last_fps is not None else None
-    def last_frame_size(self) -> Optional[Tuple[int,int]]: return tuple(self._last_size) if self._last_size else None
-    def get_light_mode(self) -> str: return "normal"
-    def source_desc(self) -> Optional[str]:      return self._source_desc
+    def is_open(self) -> bool:
+        return bool(self._opened)
+
+    def is_running(self) -> bool:
+        return bool(self._running)
+
+    def last_fps(self) -> Optional[float]:
+        return float(self._last_fps) if self._last_fps is not None else None
+
+    def last_frame_size(self) -> Optional[Tuple[int, int]]:
+        return tuple(self._last_size) if self._last_size else None
+
+    def get_light_mode(self) -> str:
+        return "normal"
+
+    def source_desc(self) -> Optional[str]:
+        return self._source_desc
+
+    # -------- תאימות ל־routes_video --------
+    def has_frames(self) -> bool:
+        """בודק אם קיים פריים אחרון בזיכרון."""
+        return self._last_jpeg is not None
+
+    def buffer_len(self) -> int:
+        """תאימות לגרסה ישנה – מחזיר 1 אם קיים פריים."""
+        return 1 if self._last_jpeg is not None else 0
 
     # -------- Camera settings (headless) --------
-    def get_camera_settings(self) -> Dict[str,int]:
+    def get_camera_settings(self) -> Dict[str, int]:
         return {"width": int(self.width), "height": int(self.height), "fps": int(self.fps)}
 
     def set_resolution(self, width: int, height: int) -> None:
@@ -81,17 +128,24 @@ class VideoStreamer:
         except Exception:
             pass
 
-    def apply_camera_settings(self, *, fps: Optional[int] = None, width: Optional[int] = None,
+    def apply_camera_settings(self, *, fps: Optional[int] = None,
+                              width: Optional[int] = None,
                               height: Optional[int] = None):
-        if fps   is not None:
-            try: self.fps = int(fps)
-            except Exception: pass
+        if fps is not None:
+            try:
+                self.fps = int(fps)
+            except Exception:
+                pass
         if width is not None:
-            try: self.width = int(width)
-            except Exception: pass
+            try:
+                self.width = int(width)
+            except Exception:
+                pass
         if height is not None:
-            try: self.height = int(height)
-            except Exception: pass
+            try:
+                self.height = int(height)
+            except Exception:
+                pass
         self._last_size = (int(self.width), int(self.height))
         return True, "applied_headless"
 
@@ -118,10 +172,12 @@ class VideoStreamer:
         with self._cv:
             self._last_jpeg = bytes(jpeg_bytes)
             self._cv.notify_all()
+
         self._update_fps(now)
+        logger.debug(f"Frame ingested | size={len(jpeg_bytes)} bytes | fps≈{self._last_fps or 0}")
 
     # -------- Optional manual push --------
-    def push_jpeg(self, jpeg_bytes: bytes, size: Optional[Tuple[int,int]] = None) -> None:
+    def push_jpeg(self, jpeg_bytes: bytes, size: Optional[Tuple[int, int]] = None) -> None:
         if not isinstance(jpeg_bytes, (bytes, bytearray)) or len(jpeg_bytes) < 10:
             return
         now = _safe_now()
@@ -132,16 +188,20 @@ class VideoStreamer:
         self._running = True
         self._last_push_ts = now
         if size:
-            try: self._last_size = (int(size[0]), int(size[1]))
-            except Exception: pass
+            try:
+                self._last_size = (int(size[0]), int(size[1]))
+            except Exception:
+                pass
         with self._cv:
             self._last_jpeg = bytes(jpeg_bytes)
             self._cv.notify_all()
         self._update_fps(now)
+        logger.debug("push_jpeg() called manually")
 
-    # -------- MJPEG --------
+    # -------- MJPEG generator --------
     def get_jpeg_generator(self):
-        boundary = b"--frame"; heartbeat = _safe_now() + 2.0
+        boundary = b"--frame"
+        heartbeat = _safe_now() + 2.0
         while True:
             with self._cv:
                 if self._last_jpeg is None:
@@ -163,13 +223,23 @@ class VideoStreamer:
             return bytes(self._last_jpeg) if self._last_jpeg is not None else None
 
     # -------- Freeze/preview (no-op) --------
-    def enable_preview(self, on: bool): return
-    def start_auto_capture(self): self._source_desc = "ingest-only"; self._ensure_placeholder_jpeg()
-    def stop_auto_capture(self): self._running = False; self._opened = False
+    def enable_preview(self, on: bool):
+        return
+
+    def start_auto_capture(self):
+        self._source_desc = "ingest-only"
+        self._ensure_placeholder_jpeg()
+        logger.info("Auto-capture simulated (placeholder ready)")
+
+    def stop_auto_capture(self):
+        self._running = False
+        self._opened = False
+        logger.info("Video capture stopped (logical)")
 
     # -------- Internals --------
     def _ensure_placeholder_jpeg(self):
-        if self._last_jpeg is None: self._last_jpeg = _MINI_JPEG
+        if self._last_jpeg is None:
+            self._last_jpeg = _MINI_JPEG
 
     def _update_fps(self, now: float):
         self._fps_win.append(now)
@@ -177,15 +247,22 @@ class VideoStreamer:
             self._fps_win.pop(0)
         if len(self._fps_win) >= 2:
             span = self._fps_win[-1] - self._fps_win[0]
-            if span > 0: self._last_fps = round((len(self._fps_win) - 1) / span, 2)
+            if span > 0:
+                self._last_fps = round((len(self._fps_win) - 1) / span, 2)
 
+
+# ===== Singleton streamer =====
 _streamer: Optional[VideoStreamer] = None
 
 def get_streamer() -> VideoStreamer:
+    """יוצר אובייקט גלובלי יחיד של VideoStreamer."""
     global _streamer
     if _streamer is None:
         cam = int(os.getenv("CAMERA_INDEX", os.getenv("OBJDET_CAMERA_INDEX", "0")))
-        w = int(os.getenv("WIDTH", "1280")); h = int(os.getenv("HEIGHT", "720"))
-        fps = int(os.getenv("FPS", "30")); q = int(os.getenv("JPEG_QUALITY", "70"))
+        w = int(os.getenv("WIDTH", "1280"))
+        h = int(os.getenv("HEIGHT", "720"))
+        fps = int(os.getenv("FPS", "30"))
+        q = int(os.getenv("JPEG_QUALITY", "70"))
         _streamer = VideoStreamer(cam, w, h, fps, q, False)
+        logger.info(f"get_streamer(): new instance created ({w}x{h}@{fps})")
     return _streamer

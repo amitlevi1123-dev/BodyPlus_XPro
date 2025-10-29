@@ -1,47 +1,179 @@
-# -*- coding: utf-8 -*-
 # =============================================================================
-# 🏷️ exercise_names.yaml — שמות תרגילים, משפחות, וציוד (דו־לשוני)
+# 🏷 exercise_names.yaml — שמות תצוגה ל־exercise / family / equipment (he/en)
+# =============================================================================
+# שימוש:
+# • מיועד לדוחות/UI כדי להציג שמות יפים לשדות: exercise.id, family, equipment.
+# • אין כאן נרמול ואין aliases — רק תוויות תצוגה.
+# • אם חסר כאן פריט, ה־UI ייפול־חזרה (fallback) לשם המקורי (id/מחרוזת).
+# • ניתן להרחיב/לערוך חופשי; לא שובר את המנוע.
 # =============================================================================
 
-families:
-  squat: { he: "סקוואט", en: "Squat" }
-  hinge: { he: "הינג׳ / דדליפט", en: "Hinge / Deadlift" }
-  press: { he: "לחיצה", en: "Press" }
-  chest_press: { he: "חזה", en: "Chest Press" }
-  biceps: { he: "זרוע קדמית", en: "Biceps" }
+names:
 
-equipment:
-  bodyweight: { he: "משקל גוף", en: "Bodyweight" }
-  barbell: { he: "מוט", en: "Barbell" }
-  dumbbell: { he: "משקולות יד", en: "Dumbbells" }
+  exercises:
+    # —— רגליים / סקוואט ——
+    squat.bodyweight:
+      he: "סקוואט משקל גוף"
+      en: "Bodyweight Squat"
+    squat.dumbbell:
+      he: "סקוואט משקולת יד"
+      en: "Dumbbell Squat"
+    squat.barbell.highbar:
+      he: "סקוואט עם מוט (היי־בר)"
+      en: "Barbell Squat (High-Bar)"
+    squat.barbell.lowbar:
+      he: "סקוואט עם מוט (לו־בר)"
+      en: "Barbell Squat (Low-Bar)"
+    split_squat.dumbbell:
+      he: "ספליט סקוואט משקולות יד"
+      en: "Dumbbell Split Squat"
+    lunge.dumbbell.forward:
+      he: "לאנץ׳ קדמי משקולות יד"
+      en: "Dumbbell Forward Lunge"
 
-exercises:
-  squat.bodyweight:
-    family: squat
-    equipment: bodyweight
-    labels: { he: "סקוואט גוף", en: "Bodyweight Squat" }
-    aliases: ["squat", "bodyweight squat", "סקוואט"]
+    # —— הינג' / דדליפט ——
+    deadlift.barbell.conventional:
+      he: "דדליפט קונבנציונלי עם מוט"
+      en: "Conventional Barbell Deadlift"
+    deadlift.barbell.romanian:
+      he: "דדליפט רומני עם מוט (RDL)"
+      en: "Barbell Romanian Deadlift (RDL)"
+    deadlift.dumbbell.romanian:
+      he: "דדליפט רומני עם משקולות יד"
+      en: "Dumbbell Romanian Deadlift"
+    hip_hinge.bodyweight:
+      he: "הינג׳ גוף־משקל"
+      en: "Bodyweight Hip Hinge"
 
-  deadlift.barbell.romanian:
-    family: hinge
-    equipment: barbell
-    labels: { he: "דדליפט רומני", en: "Romanian Deadlift" }
-    aliases: ["rdl", "romanian deadlift", "דדליפט רומני"]
+    # —— חזה ——
+    bench_press.barbell.flat:
+      he: "לחיצת חזה שטוחה עם מוט"
+      en: "Barbell Bench Press (Flat)"
+    bench_press.dumbbell.flat:
+      he: "לחיצת חזה שטוחה עם משקולות יד"
+      en: "Dumbbell Bench Press (Flat)"
+    pushup.bodyweight.standard:
+      he: "שכיבות סמיכה"
+      en: "Push-Up"
 
-  shoulder_press.dumbbell.seated:
-    family: press
-    equipment: dumbbell
-    labels: { he: "לחיצת כתפיים (ישיבה)", en: "Seated Shoulder Press" }
-    aliases: ["shoulder press", "לחיצת כתפיים"]
+    # —— כתפיים ——
+    shoulder_press.dumbbell.seated:
+      he: "לחיצת כתפיים עם משקולות יד (ישיבה)"
+      en: "Seated Dumbbell Shoulder Press"
+    shoulder_press.barbell.standing:
+      he: "לחיצת כתפיים עם מוט (עמידה)"
+      en: "Standing Barbell Shoulder Press"
+    lateral_raise.dumbbell:
+      he: "הרחקת כתפיים לצדדים (דאמבלים)"
+      en: "Dumbbell Lateral Raise"
 
-  bench_press.barbell.flat:
-    family: chest_press
-    equipment: barbell
-    labels: { he: "לחיצת חזה במוט", en: "Flat Bench Press" }
-    aliases: ["bench press", "לחיצת חזה"]
+    # —— גב/משיכה ——
+    row.dumbbell.one_arm:
+      he: "חתירה ביד אחת (דאמבל)"
+      en: "One-Arm Dumbbell Row"
+    row.barbell.bent_over:
+      he: "חתירה בהטיית גו עם מוט"
+      en: "Bent-Over Barbell Row"
+    pulldown.cable.wide:
+      he: "פול־דאון בפולי (אחיזה רחבה)"
+      en: "Lat Pulldown (Wide Grip)"
 
-  biceps_curl.dumbbell.standing:
-    family: biceps
-    equipment: dumbbell
-    labels: { he: "כפיפות מרפקים", en: "Biceps Curl" }
-    aliases: ["biceps curl", "db curl", "כפיפות מרפקים"]
+    # —— יד קדמית / יד אחורית ——
+    biceps_curl.dumbbell.alternating:
+      he: "כפיפות מרפקים (דאמבלים לסירוגין)"
+      en: "Alternating Dumbbell Biceps Curl"
+    biceps_curl.barbell.standing:
+      he: "כפיפות מרפקים עם מוט (עמידה)"
+      en: "Standing Barbell Biceps Curl"
+    triceps_pushdown.cable.bar:
+      he: "פשיטת מרפקים בפולי (מוט)"
+      en: "Cable Triceps Pushdown (Bar)"
+    triceps_overhead.extension.dumbbell:
+      he: "פשיטת מרפקים מעל הראש (דאמבל)"
+      en: "Overhead Triceps Extension (Dumbbell)"
+
+    # —— ליבה ——
+    plank.bodyweight.standard:
+      he: "פלאנק"
+      en: "Plank"
+    crunch.bodyweight.standard:
+      he: "קרנצ׳ים"
+      en: "Crunches"
+
+    # —— בסיסים (קבצי base בספריה) ——
+    squat.base:
+      he: "סקוואט (בסיס)"
+      en: "Squat (Base)"
+    curl.base:
+      he: "כפיפות מרפקים (בסיס)"
+      en: "Curl (Base)"
+
+  families:
+    squat:
+      he: "סקוואט"
+      en: "Squat"
+    hinge:
+      he: "הינג׳"
+      en: "Hinge"
+    press:
+      he: "לחיצה"
+      en: "Press"
+    pull:
+      he: "משיכה"
+      en: "Pull"
+    chest:
+      he: "חזה"
+      en: "Chest"
+    shoulder:
+      he: "כתף"
+      en: "Shoulder"
+    back:
+      he: "גב"
+      en: "Back"
+    arms:
+      he: "ידיים"
+      en: "Arms"
+    biceps:
+      he: "יד קדמית"
+      en: "Biceps"
+    triceps:
+      he: "יד אחורית"
+      en: "Triceps"
+    core:
+      he: "ליבה"
+      en: "Core"
+    lunge:
+      he: "לאנץ'"
+      en: "Lunge"
+    curl:
+      he: "כפיפות מרפקים"
+      en: "Curl"
+
+  equipment:
+    barbell:
+      he: "מוט"
+      en: "Barbell"
+    dumbbell:
+      he: "משקולת יד"
+      en: "Dumbbell"
+    kettlebell:
+      he: "קטלבל"
+      en: "Kettlebell"
+    trapbar:
+      he: "טרפ־בר"
+      en: "Trap Bar"
+    bodyweight:
+      he: "משקל גוף"
+      en: "Bodyweight"
+    cable:
+      he: "פולי"
+      en: "Cable"
+    machine:
+      he: "מכונה"
+      en: "Machine"
+    band:
+      he: "גומייה"
+      en: "Band"
+    none:
+      he: "ללא ציוד"
+      en: "None"
