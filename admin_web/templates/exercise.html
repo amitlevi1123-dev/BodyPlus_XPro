@@ -10,6 +10,7 @@
     --ok:#22c55e; --warn:#f97316; --bad:#ef4444; --muted2:#9ca3af;
   }
   html[dir="rtl"] .ltr { direction:ltr }
+
   .mono{font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono","Courier New",monospace}
   .card{background:var(--bg);border:1px solid var(--border);border-radius:1rem}
   .card-h{padding:.9rem 1.1rem;border-bottom:1px solid #eef2f7}
@@ -38,13 +39,21 @@
   .status-dot{width:10px;height:10px;border-radius:9999px;background:#ef4444;display:inline-block}
   .status-dot.connected{background:#22c55e}
 
-  /* Tables */
+  /* Tables (לא גולשות) */
   .table-wrap{ overflow-x:auto; }
-  .mtable{ width:100%; border-collapse:separate; border-spacing:0; border:1px solid var(--border); border-radius:.8rem; overflow:hidden; min-width:720px }
-  .mtable th, .mtable td{ padding:.5rem .6rem; border-bottom:1px solid var(--border); font-size:.875rem; vertical-align:middle }
+  .mtable{
+    width:100%; border-collapse:separate; border-spacing:0; border:1px solid var(--border);
+    border-radius:.8rem; overflow:hidden; table-layout:fixed; /* חשוב נגד גלישות */
+    min-width:720px;
+  }
+  .mtable th, .mtable td{
+    padding:.5rem .6rem; border-bottom:1px solid var(--border); font-size:.875rem; vertical-align:middle;
+    overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+  }
   .mtable thead th{ background:#f8fafc; color:#334155; font-weight:600 }
   .mtable tr:last-child td{ border-bottom:none }
 
+  /* Key/Value grids */
   .kv-grid{ display:grid; grid-template-columns: 1fr auto; gap:.35rem .8rem }
   .kv-key{ color:#475569 }
   .kv-val{ font-weight:600; color:#1f2937; direction:ltr }
@@ -52,8 +61,18 @@
   .hint{ font-size:.8rem; color:#64748b }
   .badge{display:inline-flex;align-items:center;gap:.35rem;padding:.2rem .55rem;border-radius:9999px;font-size:.75rem;background:#f1f5f9;border:1px solid #e5e7eb}
   .score-badge{font-weight:700}
-  .circle{width:9px;height:9px;border-radius:9999px;display:inline-block}
-  .c-ok{background:#22c55e}.c-warn{background:#f59e0b}.c-bad{background:#ef4444}
+
+  /* עיגול צבעוני לכל חזרה */
+  .rep-badge{ display:inline-flex; align-items:center; gap:.45rem; }
+  .rep-dot{ width:10px; height:10px; border-radius:9999px; background:#9ca3af; flex:none; }
+  .rep-dot.red{ background:#ef4444; }
+  .rep-dot.orange{ background:#f97316; }
+  .rep-dot.green{ background:#22c55e; }
+  .rep-dot.gray{ background:#9ca3af; }
+
+  /* סיכום סט */
+  .set-summary{ background:#f8fafc; border:1px solid var(--border); border-radius:.8rem; padding:.6rem .75rem; }
+  .set-summary .sub{ color:#64748b; font-size:.85rem }
 </style>
 {% endblock %}
 
@@ -83,7 +102,7 @@
             <div class="font-semibold" id="exNameHe">—</div>
             <div class="text-sm text-gray-500" id="exNameEn">—</div>
           </div>
-          <span class="badge"><span class="circle c-ok"></span><span id="exerciseId">—</span></span>
+          <span class="badge"><span class="rep-dot green"></span><span id="exerciseId">—</span></span>
         </div>
       </div>
       <div class="border rounded-xl p-3">
@@ -123,7 +142,7 @@
     <div class="card-b">
       <img id="videoFeed" src="/video/stream.mjpg" alt="Video stream"
            class="w-full h-[380px] object-contain bg-gray-50 rounded-lg border border-gray-200" />
-      <div class="text-xs text-gray-500 mt-2">אם לא רואים וידאו: ודא שהסטרימר פעיל. (בדף <span class="mono">/video</span>)</div>
+      <div class="text-xs text-gray-500 mt-2">אם לא רואים וידאו: ודא שהסטרימר פעיל (בדף <span class="mono">/video</span>).</div>
     </div>
   </div>
 
@@ -137,7 +156,6 @@
           <div class="text-sm text-gray-600">חיבור API / מצב סטרים</div>
         </div>
 
-        <!-- בריאות מערכת -->
         <div class="flex items-center gap-3">
           <span class="status-dot" id="healthDot"></span>
           <div class="text-sm text-gray-600">בריאות מערכת (healthz)</div>
@@ -229,7 +247,7 @@
   </div>
 </div>
 
-<!-- פאנל סימולטור (השארתי אבל נקי) -->
+<!-- פאנל סימולטור -->
 <div class="card mt-6">
   <div class="card-h flex items-center justify-between">
     <div class="font-semibold">סימולטור חזרות/סטים (UI בלבד)</div>

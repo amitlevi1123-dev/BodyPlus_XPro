@@ -41,6 +41,14 @@
     gaugeRep:  $('#gaugeRep'),
     gaugeSet:  $('#gaugeSet'),
 
+    // measured-vs-target tables
+    setTargetsTable: $('#setTargetsTable'),
+    repTargetsTable: $('#repTargetsTable'),
+
+    // set summary (under set table)
+    setSummaryHe:  $('#setSummaryHe'),
+    setSummaryEn:  $('#setSummaryEn'),
+
     // simulator
     simSets:   $('#simSets'),
     simReps:   $('#simReps'),
@@ -51,10 +59,6 @@
     btnServerScore:  $('#btnServerScore'),
     btnOpenLastJson: $('#btnOpenLastJson'),
     simTB:     $('#simTbody'),
-
-    // measured-vs-target tables
-    setTargetsTable: $('#setTargetsTable'),
-    repTargetsTable: $('#repTargetsTable'),
 
     // diag
     btnDiagStart: $('#btnDiagStart'),
@@ -89,21 +93,15 @@
   let simRunning = false;
   let LAST_REPORT = null;
 
-  // דו־לשוני: שפה נוכחית + מפות תוויות (אם יגיעו מהשרת)
+  // דו־לשוני
   let LANG = 'he';
-  let LABELS = {
-    // מבנה רצוי אם יגיע מהשרת בעתיד:
-    // exercise: { he:'סקוואט משקולת יד', en:'Dumbbell Squat' }
-    // family:   { he:'סקוואט', en:'Squat' }
-    // equipment:{ he:'משקולות יד', en:'Dumbbell' }
-  };
+  let LABELS = {}; // ייטען מתוך report.ui.labels אם קיים
 
   function applyLanguage(){
     LANG = (el.langSelect?.value==='en') ? 'en' : 'he';
     const html = document.documentElement;
     if (LANG==='en'){ html.setAttribute('dir','ltr'); html.setAttribute('lang','en'); }
     else { html.setAttribute('dir','rtl'); html.setAttribute('lang','he'); }
-    // רענון כותרת/שמות אם יש דו"ח טעים אחרון
     if (LAST_REPORT) fillHeaderFromReport(LAST_REPORT);
   }
   el.langSelect?.addEventListener('change', applyLanguage);
@@ -119,7 +117,6 @@
 
   function fillHeaderFromReport(rep){
     try{
-      // אם הגיעו LABELS מלאים ב־report.ui.labels – נקלוט:
       const ui = rep?.ui || {};
       const labs = ui.labels || rep?.labels || null;
       if (labs && typeof labs==='object') LABELS = { ...LABELS, ...labs };
@@ -291,6 +288,21 @@
     } catch {
       return 'אין פירוק קריטריונים זמין';
     }
+  }
+
+  // ---------- Rep badge (colored circle per rep) ----------
+  function scoreColor(p){
+    if (p == null) return '#9ca3af';
+    if (p < 60) return '#ef4444';
+    if (p < 75) return '#f59e0b';
+    return '#22c55e';
+  }
+  function repBadge(pct, idx){
+    const color = scoreColor(pct);
+    const title = pct!=null ? `${pct}%` : '—';
+    return `<span title="ציון חזרה: ${title}" style="display:inline-flex;align-items:center;gap:.35rem;padding:.1rem .55rem;border-radius:9999px;font-size:.8rem;background:#f1f5f9;border:1px solid #e5e7eb">
+              <span style="width:9px;height:9px;border-radius:9999px;background:${color}"></span><span>${idx}</span>
+            </span>`;
   }
 
   // ---------- Modal Tabs ----------
@@ -499,20 +511,16 @@
   clearTable(el.setTargetsTable, 5);
   clearTable(el.repTargetsTable, 6);
 
-  // מייצר תא יעד קריא מ־metrics_detail.targets (אם קיים)
   function formatTargetCell(rep, critId){
     try{
       const t = rep?.metrics_detail?.targets;
       if(!t || typeof t!=='object') return '—';
-      // אם יש מבנה ספציפי לקריטריון
       if (critId && t[critId]){
         const v = t[critId];
         return (typeof v==='object') ? escapeHtml(safeJSON(v)) : escapeHtml(String(v));
       }
-      // אחרת: יעד כללי (למשל טווחי טמפו)
       const keys = Object.keys(t);
       if(!keys.length) return '—';
-      // מציגים תת-עץ קטן (עד 1 רמה) כדי לא לזהם את ה־UI
       const first = keys[0];
       const v = t[first];
       if (typeof v==='object'){
@@ -526,8 +534,6 @@
 
   function formatMeasuredCell(rep, critId){
     try{
-      // אין לנו מיפוי קשיח: ננסה להציג את הערך הכי רלוונטי מה־canonical אם קיים
-      // fallback: נציג את ה־score_pct עצמו כסוג של מדד
       const cList = Array.isArray(rep?.scoring?.criteria) ? rep.scoring.criteria : [];
       const c = cList.find(x=> String(x.id)===String(critId));
       if (c && c.score_pct!=null) return `${c.score_pct}%`;
@@ -536,22 +542,23 @@
     }catch{ return '—'; }
   }
 
-  function appendRepTargetsRow(setIdx, repIdx, crit){
+  // !!! NEW: includes repPct and colored badge
+  function appendRepTargetsRow(setIdx, repIdx, repPct, crit){
     const tb = tbodyOf(el.repTargetsTable);
     if(!tb) return;
-    // אם זו השורה הראשונה – מחיקה של placeholder
     const firstPlaceholder = tb.querySelector('td[colspan]');
     if (firstPlaceholder) tb.innerHTML = '';
 
-    const tr = document.createElement('tr');
-    const pct = (crit?.score_pct!=null) ? `${crit.score_pct}%` :
-                (crit?.score!=null) ? `${Math.round(Number(crit.score)*100)}%` : '—';
-    const measured = formatMeasuredCell({ scoring:{criteria:[crit]} }, crit?.id);
-    const target   = formatTargetCell(LAST_REPORT, crit?.id); // נעזר בדו"ח האחרון לצורך targets כלליים
+    const pct = (crit?.score_pct!=null) ? `${crit.score_pct}%`
+              : (crit?.score!=null) ? `${Math.round(Number(crit.score)*100)}%` : '—';
 
+    const measured = formatMeasuredCell({ scoring:{criteria:[crit]} }, crit?.id);
+    const target   = formatTargetCell(LAST_REPORT, crit?.id);
+
+    const tr = document.createElement('tr');
     tr.innerHTML = `
       <td class="py-2 px-3">${setIdx}</td>
-      <td class="py-2 px-3">${repIdx}</td>
+      <td class="py-2 px-3">${repBadge(repPct, repIdx)}</td>
       <td class="py-2 px-3">${escapeHtml(crit?.id || '—')}</td>
       <td class="py-2 px-3">${escapeHtml(measured)}</td>
       <td class="py-2 px-3">${escapeHtml(target)}</td>
@@ -564,8 +571,7 @@
     if(!tb) return;
     tb.innerHTML = '';
 
-    // איגוד לפי קריטריון → ממוצע score_pct + דוגמת יעד
-    const agg = new Map(); // id -> {sum, n, targetStr}
+    const agg = new Map(); // id -> {sum, n, targ}
     for (const rep of repReports){
       const list = Array.isArray(rep?.scoring?.criteria) ? rep.scoring.criteria : [];
       for (const c of list){
@@ -598,7 +604,7 @@
       tb.appendChild(tr);
     });
 
-    // שורה מסכמת
+    // שורה מסכמת (טקסטי)
     const all = Array.from(agg.values()).filter(x=>x.n>0).map(x=> Math.round(x.sum/x.n));
     const overall = all.length ? Math.round(all.reduce((a,b)=>a+b,0)/all.length) : null;
     const trSum = document.createElement('tr');
@@ -628,7 +634,7 @@
   }
 
   function pushRow(setIdx, repIdx, rep){
-    // טבלת “סימולטור”
+    // סימולטור
     if(el.simTB.querySelector('td[colspan]')) el.simTB.innerHTML='';
     const tr=document.createElement('tr');
     const pct = repScorePct(rep);
@@ -671,23 +677,27 @@
     // טבלת “חזרה — נמדד מול יעד”
     const crits = Array.isArray(rep?.scoring?.criteria) ? rep.scoring.criteria : [];
     if (crits.length){
+      const repPct = repScorePct(rep);
       for (const c of crits){
-        appendRepTargetsRow(setIdx, repIdx, c);
+        appendRepTargetsRow(setIdx, repIdx, repPct, c);
       }
     }
 
-    // גאוג'ים + כותרת דו־לשונית
+    // gauges + header
     setGaugesAndHeader(rep);
   }
 
-  function pushSetSummary(setIdx, repLikeForSummary){
-    const buckets = bucketizeCriteria(repLikeForSummary||{});
-    const topBad = [...(buckets.critical||[]), ...(buckets.major||[])].slice(0,3).map(x=>x.id).filter(Boolean);
-    const summary = topBad.length ? ('מוקדים לשיפור: ' + topBad.join(', ')) : 'ביצוע נקי יחסית בסט זה.';
-    const tr = document.createElement('tr');
-    tr.className='bg-white';
-    tr.innerHTML = `<td colspan="9" class="py-2 px-3 text-sm text-gray-600">סט ${setIdx}: ${escapeHtml(summary)}</td>`;
-    el.simTB.appendChild(tr);
+  function updateSetSummaryDisplay(setIdx, avgPct, repLike){
+    try{
+      const exLbl = LABELS?.exercise || { he: repLike?.exercise?.display_name || repLike?.exercise?.id || '—',
+                                          en: repLike?.exercise?.id || '—' };
+      const famLbl = LABELS?.family   || { he: repLike?.exercise?.family || '—',
+                                          en: repLike?.exercise?.family || '—' };
+      const he = `${exLbl.he} — משפחה: ${famLbl.he} · סט #${setIdx} · ממוצע: ${avgPct!=null? avgPct+'%':'—'}`;
+      const en = `${exLbl.en} — family: ${famLbl.en} · set #${setIdx} · avg: ${avgPct!=null? avgPct+'%':'—'}`;
+      if (el.setSummaryHe) el.setSummaryHe.textContent = he;
+      if (el.setSummaryEn) el.setSummaryEn.textContent = en;
+    }catch(_){}
   }
 
   // ---------- Local Simulation (fallback) ----------
@@ -703,15 +713,8 @@
       { id:'tempo',        available:true,  score_pct: 86 },
     ];
     if(mode==='good') return base;
-    if(mode==='shallow'){
-      base[0].score_pct = 25; base[0].reason = 'shallow_depth';
-      return base;
-    }
-    if(mode==='missing'){
-      base[0].available = false; base[0].reason='missing_critical: depth';
-      return base;
-    }
-    // mixed
+    if(mode==='shallow'){ base[0].score_pct = 25; base[0].reason = 'shallow_depth'; return base; }
+    if(mode==='missing'){ base[0].available = false; base[0].reason='missing_critical: depth'; return base; }
     base[0].score_pct = 60+Math.round(Math.random()*30);
     base[1].score_pct = 50+Math.round(Math.random()*40);
     return base;
@@ -771,7 +774,6 @@
     const mode  = el.simMode.value || 'mixed';
     const noise = clamp(Number(el.simNoise.value||0.25), 0, 0.5);
 
-    // לאגירת דו"חות של הסט הנוכחי לצורך טבלת סט
     function newSetCollector(){ return { list: [] }; }
     let collector = newSetCollector();
 
@@ -809,13 +811,12 @@
           await new Promise(res=>setTimeout(res, 60));
         }
 
-        // סיום סט: גאוג' סט + סיכום + טבלת סט
         const setScores = collector.list.map(x=> repScorePct(x)).filter(x=> x!=null);
         const setPct = setScores.length ? Math.round(setScores.reduce((a,b)=>a+b,0)/setScores.length) : null;
         setGauge(gSet, setPct, LAST_COLOR_RANGES);
 
         const lastRepLike = collector.list.slice(-1)[0] || null;
-        pushSetSummary(setIdx, lastRepLike);
+        updateSetSummaryDisplay(setIdx, setPct, lastRepLike);
         refreshSetTargetsTable(setIdx, collector.list);
       }
     } catch(e) {
@@ -834,8 +835,9 @@
         const setScores = collector.list.map(x=> repScorePct(x)).filter(x=> x!=null);
         const setPct = setScores.length ? Math.round(setScores.reduce((a,b)=>a+b,0)/setScores.length) : null;
         setGauge(gSet, setPct, LAST_COLOR_RANGES);
+
         const lastRepLike = collector.list.slice(-1)[0] || null;
-        pushSetSummary(s, lastRepLike);
+        updateSetSummaryDisplay(s, setPct, lastRepLike);
         refreshSetTargetsTable(s, collector.list);
       }
     } finally {
@@ -849,6 +851,8 @@
     el.simTB.innerHTML='<tr><td colspan="9" class="py-6 text-center text-gray-400">נוקה.</td></tr>';
     clearTable(el.repTargetsTable, 6);
     clearTable(el.setTargetsTable, 5);
+    if (el.setSummaryHe) el.setSummaryHe.textContent = '—';
+    if (el.setSummaryEn) el.setSummaryEn.textContent = '—';
     setGauge(gRep,null);
     setGauge(gSet,null);
     el.gaugeRep?.removeAttribute('title');
@@ -887,8 +891,9 @@
 
       const rid = `r${REP_AUTO_ID++}`;
       REP_STORE.set(rid, j);
-      pushRow(1, REP_AUTO_ID, j); // מוסיף גם לטבלת rep-targets
-      refreshSetTargetsTable(1, [j]); // רענון טבלת סט עם הדו"ח היחיד
+      pushRow(1, REP_AUTO_ID, j);
+      updateSetSummaryDisplay(1, repScorePct(j), j);
+      refreshSetTargetsTable(1, [j]);
     }catch(e){
       alert('קריאת score מהשרת נכשלה — ממשיכים מקומי. '+e);
     }
@@ -903,5 +908,4 @@
 
   // init language on load
   applyLanguage();
-
 })();

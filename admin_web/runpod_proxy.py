@@ -4,48 +4,42 @@ from flask import Flask, request, Response, jsonify, make_response
 import os, json, time, traceback
 import requests
 
-# ========= קונפיג =========
-RUNPOD_BASE = (os.getenv("RUNPOD_BASE") or "https://1fmkdasa1l0x06.api.runpod.ai").rstrip("/")
-API_KEY     = os.getenv("rpa_4PXVVU7WW1RON92M9VQTT5V2ZOA4T8FZMM68ZUOE0fsl21", "")  # ← בלי מפתח קשיח בקוד!
+# ========= קונפיג (ניתן לדרוס ע"י משתני סביבה) =========
+RUNPOD_BASE = (os.getenv("RUNPOD_BASE") or "https://api.runpod.ai/v2/1fmkdasa1l0x06").rstrip("/")
+API_KEY     = os.getenv("RUNPOD_API_KEY") or "rpa_4PXVVU7WW1RON92M9VQTT5V2ZOA4T8FZMM68ZUOE0fsl21"
 PORT        = int(os.getenv("PORT", "8000"))
 DEBUG_LOG   = (os.getenv("PROXY_DEBUG", "1") == "1")      # 1=on, 0=off
 
-_LAST = {"when": None, "path": None, "method": None, "status": None, "upstream": None,
-         "resp_head": {}, "resp_text": None}
+_LAST = {"when": None, "path": None, "method": None, "status": None,
+         "upstream": None, "resp_head": {}, "resp_text": None}
 
 app = Flask(__name__)
 
 # ========= עזרי לוג =========
 def log(*args):
-    if not DEBUG_LOG:
-        return
+    if not DEBUG_LOG: return
     ts = time.strftime("[%H:%M:%S]")
     print(ts, *args, flush=True)
 
 def _mask_key(k: str) -> str:
     if not k: return ""
-    if len(k) <= 8: return "***"
-    return f"{k[:6]}...{k[-5:]}"
+    return ("***" if len(k) <= 8 else f"{k[:6]}...{k[-5:]}")
 
-def _short_headers(h: dict, drop=set(("cookie","authorization","x-api-key"))):
+def _short_headers(h: dict, drop=set(("cookie","authorization"))):
     out = {}
     for k,v in h.items():
-        if k.lower() in drop:
-            out[k] = "<hidden>"
-        else:
-            s = str(v)
-            out[k] = s if len(s) < 200 else (s[:200] + " ...")
+        out[k] = "<hidden>" if k.lower() in drop else (v if len(str(v))<200 else str(v)[:200]+" ...")
     return out
 
 def _json_or_text(r: requests.Response) -> str:
     text = r.text
     return text if len(text) < 2000 else (text[:2000] + "\n... [truncated] ...")
 
-# ========= עזרי HTTP =========
+# ========= עזרי HTTP ל-Upstream =========
 def _auth_headers() -> dict:
     return {"Authorization": f"Bearer {API_KEY}", "Accept-Encoding": "identity"}
 
-def _post(url: str, payload: dict, timeout=(5, 180)) -> requests.Response:
+def _post(url: str, payload: dict, timeout=(5, 300)) -> requests.Response:
     h = {"Content-Type": "application/json", **_auth_headers()}
     return requests.post(url, json=payload, headers=h, timeout=timeout)
 
@@ -71,14 +65,11 @@ def _opts(job_id=None):
 @app.get("/")
 def home():
     payload = {
-        "ok": True,
-        "msg": "RunPod proxy alive. Use POST /run-submit (async) or /run-sync (sync).",
-        "port": PORT,
-        "upstream": RUNPOD_BASE,
-        "api_key_mask": _mask_key(API_KEY),
+        "ok": True, "msg": "RunPod proxy alive. Use POST /run-submit (async) or /run-sync (sync).",
+        "port": PORT, "upstream": RUNPOD_BASE, "api_key_mask": _mask_key(API_KEY),
     }
-    log(">>> HOME GET /")
-    log("    headers:", json.dumps(_short_headers(dict(request.headers)), ensure_ascii=False))
+    log(">>> HOME GET /?")
+    log("    headers:", json.dumps(_short_headers(request.headers), ensure_ascii=False))
     return jsonify(payload), 200
 
 @app.get("/ui")
@@ -100,7 +91,7 @@ small{{color:#6b7280}}
     <p><b>Upstream:</b> {RUNPOD_BASE}<br><b>API Key:</b> {_mask_key(API_KEY)}</p>
     <p><label>Prompt: <input id="p" type="text" value="Hello from proxy"/></label>
        <button onclick="runSync()">Run Sync</button></p>
-    <p><small>אם זה עובד, תראה גם לוגים ב־RunPod (Logs).</small></p>
+    <p><small>לחיצה על Run Sync תבצע POST אל /run-sync ותציג את תשובת ה־Serverless (אם מוגדר נכון).</small></p>
     <pre id="out">—</pre>
   </div>
 <script>
@@ -111,7 +102,7 @@ async function runSync(){{
     const r = await fetch('/run-sync', {{
       method:'POST',
       headers:{{'Content-Type':'application/json'}},
-      body: JSON.stringify({{prompt: document.getElementById('p').value}})
+      body: JSON.stringify({{ prompt: document.getElementById('p').value }})
     }});
     const text = await r.text();
     out.textContent = "HTTP "+r.status+"\\n\\n"+text;
@@ -123,7 +114,7 @@ async function runSync(){{
 </body></html>"""
     return make_response(html, 200)
 
-# ========= Health / Debug =========
+# ========= Health / WhoAmI / Last =========
 @app.get("/_proxy/health")
 def proxy_health():
     ok = bool(RUNPOD_BASE) and bool(API_KEY)
@@ -137,16 +128,7 @@ def whoami():
 def last():
     return jsonify(_LAST), 200
 
-@app.post("/_proxy/echo")
-def echo():
-    return jsonify(
-        ok=True,
-        headers=dict(request.headers),
-        json=(request.get_json(silent=True) or {}),
-        qs=request.args,
-    ), 200
-
-# ========= שמירת מפתח =========
+# ========= מגני קלט =========
 def _require_key():
     if not API_KEY or API_KEY == "REPLACE_WITH_YOUR_KEY":
         return jsonify(ok=False, error="missing_api_key", hint="set RUNPOD_API_KEY env"), 401
@@ -160,21 +142,15 @@ def run_sync():
     log(">>> /run-sync ←", json.dumps(body, ensure_ascii=False))
     try:
         t0 = time.time()
-        up = f"{RUNPOD_BASE}/runsync"   # ← חשוב: runsync (ללא מקף)
+        up = f"{RUNPOD_BASE}/run-sync"
         r  = _post(up, {"input": body})
         dt = int((time.time()-t0)*1000)
         text = _json_or_text(r)
-
         _LAST.update({
             "when": time.strftime("%Y-%m-%d %H:%M:%S"),
-            "path": "/run-sync",
-            "method": "POST",
-            "status": r.status_code,
-            "upstream": up,
-            "resp_head": _short_headers(r.headers),
-            "resp_text": text,
+            "path": "/run-sync", "method": "POST", "status": r.status_code,
+            "upstream": up, "resp_head": _short_headers(r.headers), "resp_text": text,
         })
-
         log(f"    → upstream {up} | HTTP {r.status_code} | {dt} ms")
         log("    resp.head:", json.dumps(_short_headers(r.headers), ensure_ascii=False))
         log("    resp.body:", text)
@@ -197,12 +173,8 @@ def run_submit():
         text = _json_or_text(r)
         _LAST.update({
             "when": time.strftime("%Y-%m-%d %H:%M:%S"),
-            "path": "/run-submit",
-            "method": "POST",
-            "status": r.status_code,
-            "upstream": up,
-            "resp_head": _short_headers(r.headers),
-            "resp_text": text,
+            "path": "/run-submit", "method": "POST", "status": r.status_code,
+            "upstream": up, "resp_head": _short_headers(r.headers), "resp_text": text,
         })
         log(f"    → upstream {up} | HTTP {r.status_code}")
         log("    resp.head:", json.dumps(_short_headers(r.headers), ensure_ascii=False))
@@ -225,12 +197,8 @@ def status(job_id: str):
         text = _json_or_text(r)
         _LAST.update({
             "when": time.strftime("%Y-%m-%d %H:%M:%S"),
-            "path": f"/status/{job_id}",
-            "method": "GET",
-            "status": r.status_code,
-            "upstream": up,
-            "resp_head": _short_headers(r.headers),
-            "resp_text": text,
+            "path": f"/status/{job_id}", "method": "GET", "status": r.status_code,
+            "upstream": up, "resp_head": _short_headers(r.headers), "resp_text": text,
         })
         log(f"    → upstream {up} | HTTP {r.status_code}")
         log("    resp.head:", json.dumps(_short_headers(r.headers), ensure_ascii=False))
@@ -242,11 +210,11 @@ def status(job_id: str):
         log(traceback.format_exc())
         return jsonify(ok=False, error="proxy_exception", detail=str(e)), 500
 
-# חסימת סטרים – לא נתמך ב-Serverless
+# חסימת סטרים – Serverless לא תומך ב-MJPEG
 @app.get("/video/stream.mjpg")
 def no_stream():
     return jsonify(ok=False, error="serverless_no_stream",
-                   detail="Serverless לא תומך ב-MJPEG. השתמש ב-Pod."), 400
+                   detail="Serverless לא תומך ב-MJPEG. השתמש ב-Pod/שרת קבוע."), 400
 
 # ========= main =========
 if __name__ == "__main__":

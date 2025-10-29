@@ -3,18 +3,26 @@
 # 📘 report_builder.py — בניית דוחות סופיים לממשק המשתמש (UI)
 # -----------------------------------------------------------------------------
 # נקודות עיקריות:
-# • דו־לשוניות (he/en) לשמות תרגיל/משפחה/ציוד ולתוויות קריטריונים דרך aliases.yaml.
+# • דו־לשוניות (he/en) לשמות תרגיל/משפחה/ציוד ולתוויות קריטרונים דרך aliases/labels.
 # • "נמדד מול יעד" לכל קריטריון מתוך thresholds של התרגיל.
 # • ביקורת חזרה (rep_critique) + ביקורת סט (set_critique) — ממקדות מוקדי שיפור.
 # • שמירת תאימות לאחור: כל ההרחבות אופציונליות; המבנה ההיסטורי נשמר.
 # • report_health חכם: OK/WARN/FAIL + issues[] (כבר קיים).
 # • metrics_detail אוטומטי (כבר קיים) — שומרנו ומשפרים קלות.
+# • NEW: שילוב report_name_labeler — תוויות יפות למדדים ושמות תרגיל/משפחה/ציוד.
 # -----------------------------------------------------------------------------
 
 from __future__ import annotations
 from typing import Any, Dict, List, Optional, Tuple, cast
 from collections import Counter
 from datetime import datetime
+
+# === NEW: name/labeling for report UI (ללא נרמול ערכים) ===
+try:
+    # נתיב: exercise_engine/report/report_name_labeler.py
+    from exercise_engine.report.report_name_labeler import build_ui_names  # type: ignore
+except Exception:
+    build_ui_names = None  # fallback: נמשיך בלי מודול התוויות
 
 # ---------------------------- Utilities ----------------------------
 
@@ -90,8 +98,8 @@ def _format_target_phrase(th: Optional[Dict[str, Any]], unit: Optional[str], lan
     """
     יוצר טקסט יעד (he/en) מתוך thresholds של הקריטריון.
     תומך במבנים:
-      - {"min": x}         → "יעד ≥ x" / "Target ≥ x"
-      - {"max": x}         → "יעד ≤ x" / "Target ≤ x"
+      - {"min": x}           → "יעד ≥ x" / "Target ≥ x"
+      - {"max": x}           → "יעד ≤ x" / "Target ≤ x"
       - {"min": x, "max": y} → "טווח x–y" / "Range x–y"
       - {"range": {"min": x, "max": y}} — דומה
     """
@@ -138,16 +146,7 @@ def _default_note_for_score(crit_label: str, target_text: str, score_pct: Option
 
 def _phrase_for_criterion(phrases: Optional[Dict[str, Any]], crit_id: str, quality: Optional[str], lang: str) -> Optional[str]:
     """
-    קריאה אופציונלית ל-phrases.yaml (אם הועבר) — לא חוסם אם אין.
-    מצפה למבנה דמוי:
-      phrases:
-        he:
-          criteria:
-            depth:
-              good: "ביצוע טוב"
-              warn: "שפר עומק"
-        en:
-          criteria: ...
+    תמיכה עתידית ב-phrases.yaml (אם תבחר להשתמש).
     """
     if not isinstance(phrases, dict):
         return None
@@ -451,13 +450,12 @@ def _rep_critique_rows(*, exercise, canonical: Dict[str, Any],
                        lang: str) -> List[Dict[str, Any]]:
     """
     בונה שורה לכל קריטריון: id, name_he/en, unit, measured, target_he/en, score_pct, note_he/en.
-    אין כאן זיהוי per-rep מה־canonical (כי המדידות הן פר-סט), אבל נשמר הפורמט ל-UI.
     """
     out: List[Dict[str, Any]] = []
     crit_defs = getattr(exercise, "criteria", {}) or {}
     for cid in crit_defs.keys():
         label, unit = _alias_label(aliases, cid, lang)
-        measured = canonical.get(cid)  # אם יש ערך נוח להצגה (אחרת — None)
+        measured = canonical.get(cid)  # אם יש ערך להצגה (אחרת — None)
         th = _criterion_target(exercise, cid)
         target_text_lang = _format_target_phrase(th, unit, lang)
         target_text_alt  = _format_target_phrase(th, unit, "en" if lang=="he" else "he")
@@ -483,21 +481,14 @@ def _rep_critique_rows(*, exercise, canonical: Dict[str, Any],
     return out
 
 def _set_critique_from_rows(rows: List[Dict[str, Any]]) -> Dict[str, Any]:
-    """
-    מסכם "צווארי בקבוק" ברמת סט:
-      - ממוצע ציון לכל קריטריון
-      - "גרוע ביותר" (אין לנו per-rep פה, לכן זהה לממוצע אם אין פירוק)
-    """
     if not rows:
         return {"set_score_pct": None, "rep_count": None, "top_issues": [], "summary_he": "-", "summary_en": "-"}
-
     crit_scores = []
     for r in rows:
         if isinstance(r.get("score_pct"), int):
             crit_scores.append(r["score_pct"])
     set_score_pct = int(round(sum(crit_scores)/len(crit_scores))) if crit_scores else None
 
-    # Top issues = השליש התחתון (עד 3) לפי ציון
     sorted_rows = sorted([r for r in rows if isinstance(r.get("score_pct"), int)], key=lambda x: x["score_pct"])
     top = sorted_rows[:3] if sorted_rows else []
 
@@ -505,7 +496,7 @@ def _set_critique_from_rows(rows: List[Dict[str, Any]]) -> Dict[str, Any]:
         "id": t["id"],
         "name_he": t["name_he"],
         "name_en": t["name_en"],
-        "worst_rep_pct": t["score_pct"],  # ללא per-rep אמיתי — משתמשים בציון עצמו
+        "worst_rep_pct": t["score_pct"],
         "avg_pct": t["score_pct"],
     } for t in top]
 
@@ -602,7 +593,7 @@ def build_payload(
             "display_name": getattr(exercise, "display_name", exercise.id),
         }
 
-    # ui.lang_labels (he/en) עבור exercise/family/equipment
+    # ui.lang_labels (he/en) — Fallback קודם כל לפי aliases המקומיים
     ui_lang_labels = _alias_name_triplet(
         aliases=aliases,
         exercise_id=(ex_block or {}).get("id"),
@@ -676,7 +667,6 @@ def build_payload(
 
     # ---------- NEW: measured-vs-targets + critiques ----------
     try:
-        # טבלת "נמדד מול יעד" ברירת המחדל — לוקחת את כל הקריטריונים של התרגיל
         rows = _rep_critique_rows(
             exercise=exercise,
             canonical=report.get("canonical", {}) or report.get("measurements", {}) or {},
@@ -684,7 +674,6 @@ def build_payload(
             aliases=aliases,
             lang=display_lang,
         )
-        # ביקורת חזרה: מייצרים "חזרה מדומה" אחת (UI יוכל לפתוח Modal עם הטבלה הזו)
         report["rep_critique"] = [{
             "set_index": 1,
             "rep_index": 1,
@@ -693,7 +682,6 @@ def build_payload(
             "summary_en": _set_critique_from_rows(rows).get("summary_en"),
         }]
 
-        # ביקורת סט: מסקנות כלומבריות (Top issues)
         set_summary = _set_critique_from_rows(rows)
         report["set_critique"] = [{
             "set_index": 1,
@@ -704,9 +692,39 @@ def build_payload(
             "summary_en": set_summary.get("summary_en"),
         }]
     except Exception:
-        # לא מפילים דו"ח אם אין אפשרות לבנות טבלת יעדים
         report["rep_critique"] = []
         report["set_critique"] = []
+
+    # ---------- NEW: integrate report_name_labeler (labels & pretty metrics) ----------
+    try:
+        if build_ui_names is not None:
+            # מעדיפים מפתחות קנוניים אם קיימים, אחרת measurements
+            metrics_src = report.get("canonical", {}) or report.get("measurements", {}) or {}
+            ex_id = (ex_block or {}).get("id")
+            names_pack = build_ui_names(
+                metrics_normalized=metrics_src,
+                exercise_id=ex_id,
+                aliases_yaml=aliases,   # לצורך יחידות/פורמט
+                lang=display_lang,
+            )
+
+            # תוויות יפות למדדים — UI יוכל להציג value_fmt/label/unit
+            report["metrics_ui"] = names_pack.get("metrics_ui", {})
+
+            # תוויות יפות לשמות תרגיל/משפחה/ציוד — גובר על ה-fallback אם קיים
+            ex_labels = (names_pack.get("exercise") or {}).get("ui_labels") or {}
+            if ex_labels:
+                report["ui"]["lang_labels"] = {
+                    "exercise": ex_labels.get("exercise") or report["ui"]["lang_labels"]["exercise"],
+                    "family":   ex_labels.get("family")   or report["ui"]["lang_labels"]["family"],
+                    "equipment":ex_labels.get("equipment")or report["ui"]["lang_labels"]["equipment"],
+                }
+        else:
+            # אם המודול לא קיים — ממשיכים בלי metrics_ui
+            report["metrics_ui"] = {}
+    except Exception:
+        # לא מפילים דו"ח בגלל labeling
+        report["metrics_ui"] = report.get("metrics_ui", {})
 
     # health
     report["report_health"] = _compute_report_health(report)

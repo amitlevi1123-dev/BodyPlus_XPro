@@ -1,0 +1,47 @@
+# -*- coding: utf-8 -*-
+# =============================================================================
+# 🏷️ exercise_names.yaml — שמות תרגילים, משפחות, וציוד (דו־לשוני)
+# =============================================================================
+
+families:
+  squat: { he: "סקוואט", en: "Squat" }
+  hinge: { he: "הינג׳ / דדליפט", en: "Hinge / Deadlift" }
+  press: { he: "לחיצה", en: "Press" }
+  chest_press: { he: "חזה", en: "Chest Press" }
+  biceps: { he: "זרוע קדמית", en: "Biceps" }
+
+equipment:
+  bodyweight: { he: "משקל גוף", en: "Bodyweight" }
+  barbell: { he: "מוט", en: "Barbell" }
+  dumbbell: { he: "משקולות יד", en: "Dumbbells" }
+
+exercises:
+  squat.bodyweight:
+    family: squat
+    equipment: bodyweight
+    labels: { he: "סקוואט גוף", en: "Bodyweight Squat" }
+    aliases: ["squat", "bodyweight squat", "סקוואט"]
+
+  deadlift.barbell.romanian:
+    family: hinge
+    equipment: barbell
+    labels: { he: "דדליפט רומני", en: "Romanian Deadlift" }
+    aliases: ["rdl", "romanian deadlift", "דדליפט רומני"]
+
+  shoulder_press.dumbbell.seated:
+    family: press
+    equipment: dumbbell
+    labels: { he: "לחיצת כתפיים (ישיבה)", en: "Seated Shoulder Press" }
+    aliases: ["shoulder press", "לחיצת כתפיים"]
+
+  bench_press.barbell.flat:
+    family: chest_press
+    equipment: barbell
+    labels: { he: "לחיצת חזה במוט", en: "Flat Bench Press" }
+    aliases: ["bench press", "לחיצת חזה"]
+
+  biceps_curl.dumbbell.standing:
+    family: biceps
+    equipment: dumbbell
+    labels: { he: "כפיפות מרפקים", en: "Biceps Curl" }
+    aliases: ["biceps curl", "db curl", "כפיפות מרפקים"]

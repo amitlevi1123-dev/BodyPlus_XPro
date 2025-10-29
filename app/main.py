@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 # -------------------------------------------------------
 # 🖥️ ProCoach — מצלמה + דשבורד + זיהוי אובייקטים
 # תואם ענן (Gunicorn/App Runner/RunPod) וגם ריצה מקומית (Tk + Flask פנימי)
@@ -101,7 +102,6 @@ def health():
 def ping():
     return "pong", 200
 
-# נשאיר תאימות (server.py כבר מספק /healthz מתקדם; כאן לא מזיק)
 try:
     @app.get("/healthz")
     def _healthz():
@@ -112,9 +112,9 @@ except Exception:
 # ---------- מקור הווידאו ----------
 from app.ui.video import get_streamer
 
-# ---------- מדידות ----------
+# ---------- מדידות / קינטיקה ----------
 from core.kinematics import KINEMATICS
-from core.mediapipe_runner import MediaPipeRunner
+from core.mediapipe_runner import MediaPipeRunner  # ללא OpenCV
 
 # סכימת payload
 from core.payload import ensure_schema
@@ -138,7 +138,7 @@ except Exception as e:
     ObjectDetectionEngine = None  # type: ignore
 
 # ---------- תצורה/ביצועים ----------
-MP_MAX_WIDTH     = int(os.getenv("MP_MAX_WIDTH", "640"))
+MP_MAX_WIDTH     = int(os.getenv("MP_MAX_WIDTH", "640"))     # resize דרך PIL בלבד
 HANDS_EVERY_N    = int(os.getenv("HANDS_EVERY_N", "2"))
 LOOP_INTERVAL_MS = int(os.getenv("MAIN_LOOP_MS", "15"))
 DEFAULT_MIRROR_X = True
@@ -151,15 +151,7 @@ WATCHDOG_ENABLED     = True
 WATCHDOG_IDLE_SEC    = float(os.getenv("VIDEO_WATCHDOG_IDLE_SEC", "10"))
 WATCHDOG_CHECK_EVERY = 1.0
 
-# אופציונלי: OpenCV
-try:
-    import cv2
-    _OPENCV_AVAILABLE = True
-except Exception:
-    cv2 = None  # type: ignore
-    _OPENCV_AVAILABLE = False
-
-# אופציונלי: requests
+# אופציונלי: requests (ל-payload_push מקומי)
 try:
     import requests
     _REQUESTS_AVAILABLE = True
@@ -187,7 +179,7 @@ def _init_logging_safe() -> None:
 def start_admin_ui_server(host: str = "127.0.0.1", port: int = 5000) -> None:
     """ריצה מקומית בלבד — Flask פנימי ב-thread נפרד."""
     if IS_CLOUD:
-        return  # בענן לא מרימים שרת פנימי על 127.0.0.1
+        return
     def _run():
         local_app = create_app()
         logger.info(f"Admin UI starting on http://{host}:{port}")
@@ -411,15 +403,50 @@ class App:
         with self._pl_lock:
             return dict(self._payload)
 
+    # ---------- RGB helpers (ללא OpenCV) ----------
+    def _to_rgb(self, frame):
+        """
+        מבטיח שהפריים ב-RGB (np.uint8). ללא OpenCV.
+        אם אתה יודע שהמקור BGR — שים FRAME_IS_BGR=1 ב-ENV.
+        """
+        try:
+            import numpy as np  # noqa
+            if frame is None:
+                return None
+            if not (hasattr(frame, "shape") and frame.ndim == 3 and frame.shape[2] == 3):
+                return frame
+            if os.getenv("FRAME_IS_BGR", "0") == "1":
+                return frame[:, :, ::-1].copy()
+            return frame  # מניחים שכבר RGB
+        except Exception:
+            return frame
+
+    def _resize_rgb(self, frame_rgb, max_w: int):
+        """
+        שינוי גודל בעזרת PIL בלבד. אם אין PIL או אין צורך — מחזיר כמו שהוא.
+        """
+        try:
+            if not max_w or not hasattr(frame_rgb, "shape") or frame_rgb.shape[1] <= max_w:
+                return frame_rgb
+            from PIL import Image
+            import numpy as np
+            h, w = frame_rgb.shape[:2]
+            new_h = int(h * (max_w / w))
+            img = Image.fromarray(frame_rgb, mode="RGB").resize((max_w, new_h), Image.BILINEAR)
+            return np.array(img, dtype=frame_rgb.dtype)
+        except Exception:
+            return frame_rgb
+
     # ---------- MediaPipe ----------
     def _init_mediapipe_runner(self) -> None:
         try:
             self.mpr = MediaPipeRunner(
                 enable_pose=True,
                 enable_hands=True,
-                max_width=MP_MAX_WIDTH,
                 hands_every_n=HANDS_EVERY_N,
-                pose_model_complexity=0  # מהיר יותר על CPU
+                pose_model_complexity=0,   # מהיר יותר על CPU
+                publish_hz=12.0,
+                verbose=True,
             ).start()
             logger.info("MediaPipeRunner initialized (pose+hands)")
         except Exception as e:
@@ -462,7 +489,6 @@ class App:
             while self.running:
                 try:
                     now = time.time()
-                    # אין פריימים זמן ממושך? או fps נמוך מאוד?
                     no_frames = (self._last_tick is None) or ((now - (self._last_tick or now)) > WATCHDOG_IDLE_SEC)
                     low_fps = (self._fps_ema is not None and self._fps_ema < 0.2)  # פחות מפריים ב-5 שניות
                     if (no_frames or low_fps) and (now - last_restart > WATCHDOG_IDLE_SEC):
@@ -543,7 +569,6 @@ class App:
 
         if frame is None:
             import tkinter as tk  # מקומי
-            # דחוף payload עם FPS מעודכן גם כשאין פריים (כדי שה-UI יראה ירידה)
             p = self._payload_get()
             meta = dict(p.get("meta", {}))
             meta["fps"] = float(self._fps_ema or 0.0)
@@ -554,15 +579,14 @@ class App:
             self.root.after(LOOP_INTERVAL_MS, self._loop_once)
             return
 
-        # ---- MediaPipe ----
+        # ---- MediaPipe (ללא OpenCV): ממירים ל-RGB + (רשות) resize עם PIL ----
         results_pose = None
         results_hands = None
         if self.mpr is not None:
             try:
-                proc = frame
-                if MP_MAX_WIDTH and _OPENCV_AVAILABLE and frame.shape[1] > MP_MAX_WIDTH:
-                    scale = MP_MAX_WIDTH / frame.shape[1]
-                    proc = cv2.resize(frame, (MP_MAX_WIDTH, int(frame.shape[0] * scale)), interpolation=cv2.INTER_AREA)
+                proc = self._to_rgb(frame)
+                if MP_MAX_WIDTH:
+                    proc = self._resize_rgb(proc, MP_MAX_WIDTH)
                 results_pose, results_hands = self.mpr.process(proc)
             except Exception as e:
                 logger.warning(f"MediaPipeRunner process failed: {e}")
@@ -579,8 +603,9 @@ class App:
                 "visibility": {},
                 "meta": {"fps": float(self._fps_ema or 0.0), "warnings": [str(e)]}
             }
+            logger.warning(f"KINEMATICS.compute failed: {e}")
 
-        # ---- זיהוי אובייקטים ----
+        # ---- זיהוי אובייקטים (מקבל את הפריים המקורי! לא נוגעים בצבעים) ----
         objdet_payload = self._process_object_detection(frame)
         if objdet_payload:
             payload["objdet"] = objdet_payload
@@ -638,6 +663,7 @@ class App:
         self.od_last_update = now_ms
         ts_ms = int(now_ms)
         try:
+            # ⚠️ חשוב: מעבירים את הפריים המקורי, בלי המרות צבע, כדי לשמור על עקביות מודל ה-OD
             self.od_engine.update_frame(frame, ts_ms=ts_ms)
             _tracks, raw_payload = self.od_engine.tick()
             return self._convert_od_payload_for_frontend(raw_payload, frame.shape, ts_ms)
@@ -698,11 +724,9 @@ if __name__ == "__main__":
     port = int(os.getenv("PORT", "5000"))
 
     if IS_CLOUD:
-        # בענן מרימים את ה-Flask הראשי שחשוף ע"י RunPod/Load Balancer
         logger.info(f"Cloud mode: serving Flask on 0.0.0.0:{port}")
         app.run(host="0.0.0.0", port=port, debug=False, use_reloader=False, threaded=True)
     else:
-        # מצב מקומי (עם Tk + לולאת וידאו)
         cam_index = int(os.getenv("CAMERA_INDEX", "0"))
         _global_app_instance: Optional[App] = None
 
