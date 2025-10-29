@@ -724,9 +724,11 @@ if __name__ == "__main__":
     port = int(os.getenv("PORT", "5000"))
 
     if IS_CLOUD:
-        logger.info(f"Cloud mode: serving Flask on 0.0.0.0:{port}")
-        app.run(host="0.0.0.0", port=port, debug=False, use_reloader=False, threaded=True)
+        # בענן (RunPod / Gunicorn / App Runner) – לא מריצים Flask ידנית
+        logger.info(f"⚙️ Detected cloud environment — skipping app.run()")
+        logger.info(f"App will be served by Gunicorn on port {port}")
     else:
+        # מקומית בלבד – עם מצלמה, Tkinter ודשבורד
         cam_index = int(os.getenv("CAMERA_INDEX", "0"))
         _global_app_instance: Optional[App] = None
 

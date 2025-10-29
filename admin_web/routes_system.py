@@ -6,6 +6,8 @@ admin_web/routes_system.py — 🔧 בריאות/דיאגנוסטיקה כ-Bluep
 
 GET  /version
 GET  /healthz
+GET  /health              (alias ל-/healthz)
+GET  /ping                (בדיקת חיים לייט)
 GET  /readyz
 GET  /api/health
 GET  /api/system
@@ -29,7 +31,7 @@ bp_system = Blueprint("system", __name__)
 def _get_basic_config() -> Tuple[str, str, float]:
     """Returns (APP_VERSION, PAYLOAD_VERSION, START_TS) with safe fallbacks."""
     try:
-        from server import APP_VERSION, START_TS
+        from server import APP_VERSION, START_TS  # type: ignore
     except Exception:
         APP_VERSION, START_TS = os.getenv("APP_VERSION", "dev"), time.time()
     try:
@@ -94,7 +96,25 @@ def _get_objdet_status():
         return {"ok": False, "note": "objdet_status_unavailable"}, Lock()
 
 
-# ================ Endpoints =================
+# =========================================================
+#  Common headers (CORS/no-cache), לא חובה אבל נוח לדשבורד
+# =========================================================
+@bp_system.after_request
+def _common_headers(resp):
+    try:
+        resp.headers["Pragma"] = "no-cache"
+        resp.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+        resp.headers["Expires"] = "0"
+        resp.headers["X-Accel-Buffering"] = "no"
+        resp.headers["Access-Control-Allow-Origin"] = "*"
+        resp.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
+        resp.headers["Access-Control-Allow-Headers"] = "Content-Type, X-Ingest-Token"
+    except Exception:
+        pass
+    return resp
+
+
+# ============================ Endpoints ============================
 
 @bp_system.get("/version")
 def version():
@@ -119,7 +139,7 @@ def healthz():
         payload = get_shared_payload() or {}
 
         if not payload:
-            LAST_PAYLOAD, LAST_PAYLOAD_LOCK = _get_last_payload()
+            LAST_PAYLOAD, _ = _get_last_payload()
             if isinstance(LAST_PAYLOAD, dict):
                 payload = LAST_PAYLOAD or {}
 
@@ -152,6 +172,19 @@ def healthz():
         }), 200
     except Exception as e:
         return jsonify({"ok": False, "error": str(e)}), 200
+
+
+# --------- Aliases ל תאימות כלים/סקריפטים ---------
+
+@bp_system.get("/health")
+def health_alias():
+    """Alias ל-/healthz בשביל כלים/סקריפטים שמצפים /health."""
+    return healthz()
+
+@bp_system.get("/ping")
+def ping():
+    """בדיקת חיים פשוטה (לייט) – מחזיר ok=True ו-timestamp."""
+    return jsonify(ok=True, ts=int(time.time())), 200
 
 
 @bp_system.get("/readyz")
@@ -207,13 +240,13 @@ def api_system():
 def api_diagnostics():
     diag: Dict[str, Any] = {"ok": True, "errors": [], "warnings": []}
     try:
-        _, PAYLOAD_VERSION, APP_START = _get_basic_config()  # APP_START unused but harmless
+        _, PAYLOAD_VERSION, _ = _get_basic_config()
 
         get_shared_payload = _get_shared_payload_fn()
         payload = get_shared_payload() or {}
 
         if not payload:
-            LAST_PAYLOAD, LAST_PAYLOAD_LOCK = _get_last_payload()
+            LAST_PAYLOAD, _ = _get_last_payload()
             if isinstance(LAST_PAYLOAD, dict):
                 payload = LAST_PAYLOAD.copy()
 
@@ -235,8 +268,11 @@ def api_diagnostics():
         diag["video"] = {"opened": opened, "running": running}
 
         OBJDET_STATUS, OBJDET_STATUS_LOCK = _get_objdet_status()
-        with OBJDET_STATUS_LOCK:
-            st = dict(OBJDET_STATUS)
+        try:
+            with OBJDET_STATUS_LOCK:
+                st = dict(OBJDET_STATUS)
+        except Exception:
+            st = dict(OBJDET_STATUS) if isinstance(OBJDET_STATUS, dict) else {"ok": False}
         diag["objdet"] = st
 
         APP_VERSION, _, _ = _get_basic_config()
@@ -302,7 +338,7 @@ def api_exercise_diag_snapshot():
     except Exception:
         snap = {}
     if not snap:
-        LAST_PAYLOAD, LAST_PAYLOAD_LOCK = _get_last_payload()
+        LAST_PAYLOAD, _ = _get_last_payload()
         if isinstance(LAST_PAYLOAD, dict):
             snap = dict(LAST_PAYLOAD)
 

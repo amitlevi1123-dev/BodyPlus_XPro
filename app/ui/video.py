@@ -12,6 +12,7 @@ app/ui/video.py — VideoStreamer ingest-only (ללא OpenCV)
 - get_jpeg_generator(): הפקת סטרים MJPEG.
 - get_latest_jpeg(): החזרת הפריים האחרון למדידות.
 - has_frames() / buffer_len(): תאימות מלאה לנתיב /video/stream.mjpg.
+- ✅ read_frame(): תאימות מלאה ל-main.py (מחזיר np.ndarray RGB) — ללא OpenCV.
 """
 
 from __future__ import annotations
@@ -30,11 +31,13 @@ if not logger.handlers:
 # ===== PIL (לקריאת גודל פריים) =====
 try:
     from PIL import Image  # type: ignore
+    import numpy as np  # נדרש רק ליצירת המטריצה
     PIL_OK = True
-except Exception:
+except Exception as e:
     Image = None  # type: ignore
+    np = None  # type: ignore
     PIL_OK = False
-    logger.warning("PIL not available — frame size will not be inferred.")
+    logger.warning(f"PIL/numpy unavailable — {e}")
 
 def _safe_now() -> float:
     try:
@@ -176,28 +179,6 @@ class VideoStreamer:
         self._update_fps(now)
         logger.debug(f"Frame ingested | size={len(jpeg_bytes)} bytes | fps≈{self._last_fps or 0}")
 
-    # -------- Optional manual push --------
-    def push_jpeg(self, jpeg_bytes: bytes, size: Optional[Tuple[int, int]] = None) -> None:
-        if not isinstance(jpeg_bytes, (bytes, bytearray)) or len(jpeg_bytes) < 10:
-            return
-        now = _safe_now()
-        if self.encode_fps > 0 and now < self._next_encode_due:
-            return
-        self._next_encode_due = now + (1.0 / float(self.encode_fps)) if self.encode_fps > 0 else now
-        self._opened = True
-        self._running = True
-        self._last_push_ts = now
-        if size:
-            try:
-                self._last_size = (int(size[0]), int(size[1]))
-            except Exception:
-                pass
-        with self._cv:
-            self._last_jpeg = bytes(jpeg_bytes)
-            self._cv.notify_all()
-        self._update_fps(now)
-        logger.debug("push_jpeg() called manually")
-
     # -------- MJPEG generator --------
     def get_jpeg_generator(self):
         boundary = b"--frame"
@@ -266,3 +247,23 @@ def get_streamer() -> VideoStreamer:
         _streamer = VideoStreamer(cam, w, h, fps, q, False)
         logger.info(f"get_streamer(): new instance created ({w}x{h}@{fps})")
     return _streamer
+
+
+# ===== ✅ תאימות ל-main.py =====
+def read_frame() -> tuple[bool, Optional["np.ndarray"]]:
+    """
+    מחזיר את הפריים האחרון מה-ingest כ-numpy array RGB — ללא OpenCV.
+    """
+    try:
+        from PIL import Image
+        import numpy as np
+        s = get_streamer()
+        jpeg = s.get_latest_jpeg()
+        if not jpeg:
+            return False, None
+        with Image.open(BytesIO(jpeg)) as im:
+            frame_rgb = np.array(im.convert("RGB"))
+        return True, frame_rgb
+    except Exception as e:
+        logger.warning(f"read_frame() failed: {e}")
+        return False, None

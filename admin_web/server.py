@@ -622,11 +622,15 @@ def create_app() -> Flask:
 
     return app
 
-
 # === WSGI export (ל-Gunicorn) ===
 app = create_app()
 
+# ================================================================
+# ריצה מקומית בלבד (לא בענן / RunPod)
+# ================================================================
 if __name__ == "__main__":
+    # מקומית: אפשר להריץ על פורט 5000 כדי לבדוק
     port = int(os.getenv("PORT", "5000"))
-    logger.info("Server ready. /payload ו-/video זמינים. /capture לפתיחת מצלמה לשידור ingest.")
-    app.run(host="0.0.0.0", port=port, debug=False, use_reloader=False, threaded=True)
+    logger.info(f"[Local] Flask server running at http://127.0.0.1:{port}")
+    logger.info("Available endpoints: /payload, /video, /capture, /healthz, etc.")
+    app.run(host="0.0.0.0", port=port, debug=True, use_reloader=False, threaded=True)

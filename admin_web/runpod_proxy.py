@@ -257,9 +257,12 @@ def no_stream():
 
 # ========= main =========
 if __name__ == "__main__":
-    # מקומי בלבד. בענן מריצים עם gunicorn:
-    # gunicorn -k gthread -w 1 --threads 8 -t 120 --bind 0.0.0.0:8000 "admin_web.runpod_proxy:app"
-    print(f"🔁 Proxy running at http://127.0.0.1:{PORT} → {RUNPOD_BASE}")
-    print(f"🔐 API key loaded? {_mask_key(API_KEY) if API_KEY else 'NO'}")
-    print(f"🪵 DEBUG_LOG={'True' if DEBUG_LOG else 'False'}")
-    app.run(host="127.0.0.1", port=PORT, debug=False, threaded=True)
+    # מקומית בלבד — בענן (RunPod) אסור להריץ app.run, אלא רק דרך gunicorn.
+    if os.getenv("RUNPOD") == "1" or os.getenv("RUNPOD_BASE", "").startswith("https://api.runpod.ai"):
+        print("⚠️  Detected RunPod environment — skipping Flask dev server (use gunicorn).")
+    else:
+        print(f"🔁 Proxy running at http://127.0.0.1:{PORT} → {RUNPOD_BASE}")
+        print(f"🔐 API key loaded? {_mask_key(API_KEY) if API_KEY else 'NO'}")
+        print(f"🪵 DEBUG_LOG={'True' if DEBUG_LOG else 'False'}")
+        app.run(host="0.0.0.0", port=PORT, debug=True, threaded=True)
+
