@@ -27,9 +27,11 @@ def log(*args):
 def _mask_key(k: str) -> str:
     if not k:
         return ""
-    return ("***" if len(k) <= 8 else f"{k[:6]}...{k[-5:]}")
+    return "***" if len(k) <= 8 else f"{k[:6]}...{k[-5:]}"
 
-def _short_headers(h: dict, drop=set(("cookie", "authorization"))):
+def _short_headers(h: dict, drop=None):
+    if drop is None:
+        drop = {"cookie", "authorization"}
     out = {}
     for k, v in h.items():
         out[k] = "<hidden>" if k.lower() in drop else (v if len(str(v)) < 200 else str(v)[:200] + " ...")
@@ -52,11 +54,11 @@ def _get(url: str, timeout=(5, 60)) -> requests.Response:
 
 # ========= CORS =========
 @app.after_request
-def _cors(resp):
-    resp.headers["Access-Control-Allow-Origin"] = "*"
-    resp.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
-    resp.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization"
-    return resp
+def _cors(response):
+    response.headers["Access-Control-Allow-Origin"] = "*"
+    response.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
+    response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization"
+    return response
 
 @app.route("/", methods=["OPTIONS"])
 @app.route("/run-submit", methods=["OPTIONS"])
@@ -64,6 +66,7 @@ def _cors(resp):
 @app.route("/status/<job_id>", methods=["OPTIONS"])
 @app.route("/healthz", methods=["OPTIONS"])
 def _opts(job_id=None):
+    _ = job_id  # Unused parameter for route matching
     return Response(status=204)
 
 # ========= דפי בית / UI =========
@@ -77,7 +80,7 @@ def home():
         "api_key_mask": _mask_key(API_KEY),
     }
     log(">>> HOME GET /")
-    log("    headers:", json.dumps(_short_headers(request.headers), ensure_ascii=False))
+    log("    headers:", json.dumps(_short_headers(dict(request.headers)), ensure_ascii=False))
     return jsonify(payload), 200
 
 @app.get("/ui")
@@ -147,12 +150,13 @@ def last():
 def _require_key():
     if not API_KEY or API_KEY == "REPLACE_WITH_YOUR_KEY":
         return jsonify(ok=False, error="missing_api_key", hint="set RUNPOD_API_KEY env"), 401
+    return None
 
 # ========= נתיבים עיקריים =========
 @app.post("/run-sync")
 def run_sync():
-    if (resp := _require_key()) is not None:
-        return resp
+    if (err_resp := _require_key()) is not None:
+        return err_resp
     body = request.get_json(silent=True) or {}
     log(">>> /run-sync ←", json.dumps(body, ensure_ascii=False))
     try:
@@ -167,26 +171,26 @@ def run_sync():
             "method": "POST",
             "status": r.status_code,
             "upstream": up,
-            "resp_head": _short_headers(r.headers),
+            "resp_head": _short_headers(dict(r.headers)),
             "resp_text": text,
         })
         log(f"    → upstream {up} | HTTP {r.status_code} | {dt} ms")
-        log("    resp.head:", json.dumps(_short_headers(r.headers), ensure_ascii=False))
+        log("    resp.head:", json.dumps(_short_headers(dict(r.headers)), ensure_ascii=False))
         log("    resp.body:", text)
         return Response(
             r.content,
             status=r.status_code,
             headers={"Content-Type": r.headers.get("Content-Type", "application/json")},
         )
-    except Exception as e:
-        log("    EXC /run-sync:", repr(e))
+    except Exception as exc:
+        log("    EXC /run-sync:", repr(exc))
         log(traceback.format_exc())
-        return jsonify(ok=False, error="proxy_exception", detail=str(e)), 500
+        return jsonify(ok=False, error="proxy_exception", detail=str(exc)), 500
 
 @app.post("/run-submit")
 def run_submit():
-    if (resp := _require_key()) is not None:
-        return resp
+    if (err_resp := _require_key()) is not None:
+        return err_resp
     body = request.get_json(silent=True) or {}
     log(">>> /run-submit ←", json.dumps(body, ensure_ascii=False))
     try:
@@ -199,26 +203,26 @@ def run_submit():
             "method": "POST",
             "status": r.status_code,
             "upstream": up,
-            "resp_head": _short_headers(r.headers),
+            "resp_head": _short_headers(dict(r.headers)),
             "resp_text": text,
         })
         log(f"    → upstream {up} | HTTP {r.status_code}")
-        log("    resp.head:", json.dumps(_short_headers(r.headers), ensure_ascii=False))
+        log("    resp.head:", json.dumps(_short_headers(dict(r.headers)), ensure_ascii=False))
         log("    resp.body:", text)
         return Response(
             r.content,
             status=r.status_code,
             headers={"Content-Type": r.headers.get("Content-Type", "application/json")},
         )
-    except Exception as e:
-        log("    EXC /run-submit:", repr(e))
+    except Exception as exc:
+        log("    EXC /run-submit:", repr(exc))
         log(traceback.format_exc())
-        return jsonify(ok=False, error="proxy_exception", detail=str(e)), 500
+        return jsonify(ok=False, error="proxy_exception", detail=str(exc)), 500
 
 @app.get("/status/<job_id>")
 def status(job_id: str):
-    if (resp := _require_key()) is not None:
-        return resp
+    if (err_resp := _require_key()) is not None:
+        return err_resp
     log(f">>> /status/{job_id}")
     try:
         up = f"{RUNPOD_BASE}/status/{job_id}"
@@ -230,21 +234,21 @@ def status(job_id: str):
             "method": "GET",
             "status": r.status_code,
             "upstream": up,
-            "resp_head": _short_headers(r.headers),
+            "resp_head": _short_headers(dict(r.headers)),
             "resp_text": text,
         })
         log(f"    → upstream {up} | HTTP {r.status_code}")
-        log("    resp.head:", json.dumps(_short_headers(r.headers), ensure_ascii=False))
+        log("    resp.head:", json.dumps(_short_headers(dict(r.headers)), ensure_ascii=False))
         log("    resp.body:", text)
         return Response(
             r.content,
             status=r.status_code,
             headers={"Content-Type": r.headers.get("Content-Type", "application/json")},
         )
-    except Exception as e:
-        log("    EXC /status:", repr(e))
+    except Exception as exc:
+        log("    EXC /status:", repr(exc))
         log(traceback.format_exc())
-        return jsonify(ok=False, error="proxy_exception", detail=str(e)), 500
+        return jsonify(ok=False, error="proxy_exception", detail=str(exc)), 500
 
 # חסימת סטרים – Serverless לא תומך ב-MJPEG
 @app.get("/video/stream.mjpg")
