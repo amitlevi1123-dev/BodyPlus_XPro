@@ -5,6 +5,7 @@
 # מה הוא עושה?
 # • מקבל פריים RGB (np.ndarray) ומריץ MediaPipe Pose+Hands.
 # • שולח JSON של נקודות ל-admin_web.state.set_last_pose(...).
+# • בנוסף מזריק אל ה-payload השיתופי את mp.landmarks (0..1) לציור שלד בצד לקוח.
 # • לא מצייר, לא מקודד, לא נוגע ב-MJPEG. הווידאו זורם בנפרד.
 #
 # שימוש:
@@ -14,7 +15,7 @@
 
 from __future__ import annotations
 from typing import Optional, Tuple, Dict, Any
-import sys, traceback, time
+import sys, traceback, time, math
 
 try:
     from core.logs import logger  # type: ignore
@@ -181,7 +182,7 @@ class MediaPipeRunner:
         """
         קלט: frame_rgb = np.ndarray (H,W,3, uint8) בפורמט RGB!
         פלט: (pose_results, hands_results) או (None, None).
-        תופעת לוואי: פרסום JSON ל-state (set_last_pose) בקצב מוגבל.
+        תופעת לוואי: פרסום JSON ל-state (set_last_pose) בקצב מוגבל + הזרקת mp.landmarks.
         """
         if frame_rgb is None or not self.is_open: return None, None
         if not self.available: return None, None
@@ -201,7 +202,7 @@ class MediaPipeRunner:
                     h, w = (rgb.shape[0], rgb.shape[1]) if hasattr(rgb, "shape") else (0, 0)
                     payload: Dict[str, Any] = {"ok": False, "w": int(w), "h": int(h)}
 
-                    # Pose
+                    # Pose (פיקסלים עם שמות — שמירת תאימות לישן)
                     if pose and getattr(pose, "pose_landmarks", None) and hasattr(pose.pose_landmarks, "landmark"):
                         lm = pose.pose_landmarks.landmark
                         def xyv(i: int) -> Dict[str, float]:
@@ -228,7 +229,37 @@ class MediaPipeRunner:
                         }
                         payload["ok"] = True
 
-                    # Hands
+                        # --- הוספת mp.landmarks מנורמל (0..1) ל-payload השיתופי עבור Overlay ---
+                        try:
+                            lm_norm = []
+                            for p in lm:
+                                xn = float(getattr(p, "x", 0.0))
+                                yn = float(getattr(p, "y", 0.0))
+                                vn = float(getattr(p, "visibility", 1.0))
+                                # הגנה על NaN/Inf ותחימה ל-0..1
+                                if not (xn == xn) or math.isinf(xn): xn = 0.0
+                                if not (yn == yn) or math.isinf(yn): yn = 0.0
+                                if not (vn == vn) or math.isinf(vn): vn = 0.0
+                                xn = max(0.0, min(1.0, xn))
+                                yn = max(0.0, min(1.0, yn))
+                                vn = max(0.0, min(1.0, vn))
+                                lm_norm.append({"x": xn, "y": yn, "visibility": vn})
+
+                            if lm_norm:
+                                from admin_web.state import get_payload as _gp, set_payload as _sp  # type: ignore
+                                base = _gp() or {}
+                                mpblk = dict(base.get("mp", {})) if isinstance(base.get("mp"), dict) else {}
+                                mpblk["landmarks"] = lm_norm
+                                # אם הפריוויו שלך משתקף ב-UI — השאר True; אחרת שנה ל-False.
+                                mpblk.setdefault("mirror_x", True)
+                                base["mp"] = mpblk
+                                base.setdefault("payload_version", base.get("payload_version", "1.2.0"))
+                                base.setdefault("ts", time.time())
+                                _sp(base)
+                        except Exception:
+                            pass
+
+                    # Hands (אופציונלי)
                     hands_arr = []
                     if hands and getattr(hands, "multi_hand_landmarks", None):
                         for hlm in hands.multi_hand_landmarks:
@@ -243,7 +274,7 @@ class MediaPipeRunner:
                     # HUD בסיסי (אופציונלי)
                     payload["hud"] = {"view": "Front", "conf": 0.85, "qs": 90}
 
-                    # פרסום ל-state
+                    # פרסום ל-state (שמירה על התאימות הישנה)
                     try:
                         from admin_web.state import set_last_pose  # type: ignore
                         set_last_pose(payload)
