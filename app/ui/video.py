@@ -12,32 +12,35 @@ app/ui/video.py — VideoStreamer ingest-only (ללא OpenCV)
 - get_jpeg_generator(): הפקת סטרים MJPEG.
 - get_latest_jpeg(): החזרת הפריים האחרון למדידות.
 - has_frames() / buffer_len(): תאימות מלאה לנתיב /video/stream.mjpg.
-- ✅ read_frame(): תאימות מלאה ל-main.py (מחזיר np.ndarray RGB) — ללא OpenCV.
+- ✅ read_frame(self): מתודה שמחזירה numpy RGB (ללא OpenCV) — תואם ל-main.py שקורא s.read_frame().
 """
 
 from __future__ import annotations
-import os, time, threading, logging
+import os
+import time
+import threading
+import logging
 from typing import Optional, Tuple, List, Dict, Any
 from io import BytesIO
 
 # ===== Logger =====
 logger = logging.getLogger("VideoStreamer")
 if not logger.handlers:
-    handler = logging.StreamHandler()
-    handler.setFormatter(logging.Formatter("%(asctime)s | %(levelname)s | %(message)s"))
-    logger.addHandler(handler)
-    logger.setLevel(logging.INFO)
+    _h = logging.StreamHandler()
+    _h.setFormatter(logging.Formatter("%(asctime)s | %(levelname)s | %(message)s"))
+    logger.addHandler(_h)
+logger.setLevel(logging.INFO)
 
-# ===== PIL (לקריאת גודל פריים) =====
+# ===== PIL + numpy (ללא OpenCV) =====
 try:
     from PIL import Image  # type: ignore
-    import numpy as np  # נדרש רק ליצירת המטריצה
+    import numpy as np     # type: ignore
     PIL_OK = True
 except Exception as e:
     Image = None  # type: ignore
-    np = None  # type: ignore
+    np = None     # type: ignore
     PIL_OK = False
-    logger.warning(f"PIL/numpy unavailable — {e}")
+    logger.warning(f"PIL/numpy unavailable — {e!r}")
 
 def _safe_now() -> float:
     try:
@@ -53,14 +56,19 @@ _MINI_JPEG = (
     b"\xff\xda\x00\x0c\x03\x01\x00\x02\x11\x03\x11\x00?\x00\xcf\xff\xd9"
 )
 
-
 class VideoStreamer:
     """מקבל JPEG מבחוץ ומספק סטרים MJPEG לזיכרון — ללא OpenCV."""
 
-    def __init__(self, camera_index: int = 0, width: int = 1280, height: int = 720,
-                 fps: int = 30, jpeg_quality: int = 70,
-                 show_preview_default: bool = False,
-                 window_name: str = "Preview"):
+    def __init__(
+        self,
+        camera_index: int = 0,
+        width: int = 1280,
+        height: int = 720,
+        fps: int = 30,
+        jpeg_quality: int = 70,
+        show_preview_default: bool = False,
+        window_name: str = "Preview",
+    ):
         self.camera_index = int(camera_index)
         self.width = int(width)
         self.height = int(height)
@@ -131,9 +139,13 @@ class VideoStreamer:
         except Exception:
             pass
 
-    def apply_camera_settings(self, *, fps: Optional[int] = None,
-                              width: Optional[int] = None,
-                              height: Optional[int] = None):
+    def apply_camera_settings(
+        self,
+        *,
+        fps: Optional[int] = None,
+        width: Optional[int] = None,
+        height: Optional[int] = None,
+    ):
         if fps is not None:
             try:
                 self.fps = int(fps)
@@ -177,7 +189,7 @@ class VideoStreamer:
             self._cv.notify_all()
 
         self._update_fps(now)
-        logger.debug(f"Frame ingested | size={len(jpeg_bytes)} bytes | fps≈{self._last_fps or 0}")
+        logger.debug("Frame ingested | size=%d bytes | fps≈%s", len(jpeg_bytes), self._last_fps or 0)
 
     # -------- MJPEG generator --------
     def get_jpeg_generator(self):
@@ -196,7 +208,7 @@ class VideoStreamer:
                 continue
             yield boundary + b"\r\nContent-Type: image/jpeg\r\n\r\n" + data + b"\r\n"
 
-    iter_mjpeg = get_jpeg_generator
+    iter_mjpeg = get_jpeg_generator  # alias
 
     # -------- Accessor for metrics worker --------
     def get_latest_jpeg(self) -> Optional[bytes]:
@@ -217,6 +229,25 @@ class VideoStreamer:
         self._opened = False
         logger.info("Video capture stopped (logical)")
 
+    # -------- ✅ read_frame כמתודה (ללא OpenCV) --------
+    def read_frame(self) -> Tuple[bool, Optional[Any]]:
+        """
+        מחזיר פריים כ-numpy array בפורמט RGB (ללא cv2).
+        תואם ל-main.py שקורא s.read_frame().
+        """
+        if not PIL_OK or np is None:
+            return False, None
+        jpeg = self.get_latest_jpeg()
+        if not jpeg:
+            return False, None
+        try:
+            with Image.open(BytesIO(jpeg)) as im:  # type: ignore
+                arr = np.array(im.convert("RGB"))  # type: ignore
+                return True, arr
+        except Exception as e:
+            logger.debug("read_frame() decode error: %r", e)
+            return False, None
+
     # -------- Internals --------
     def _ensure_placeholder_jpeg(self):
         if self._last_jpeg is None:
@@ -231,7 +262,6 @@ class VideoStreamer:
             if span > 0:
                 self._last_fps = round((len(self._fps_win) - 1) / span, 2)
 
-
 # ===== Singleton streamer =====
 _streamer: Optional[VideoStreamer] = None
 
@@ -243,27 +273,12 @@ def get_streamer() -> VideoStreamer:
         w = int(os.getenv("WIDTH", "1280"))
         h = int(os.getenv("HEIGHT", "720"))
         fps = int(os.getenv("FPS", "30"))
-        q = int(os.getenv("JPEG_QUALITY", "70"))
+        q = int(os.getenv("JPEG_QUALITY", "70"))  # נשמר לתאימות, לא בשימוש כאן
         _streamer = VideoStreamer(cam, w, h, fps, q, False)
-        logger.info(f"get_streamer(): new instance created ({w}x{h}@{fps})")
+        logger.info("get_streamer(): new instance created (%dx%d@%d)", w, h, fps)
     return _streamer
 
-
-# ===== ✅ תאימות ל-main.py =====
-def read_frame() -> tuple[bool, Optional["np.ndarray"]]:
-    """
-    מחזיר את הפריים האחרון מה-ingest כ-numpy array RGB — ללא OpenCV.
-    """
-    try:
-        from PIL import Image
-        import numpy as np
-        s = get_streamer()
-        jpeg = s.get_latest_jpeg()
-        if not jpeg:
-            return False, None
-        with Image.open(BytesIO(jpeg)) as im:
-            frame_rgb = np.array(im.convert("RGB"))
-        return True, frame_rgb
-    except Exception as e:
-        logger.warning(f"read_frame() failed: {e}")
-        return False, None
+# ===== פונקציה גלובלית אופציונלית (למי שקורא read_frame() בלי האובייקט) =====
+def read_frame() -> Tuple[bool, Optional[Any]]:
+    s = get_streamer()
+    return s.read_frame()
