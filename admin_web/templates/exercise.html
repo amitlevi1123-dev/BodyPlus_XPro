@@ -9,6 +9,7 @@
     --subtle:#f8fafc; --chip:#f1f5f9; --chip-border:#e5e7eb;
     --ok:#22c55e; --warn:#f97316; --bad:#ef4444; --muted2:#9ca3af;
   }
+  html[dir="rtl"] .ltr { direction:ltr }
   .mono{font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono","Courier New",monospace}
   .card{background:var(--bg);border:1px solid var(--border);border-radius:1rem}
   .card-h{padding:.9rem 1.1rem;border-bottom:1px solid #eef2f7}
@@ -21,7 +22,7 @@
   .gauge .label{font-size:14px;fill:#6b7280}
   .gauge .value{font-size:22px;font-weight:700;fill:#111827}
 
-  /* Modal (פירוט חזרה/סט) */
+  /* Modal */
   .modal-backdrop{ position:fixed; inset:0; background:rgba(0,0,0,.45); display:none; align-items:flex-start; justify-content:center; padding:4vh 1rem; z-index:60; }
   .modal-backdrop.show{ display:flex; }
   .modal-card{ width:min(1080px, 96vw); max-height:92vh; overflow:auto; background:#fff; border:1px solid #e5e7eb; border-radius:1rem; box-shadow:0 10px 25px rgba(0,0,0,.12); }
@@ -29,13 +30,7 @@
   .modal-tab{ padding:.55rem .8rem; border:1px solid transparent; border-radius:.6rem .6rem 0 0; cursor:pointer; color:#475569 }
   .modal-tab.active{ background:#fff; border-color:var(--border) var(--border) #fff var(--border); color:#111827; }
 
-  .crit-list h5{ font-weight:600; margin:.5rem 0 .35rem; }
-  .crit-item{ display:grid; grid-template-columns: 1fr auto auto; gap:.6rem; padding:.45rem .6rem; border-radius:.6rem; }
-  .crit-bad   { background:#fff1f2; }
-  .crit-warn  { background:#fff7ed; }
-  .crit-minor { background:#f8fafc; }
-  .crit-good  { background:#f0fdf4; }
-  .pill{ display:inline-flex; align-items:center; gap:.3rem; padding:.2rem .5rem; border-radius:9999px; font-size:.75rem; }
+  .pill{ display:inline-flex; align-items:center; gap:.3rem; padding:.2rem .55rem; border-radius:9999px; font-size:.75rem; }
   .pill-k{ background:#eef2ff; color:#3730a3; }
   .pill-r{ background:#fee2e2; color:#991b1b; }
   .chip{display:inline-flex;align-items:center;background:var(--chip);border:1px solid var(--chip-border);border-radius:9999px;padding:.2rem .55rem;font-size:.75rem;color:#334155}
@@ -43,21 +38,77 @@
   .status-dot{width:10px;height:10px;border-radius:9999px;background:#ef4444;display:inline-block}
   .status-dot.connected{background:#22c55e}
 
-  /* Metrics tables */
-  .mtable{ width:100%; border-collapse:separate; border-spacing:0; border:1px solid var(--border); border-radius:.8rem; overflow:hidden }
-  .mtable th, .mtable td{ padding:.5rem .6rem; border-bottom:1px solid var(--border); font-size:.875rem }
+  /* Tables */
+  .table-wrap{ overflow-x:auto; }
+  .mtable{ width:100%; border-collapse:separate; border-spacing:0; border:1px solid var(--border); border-radius:.8rem; overflow:hidden; min-width:720px }
+  .mtable th, .mtable td{ padding:.5rem .6rem; border-bottom:1px solid var(--border); font-size:.875rem; vertical-align:middle }
   .mtable thead th{ background:#f8fafc; color:#334155; font-weight:600 }
   .mtable tr:last-child td{ border-bottom:none }
+
   .kv-grid{ display:grid; grid-template-columns: 1fr auto; gap:.35rem .8rem }
   .kv-key{ color:#475569 }
   .kv-val{ font-weight:600; color:#1f2937; direction:ltr }
 
-  /* Helper */
   .hint{ font-size:.8rem; color:#64748b }
+  .badge{display:inline-flex;align-items:center;gap:.35rem;padding:.2rem .55rem;border-radius:9999px;font-size:.75rem;background:#f1f5f9;border:1px solid #e5e7eb}
+  .score-badge{font-weight:700}
+  .circle{width:9px;height:9px;border-radius:9999px;display:inline-block}
+  .c-ok{background:#22c55e}.c-warn{background:#f59e0b}.c-bad{background:#ef4444}
 </style>
 {% endblock %}
 
 {% block content %}
+
+<!-- כותרת עליונה: זיהוי + בורר שפה + פרטי תרגיל -->
+<div class="card mb-6">
+  <div class="card-h flex items-center justify-between">
+    <div class="flex items-center gap-3">
+      <div class="font-semibold">זיהוי תרגיל</div>
+      <div class="text-xs text-gray-500">מציג שמות ויחידות מתוך <span class="mono">aliases.yaml</span></div>
+    </div>
+    <div class="flex items-center gap-2">
+      <span class="text-sm text-gray-600">שפה:</span>
+      <select id="langSelect" class="form-select rounded-lg border-gray-300">
+        <option value="he" selected>עברית</option>
+        <option value="en">English</option>
+      </select>
+    </div>
+  </div>
+  <div class="card-b">
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+      <div class="border rounded-xl p-3">
+        <div class="text-xs text-gray-500 mb-1">תרגיל</div>
+        <div class="flex items-center justify-between">
+          <div>
+            <div class="font-semibold" id="exNameHe">—</div>
+            <div class="text-sm text-gray-500" id="exNameEn">—</div>
+          </div>
+          <span class="badge"><span class="circle c-ok"></span><span id="exerciseId">—</span></span>
+        </div>
+      </div>
+      <div class="border rounded-xl p-3">
+        <div class="text-xs text-gray-500 mb-1">משפחה</div>
+        <div class="flex items-center justify-between">
+          <div>
+            <div class="font-semibold" id="familyHe">—</div>
+            <div class="text-sm text-gray-500" id="familyEn">—</div>
+          </div>
+          <span class="badge" id="familyKey">—</span>
+        </div>
+      </div>
+      <div class="border rounded-xl p-3">
+        <div class="text-xs text-gray-500 mb-1">ציוד</div>
+        <div class="flex items-center justify-between">
+          <div>
+            <div class="font-semibold" id="equipHe">—</div>
+            <div class="text-sm text-gray-500" id="equipEn">—</div>
+          </div>
+          <span class="badge" id="equipmentKey">—</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
 
 <!-- שורת עליונה: וידאו חי + סטטוס -->
 <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -72,7 +123,7 @@
     <div class="card-b">
       <img id="videoFeed" src="/video/stream.mjpg" alt="Video stream"
            class="w-full h-[380px] object-contain bg-gray-50 rounded-lg border border-gray-200" />
-      <div class="text-xs text-gray-500 mt-2">אם לא רואים וידאו: ודא שהסטרימר פעיל. (בדף <span class="mono">/video</span> או דרך המצלמה הראשית)</div>
+      <div class="text-xs text-gray-500 mt-2">אם לא רואים וידאו: ודא שהסטרימר פעיל. (בדף <span class="mono">/video</span>)</div>
     </div>
   </div>
 
@@ -86,7 +137,7 @@
           <div class="text-sm text-gray-600">חיבור API / מצב סטרים</div>
         </div>
 
-        <!-- חיווי בריאות מערכת -->
+        <!-- בריאות מערכת -->
         <div class="flex items-center gap-3">
           <span class="status-dot" id="healthDot"></span>
           <div class="text-sm text-gray-600">בריאות מערכת (healthz)</div>
@@ -108,6 +159,7 @@
             <div class="text-sm text-gray-600">סט אחרון</div>
           </div>
         </div>
+
         <div class="text-xs text-gray-500">
           מדרג צבעים:
           <span class="font-medium text-red-600">אדום</span> (0–60%)
@@ -119,11 +171,69 @@
   </div>
 </div>
 
-<!-- פאנל סימולטור -->
+<!-- פאנל “נמדד מול יעד” — סט -->
 <div class="card mt-6">
   <div class="card-h flex items-center justify-between">
-    <div class="font-semibold">סימולטור חזרות/סטים (לבדיקת הציונים)</div>
-    <div class="text-sm text-gray-500">מייצר דוחות מדומים הדומים לפלט המנוע – לצורכי UI בלבד</div>
+    <div class="font-semibold">סט — נמדד מול יעד (לפי thresholds)</div>
+    <div class="text-sm text-gray-500">תצוגה דו־לשונית לפי <span class="mono">aliases.yaml</span></div>
+  </div>
+  <div class="card-b">
+    <div class="table-wrap">
+      <table class="mtable" id="setTargetsTable">
+        <thead>
+          <tr>
+            <th style="width:24%">קריטריון</th>
+            <th style="width:18%">נמדד</th>
+            <th style="width:26%">יעד</th>
+            <th style="width:16%">% ציון</th>
+            <th style="width:16%">הערה</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td colspan="5" class="py-6 text-center text-gray-400">— אין נתונים —</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="mt-3 text-sm">
+      <span class="score-badge">סיכום סט: </span><span id="setSummaryHe">—</span>
+      <span class="text-gray-400 mx-2">|</span>
+      <span id="setSummaryEn" class="text-gray-500">—</span>
+    </div>
+  </div>
+</div>
+
+<!-- פאנל “נמדד מול יעד” — חזרה -->
+<div class="card mt-6">
+  <div class="card-h flex items-center justify-between">
+    <div class="font-semibold">חזרה — נמדד מול יעד</div>
+    <div class="text-sm text-gray-500">לחיצה על חזרה תפתח פירוט</div>
+  </div>
+  <div class="card-b">
+    <div class="table-wrap">
+      <table class="mtable" id="repTargetsTable">
+        <thead>
+          <tr>
+            <th style="width:8%">סט</th>
+            <th style="width:8%">חזרה</th>
+            <th style="width:24%">קריטריון</th>
+            <th style="width:18%">נמדד</th>
+            <th style="width:26%">יעד</th>
+            <th style="width:16%">% ציון</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td colspan="6" class="py-6 text-center text-gray-400">— אין נתונים —</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- פאנל סימולטור (השארתי אבל נקי) -->
+<div class="card mt-6">
+  <div class="card-h flex items-center justify-between">
+    <div class="font-semibold">סימולטור חזרות/סטים (UI בלבד)</div>
+    <div class="text-sm text-gray-500">מייצר דוחות מדומים לבדיקה ויזואלית</div>
   </div>
   <div class="card-b space-y-4">
     <div class="grid grid-cols-1 lg:grid-cols-6 gap-3">
@@ -140,7 +250,7 @@
         <select id="simMode" class="form-select w-40 rounded-lg border-gray-300">
           <option value="good">Good (דוגמה טובה)</option>
           <option value="shallow">Shallow (עומק חלש)</option>
-          <option value="missing">Missing Critical (חסר מדד)</option>
+          <option value="missing">Missing Critical</option>
           <option value="mixed" selected>Mixed (משולב)</option>
         </select>
       </label>
@@ -156,19 +266,19 @@
       </div>
     </div>
 
-    <div class="overflow-auto border rounded-xl">
-      <table class="min-w-full text-sm">
-        <thead class="bg-gray-50">
+    <div class="table-wrap border rounded-xl">
+      <table class="mtable">
+        <thead>
           <tr class="text-gray-600">
-            <th class="py-2 px-3 text-right">סט</th>
-            <th class="py-2 px-3 text-right">חזרה</th>
-            <th class="py-2 px-3 text-right">תרגיל</th>
-            <th class="py-2 px-3 text-right">% ציון</th>
-            <th class="py-2 px-3 text-right">איכות</th>
-            <th class="py-2 px-3 text-right">Unscored</th>
-            <th class="py-2 px-3 text-right">הערה</th>
-            <th class="py-2 px-3 text-right">JSON</th>
-            <th class="py-2 px-3 text-right">פירוט</th>
+            <th>סט</th>
+            <th>חזרה</th>
+            <th>תרגיל</th>
+            <th>% ציון</th>
+            <th>איכות</th>
+            <th>Unscored</th>
+            <th>הערה</th>
+            <th>JSON</th>
+            <th>פירוט</th>
           </tr>
         </thead>
         <tbody id="simTbody">
@@ -179,7 +289,7 @@
   </div>
 </div>
 
-<!-- דיאגנוסטיקה קלה -->
+<!-- דיאגנוסטיקה -->
 <div class="card mt-6">
   <div class="card-h font-semibold">דיאגנוסטיקות חיות (SSE)</div>
   <div class="card-b">
@@ -193,7 +303,7 @@
   </div>
 </div>
 
-<!-- Modal: פירוט חזרה/סט -->
+<!-- Modal: פירוט -->
 <div id="details-modal" class="modal-backdrop" role="dialog" aria-modal="true">
   <div class="modal-card">
     <div class="p-4 border-b">
@@ -204,8 +314,6 @@
         </div>
         <button id="details-close" class="px-3 py-2 rounded-lg bg-gray-100 hover:bg-gray-200">סגור</button>
       </div>
-
-      <!-- Tabs -->
       <div class="modal-tabs mt-3">
         <div class="modal-tab active" data-tab="crit">קריטריונים</div>
         <div class="modal-tab" data-tab="metrics">מדדים</div>
@@ -217,7 +325,7 @@
       <!-- Tab: קריטריונים -->
       <div id="tab-crit">
         <div id="details-chips" class="flex flex-wrap items-center gap-2 mb-3"></div>
-        <div id="details-lists" class="crit-list space-y-3"></div>
+        <div id="details-lists" class="space-y-3"></div>
       </div>
 
       <!-- Tab: metrics_detail -->

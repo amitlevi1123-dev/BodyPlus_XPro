@@ -1,18 +1,17 @@
 # admin_web/runpod_proxy.py — Proxy יחיד + UI בדיקה + לוגים מלאים
-# רץ מקומי על פורט 8000 ומתווך ל-RunPod Serverless.
 from __future__ import annotations
 from flask import Flask, request, Response, jsonify, make_response
 import os, json, time, traceback
 import requests
 
 # ========= קונפיג =========
-RUNPOD_BASE = (os.getenv("RUNPOD_BASE") or "https://api.runpod.ai/v2/1fmkdasa1l0x06").rstrip("/")
-API_KEY     = os.getenv("RUNPOD_API_KEY") or "rpa_JMCLGONT7MUZLIX6CXDZWLOSR8VAS3RMD1MVRL0A19qjux"
+RUNPOD_BASE = (os.getenv("RUNPOD_BASE") or "https://1fmkdasa1l0x06.api.runpod.ai").rstrip("/")
+API_KEY     = os.getenv("rpa_4PXVVU7WW1RON92M9VQTT5V2ZOA4T8FZMM68ZUOE0fsl21", "")  # ← בלי מפתח קשיח בקוד!
 PORT        = int(os.getenv("PORT", "8000"))
 DEBUG_LOG   = (os.getenv("PROXY_DEBUG", "1") == "1")      # 1=on, 0=off
 
-# לוג אחרון שנשמר להצגה ב-/_proxy/last
-_LAST = {"when": None, "path": None, "method": None, "status": None, "upstream": None, "resp_head": {}, "resp_text": None}
+_LAST = {"when": None, "path": None, "method": None, "status": None, "upstream": None,
+         "resp_head": {}, "resp_text": None}
 
 app = Flask(__name__)
 
@@ -28,36 +27,32 @@ def _mask_key(k: str) -> str:
     if len(k) <= 8: return "***"
     return f"{k[:6]}...{k[-5:]}"
 
-def _short_headers(h: dict, drop=set(("cookie","authorization"))):
+def _short_headers(h: dict, drop=set(("cookie","authorization","x-api-key"))):
     out = {}
     for k,v in h.items():
         if k.lower() in drop:
             out[k] = "<hidden>"
         else:
-            out[k] = v if len(str(v)) < 200 else (str(v)[:200] + " ...")
+            s = str(v)
+            out[k] = s if len(s) < 200 else (s[:200] + " ...")
     return out
 
 def _json_or_text(r: requests.Response) -> str:
-    ctype = r.headers.get("Content-Type","")
-    text  = r.text
-    # קיצוץ כדי שהטרמינל לא יתפוצץ
+    text = r.text
     return text if len(text) < 2000 else (text[:2000] + "\n... [truncated] ...")
 
-# ========= עזרי HTTP ל-Upstream =========
+# ========= עזרי HTTP =========
 def _auth_headers() -> dict:
-    return {
-        "Authorization": f"Bearer {API_KEY}",
-        "Accept-Encoding": "identity",
-    }
+    return {"Authorization": f"Bearer {API_KEY}", "Accept-Encoding": "identity"}
 
-def _post(url: str, payload: dict, timeout=(5, 300)) -> requests.Response:
+def _post(url: str, payload: dict, timeout=(5, 180)) -> requests.Response:
     h = {"Content-Type": "application/json", **_auth_headers()}
     return requests.post(url, json=payload, headers=h, timeout=timeout)
 
 def _get(url: str, timeout=(5, 60)) -> requests.Response:
     return requests.get(url, headers=_auth_headers(), timeout=timeout)
 
-# ========= CORS כללי =========
+# ========= CORS =========
 @app.after_request
 def _cors(resp):
     resp.headers["Access-Control-Allow-Origin"] = "*"
@@ -82,13 +77,12 @@ def home():
         "upstream": RUNPOD_BASE,
         "api_key_mask": _mask_key(API_KEY),
     }
-    log(">>> HOME GET /?")
-    log("    headers:", json.dumps(_short_headers(request.headers), ensure_ascii=False))
+    log(">>> HOME GET /")
+    log("    headers:", json.dumps(_short_headers(dict(request.headers)), ensure_ascii=False))
     return jsonify(payload), 200
 
 @app.get("/ui")
 def simple_ui():
-    # דף בדיקה קטן שמריץ /run-sync בלחיצה ומראה פלט
     html = f"""<!doctype html>
 <html lang="he"><head><meta charset="utf-8"><title>RunPod Proxy · UI</title>
 <style>
@@ -106,7 +100,7 @@ small{{color:#6b7280}}
     <p><b>Upstream:</b> {RUNPOD_BASE}<br><b>API Key:</b> {_mask_key(API_KEY)}</p>
     <p><label>Prompt: <input id="p" type="text" value="Hello from proxy"/></label>
        <button onclick="runSync()">Run Sync</button></p>
-    <p><small>התוצאה תופיע כאן למטה. אם זה עובד, תראה גם לוגים ב־RunPod תחת Logs.</small></p>
+    <p><small>אם זה עובד, תראה גם לוגים ב־RunPod (Logs).</small></p>
     <pre id="out">—</pre>
   </div>
 <script>
@@ -129,7 +123,7 @@ async function runSync(){{
 </body></html>"""
     return make_response(html, 200)
 
-# ========= Health / WhoAmI / Last =========
+# ========= Health / Debug =========
 @app.get("/_proxy/health")
 def proxy_health():
     ok = bool(RUNPOD_BASE) and bool(API_KEY)
@@ -143,7 +137,16 @@ def whoami():
 def last():
     return jsonify(_LAST), 200
 
-# ========= מגני קלט =========
+@app.post("/_proxy/echo")
+def echo():
+    return jsonify(
+        ok=True,
+        headers=dict(request.headers),
+        json=(request.get_json(silent=True) or {}),
+        qs=request.args,
+    ), 200
+
+# ========= שמירת מפתח =========
 def _require_key():
     if not API_KEY or API_KEY == "REPLACE_WITH_YOUR_KEY":
         return jsonify(ok=False, error="missing_api_key", hint="set RUNPOD_API_KEY env"), 401
@@ -157,7 +160,7 @@ def run_sync():
     log(">>> /run-sync ←", json.dumps(body, ensure_ascii=False))
     try:
         t0 = time.time()
-        up = f"{RUNPOD_BASE}/run-sync"
+        up = f"{RUNPOD_BASE}/runsync"   # ← חשוב: runsync (ללא מקף)
         r  = _post(up, {"input": body})
         dt = int((time.time()-t0)*1000)
         text = _json_or_text(r)

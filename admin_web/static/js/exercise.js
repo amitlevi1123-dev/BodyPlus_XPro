@@ -12,20 +12,35 @@
 
   // ---------- Elements ----------
   const el = {
+    // header / language + labels
+    langSelect:  $('#langSelect'),
+    exNameHe:    $('#exNameHe'),
+    exNameEn:    $('#exNameEn'),
+    familyHe:    $('#familyHe'),
+    familyEn:    $('#familyEn'),
+    equipHe:     $('#equipHe'),
+    equipEn:     $('#equipEn'),
+    familyKey:   $('#familyKey'),
+    equipmentKey:$('#equipmentKey'),
+    exerciseId:  $('#exerciseId'),
+
     // video + status
     videoFeed: $('#videoFeed'),
     vidSource: $('#vidSource'),
     vidFps:    $('#vidFps'),
     vidSize:   $('#vidSize'),
     dot:       $('#exerciseStatusDot'),
+
     // health/ready
     healthDot:  $('#healthDot'),
     readyDot:   $('#readyDot'),
     healthInfo: $('#healthInfo'),
     readyInfo:  $('#readyInfo'),
+
     // gauges
     gaugeRep:  $('#gaugeRep'),
     gaugeSet:  $('#gaugeSet'),
+
     // simulator
     simSets:   $('#simSets'),
     simReps:   $('#simReps'),
@@ -33,14 +48,20 @@
     simNoise:  $('#simNoise'),
     btnRun:    $('#btnSimRun'),
     btnClear:  $('#btnSimClear'),
-    btnServerScore: $('#btnServerScore'),
+    btnServerScore:  $('#btnServerScore'),
     btnOpenLastJson: $('#btnOpenLastJson'),
     simTB:     $('#simTbody'),
+
+    // measured-vs-target tables
+    setTargetsTable: $('#setTargetsTable'),
+    repTargetsTable: $('#repTargetsTable'),
+
     // diag
     btnDiagStart: $('#btnDiagStart'),
     btnDiagStop:  $('#btnDiagStop'),
     btnDiagSnap:  $('#btnDiagSnap'),
     diagBox:      $('#diagBox'),
+
     // Modal
     detailsModal: $('#details-modal'),
     detailsClose: $('#details-close'),
@@ -48,6 +69,7 @@
     detailsChips: $('#details-chips'),
     detailsRaw:   $('#details-raw'),
     detailsLists: $('#details-lists'),
+
     // Modal tabs & metrics detail
     tabs:        $$('.modal-tab'),
     tabCrit:     $('#tab-crit'),
@@ -66,6 +88,55 @@
   let LAST_COLOR_RANGES = null;  // מהשרת (ui_ranges.color_bar)
   let simRunning = false;
   let LAST_REPORT = null;
+
+  // דו־לשוני: שפה נוכחית + מפות תוויות (אם יגיעו מהשרת)
+  let LANG = 'he';
+  let LABELS = {
+    // מבנה רצוי אם יגיע מהשרת בעתיד:
+    // exercise: { he:'סקוואט משקולת יד', en:'Dumbbell Squat' }
+    // family:   { he:'סקוואט', en:'Squat' }
+    // equipment:{ he:'משקולות יד', en:'Dumbbell' }
+  };
+
+  function applyLanguage(){
+    LANG = (el.langSelect?.value==='en') ? 'en' : 'he';
+    const html = document.documentElement;
+    if (LANG==='en'){ html.setAttribute('dir','ltr'); html.setAttribute('lang','en'); }
+    else { html.setAttribute('dir','rtl'); html.setAttribute('lang','he'); }
+    // רענון כותרת/שמות אם יש דו"ח טעים אחרון
+    if (LAST_REPORT) fillHeaderFromReport(LAST_REPORT);
+  }
+  el.langSelect?.addEventListener('change', applyLanguage);
+
+  function setDualText(domHe, domEn, labels, fallbackHe='—', fallbackEn='—'){
+    try{
+      const he = labels?.he ?? fallbackHe;
+      const en = labels?.en ?? fallbackEn;
+      if(domHe) domHe.textContent = he;
+      if(domEn) domEn.textContent = en;
+    }catch{}
+  }
+
+  function fillHeaderFromReport(rep){
+    try{
+      // אם הגיעו LABELS מלאים ב־report.ui.labels – נקלוט:
+      const ui = rep?.ui || {};
+      const labs = ui.labels || rep?.labels || null;
+      if (labs && typeof labs==='object') LABELS = { ...LABELS, ...labs };
+
+      const exId   = rep?.exercise?.id || '—';
+      const famKey = rep?.exercise?.family || '—';
+      const eqKey  = rep?.exercise?.equipment || '—';
+
+      el.exerciseId && (el.exerciseId.textContent = exId);
+      el.familyKey  && (el.familyKey.textContent  = famKey);
+      el.equipmentKey && (el.equipmentKey.textContent = eqKey);
+
+      setDualText(el.exNameHe, el.exNameEn, LABELS.exercise || {he: rep?.exercise?.display_name || exId, en: exId}, exId, exId);
+      setDualText(el.familyHe, el.familyEn, LABELS.family   || {he: famKey, en: famKey}, famKey, famKey);
+      setDualText(el.equipHe,  el.equipEn,  LABELS.equipment|| {he: eqKey,  en: eqKey},  eqKey,  eqKey);
+    }catch{}
+  }
 
   // ---------- Status Poll ----------
   async function pollStatus(){
@@ -91,7 +162,6 @@
         fetch('/readyz',{cache:'no-store'}).then(x=>x.ok?x.json():null).catch(()=>null),
       ]);
 
-      // healthz
       if(h){
         const ok = !!h.ok;
         el.healthDot?.classList.toggle('connected', ok);
@@ -103,7 +173,6 @@
         el.healthInfo.textContent = '—';
       }
 
-      // readyz
       if(r){
         const ok = !!r.ok;
         el.readyDot?.classList.toggle('connected', ok);
@@ -138,7 +207,6 @@
   const gRep = makeGauge(el.gaugeRep, 'חזרה');
   const gSet = makeGauge(el.gaugeSet, 'סט');
 
-  // טווחי צבעים מהשרת (fallback לדיפולט)
   function colorFromRanges(pct, ranges) {
     if (pct == null) return '#9ca3af';
     if (Array.isArray(ranges) && ranges.length) {
@@ -205,23 +273,19 @@
   }
   const chip = (html)=> `<span class="chip">${html}</span>`;
 
-  // Tooltip פירוק קריטריונים
   function criteriaTooltipText(rep) {
     try {
       const br = rep?.scoring?.criteria_breakdown_pct;
       let entries = br && typeof br === 'object' ? Object.entries(br) : null;
-
       if (!entries || !entries.length) {
         const list = Array.isArray(rep?.scoring?.criteria) ? rep.scoring.criteria : [];
         entries = list
           .filter(c => c?.score_pct != null || c?.score != null)
           .map(c => [String(c.id), c.score_pct!=null ? Number(c.score_pct) : Math.round(Number(c.score)*100)]);
       }
-
       entries = entries
         .filter(([_, v]) => v != null && isFinite(Number(v)))
         .sort((a,b)=> Number(a[1])-Number(b[1]));
-
       if (!entries.length) return 'אין פירוק קריטריונים זמין';
       return entries.map(([k,v])=> `${k}: ${v}%`).join('\n');
     } catch {
@@ -233,8 +297,7 @@
   function activateTab(name){
     el.tabs.forEach(t=>{
       const n = t.getAttribute('data-tab');
-      const active = (n===name);
-      t.classList.toggle('active', active);
+      t.classList.toggle('active', n===name);
     });
     el.tabCrit.style.display    = name==='crit'    ? '' : 'none';
     el.tabMetrics.style.display = name==='metrics' ? '' : 'none';
@@ -357,12 +420,10 @@
     }).join('');
     el.detailsLists.innerHTML = html || '<div class="text-sm text-gray-500">אין פרטים להצגה.</div>';
 
-    // tooltip breakdown על המדדים
     const t = criteriaTooltipText(rep);
     el.gaugeRep?.setAttribute('title', t);
     el.gaugeSet?.setAttribute('title', t);
 
-    // Metrics detail
     renderMetricsDetail(rep);
     activateTab('crit');
     el.detailsModal.classList.add('show');
@@ -423,8 +484,151 @@
     el.gaugeSet?.setAttribute('title', tooltip);
   }
 
-  // ---------- Table row + set summary ----------
+  // ---------- Measured-vs-Target tables ----------
+  function tbodyOf(tableEl){
+    if(!tableEl) return null;
+    let tb = tableEl.querySelector('tbody');
+    if(!tb){ tb = document.createElement('tbody'); tableEl.appendChild(tb); }
+    return tb;
+  }
+  function clearTable(tableEl, cols){
+    const tb = tbodyOf(tableEl);
+    if(!tb) return;
+    tb.innerHTML = `<tr><td colspan="${cols}" class="py-6 text-center text-gray-400">— אין נתונים —</td></tr>`;
+  }
+  clearTable(el.setTargetsTable, 5);
+  clearTable(el.repTargetsTable, 6);
+
+  // מייצר תא יעד קריא מ־metrics_detail.targets (אם קיים)
+  function formatTargetCell(rep, critId){
+    try{
+      const t = rep?.metrics_detail?.targets;
+      if(!t || typeof t!=='object') return '—';
+      // אם יש מבנה ספציפי לקריטריון
+      if (critId && t[critId]){
+        const v = t[critId];
+        return (typeof v==='object') ? escapeHtml(safeJSON(v)) : escapeHtml(String(v));
+      }
+      // אחרת: יעד כללי (למשל טווחי טמפו)
+      const keys = Object.keys(t);
+      if(!keys.length) return '—';
+      // מציגים תת-עץ קטן (עד 1 רמה) כדי לא לזהם את ה־UI
+      const first = keys[0];
+      const v = t[first];
+      if (typeof v==='object'){
+        const flats = Object.entries(v).filter(([_,x])=> typeof x==='number').slice(0,3)
+          .map(([k,x])=> `${k}:${fmtNum(x)}`).join(', ');
+        return flats || escapeHtml(first);
+      }
+      return escapeHtml(`${first}: ${v}`);
+    }catch{ return '—'; }
+  }
+
+  function formatMeasuredCell(rep, critId){
+    try{
+      // אין לנו מיפוי קשיח: ננסה להציג את הערך הכי רלוונטי מה־canonical אם קיים
+      // fallback: נציג את ה־score_pct עצמו כסוג של מדד
+      const cList = Array.isArray(rep?.scoring?.criteria) ? rep.scoring.criteria : [];
+      const c = cList.find(x=> String(x.id)===String(critId));
+      if (c && c.score_pct!=null) return `${c.score_pct}%`;
+      if (c && c.score!=null)    return `${Math.round(Number(c.score)*100)}%`;
+      return '—';
+    }catch{ return '—'; }
+  }
+
+  function appendRepTargetsRow(setIdx, repIdx, crit){
+    const tb = tbodyOf(el.repTargetsTable);
+    if(!tb) return;
+    // אם זו השורה הראשונה – מחיקה של placeholder
+    const firstPlaceholder = tb.querySelector('td[colspan]');
+    if (firstPlaceholder) tb.innerHTML = '';
+
+    const tr = document.createElement('tr');
+    const pct = (crit?.score_pct!=null) ? `${crit.score_pct}%` :
+                (crit?.score!=null) ? `${Math.round(Number(crit.score)*100)}%` : '—';
+    const measured = formatMeasuredCell({ scoring:{criteria:[crit]} }, crit?.id);
+    const target   = formatTargetCell(LAST_REPORT, crit?.id); // נעזר בדו"ח האחרון לצורך targets כלליים
+
+    tr.innerHTML = `
+      <td class="py-2 px-3">${setIdx}</td>
+      <td class="py-2 px-3">${repIdx}</td>
+      <td class="py-2 px-3">${escapeHtml(crit?.id || '—')}</td>
+      <td class="py-2 px-3">${escapeHtml(measured)}</td>
+      <td class="py-2 px-3">${escapeHtml(target)}</td>
+      <td class="py-2 px-3">${pct}</td>`;
+    tb.appendChild(tr);
+  }
+
+  function refreshSetTargetsTable(setIdx, repReports){
+    const tb = tbodyOf(el.setTargetsTable);
+    if(!tb) return;
+    tb.innerHTML = '';
+
+    // איגוד לפי קריטריון → ממוצע score_pct + דוגמת יעד
+    const agg = new Map(); // id -> {sum, n, targetStr}
+    for (const rep of repReports){
+      const list = Array.isArray(rep?.scoring?.criteria) ? rep.scoring.criteria : [];
+      for (const c of list){
+        const id = String(c.id||'');
+        if(!id) continue;
+        const pct = (c.score_pct!=null) ? Number(c.score_pct) :
+                    (c.score!=null) ? Math.round(Number(c.score)*100) : null;
+        const tStr = formatTargetCell(rep, id);
+        const e = agg.get(id) || {sum:0, n:0, targ:tStr};
+        if (pct!=null && isFinite(pct)) { e.sum += pct; e.n += 1; }
+        if (!e.targ || e.targ==='—') e.targ = tStr;
+        agg.set(id, e);
+      }
+    }
+
+    if (agg.size===0){
+      tb.innerHTML = '<tr><td colspan="5" class="py-6 text-center text-gray-400">— אין נתונים —</td></tr>';
+      return;
+    }
+
+    Array.from(agg.entries()).sort(([a],[b])=> a.localeCompare(b)).forEach(([id, st])=>{
+      const avg = st.n ? Math.round(st.sum / st.n) : null;
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td class="py-2 px-3">${escapeHtml(id)}</td>
+        <td class="py-2 px-3">${avg!=null? `${avg}%`:'—'}</td>
+        <td class="py-2 px-3">${escapeHtml(st.targ || '—')}</td>
+        <td class="py-2 px-3">${avg!=null? `${avg}%`:'—'}</td>
+        <td class="py-2 px-3">${avg!=null && avg<70 ? 'דורש שיפור' : ''}</td>`;
+      tb.appendChild(tr);
+    });
+
+    // שורה מסכמת
+    const all = Array.from(agg.values()).filter(x=>x.n>0).map(x=> Math.round(x.sum/x.n));
+    const overall = all.length ? Math.round(all.reduce((a,b)=>a+b,0)/all.length) : null;
+    const trSum = document.createElement('tr');
+    trSum.className='bg-gray-50';
+    trSum.innerHTML = `
+      <td class="py-2 px-3 font-semibold">סיכום סט #${setIdx}</td>
+      <td class="py-2 px-3 font-semibold">${overall!=null? overall+'%':'—'}</td>
+      <td class="py-2 px-3 text-gray-500">—</td>
+      <td class="py-2 px-3 text-gray-500">—</td>
+      <td class="py-2 px-3 text-gray-500">${overall!=null && overall<70 ? 'מומלץ לעבוד על עומק/טמפו' : ''}</td>`;
+    tb.appendChild(trSum);
+  }
+
+  // ---------- Details: open ----------
+  function openDetailsFromRow(setIdx, repIdx, repObj){
+    openDetails(repObj, { setIdx, repIdx });
+  }
+
+  // ---------- Simulation + rows ----------
+  function setGaugesAndHeader(rep){
+    LAST_REPORT = rep;
+    setGaugesFromReport(rep);
+    fillHeaderFromReport(rep);
+    const t = criteriaTooltipText(rep);
+    el.gaugeRep?.setAttribute('title', t);
+    el.gaugeSet?.setAttribute('title', t);
+  }
+
   function pushRow(setIdx, repIdx, rep){
+    // טבלת “סימולטור”
     if(el.simTB.querySelector('td[colspan]')) el.simTB.innerHTML='';
     const tr=document.createElement('tr');
     const pct = repScorePct(rep);
@@ -446,7 +650,6 @@
         <button class="px-2 py-1 rounded bg-gray-100 hover:bg-gray-200 text-sm" data-rid="${rid}" data-set="${setIdx}" data-rep="${repIdx}">פירוט</button>
       </td>`;
 
-    // JSON button
     tr.querySelector('button[data-json]')?.addEventListener('click', (ev)=>{
       const id = ev.currentTarget.getAttribute('data-json');
       const report = REP_STORE.get(id);
@@ -454,17 +657,27 @@
       downloadJSON(report, `report_s${setIdx}_r${repIdx}.json`);
     });
 
-    // Details button
     tr.querySelector('button[data-rid]')?.addEventListener('click', (ev)=>{
       const btn = ev.currentTarget;
       const id  = btn.getAttribute('data-rid');
       const set = Number(btn.getAttribute('data-set'));
       const rix = Number(btn.getAttribute('data-rep'));
       const report = REP_STORE.get(id);
-      openDetails(report, { setIdx:set, repIdx:rix });
+      openDetailsFromRow(set, rix, report);
     });
 
     el.simTB.appendChild(tr);
+
+    // טבלת “חזרה — נמדד מול יעד”
+    const crits = Array.isArray(rep?.scoring?.criteria) ? rep.scoring.criteria : [];
+    if (crits.length){
+      for (const c of crits){
+        appendRepTargetsRow(setIdx, repIdx, c);
+      }
+    }
+
+    // גאוג'ים + כותרת דו־לשונית
+    setGaugesAndHeader(rep);
   }
 
   function pushSetSummary(setIdx, repLikeForSummary){
@@ -516,7 +729,6 @@
     const hints = [];
     const bad = criteria.filter(c=>c.available && (c.score_pct??0)<70).sort((a,b)=>a.score_pct-b.score_pct);
     if(bad[0]) hints.push(`שפר ${bad[0].id} (כעת ${bad[0].score_pct}%)`);
-    // demo metrics_detail minimal
     const metrics_detail = {
       groups:{
         joints:{ knee_left_deg:160, knee_right_deg:158, torso_forward_deg:15, spine_flexion_deg:8 },
@@ -524,12 +736,12 @@
         other:{}
       },
       rep_tempo_series:[{rep_id:1,timing_s:1.6,ecc_s:0.8,con_s:0.8,pause_top_s:0.0,pause_bottom_s:0.0}],
-      targets:{ upper:{}, tempo:{min_s:0.7,max_s:2.5} },
+      targets:{ tempo:{min_s:0.7,max_s:2.5} },
       stats:{}
     };
     return {
       ui_ranges: { color_bar: [{label:'red',from_pct:0,to_pct:60},{label:'orange',from_pct:60,to_pct:75},{label:'green',from_pct:75,to_pct:100}] },
-      exercise: { id: SAMPLE_EX },
+      exercise: { id: SAMPLE_EX, family:'squat', equipment:'bodyweight', display_name:'סקוואט גוף' },
       scoring: {
         score: ov.score, quality: ov.quality,
         unscored_reason: criteria.some(c=>!c.available && String(c.reason||'').includes('missing_critical')) ? 'missing_critical' : null,
@@ -537,7 +749,14 @@
         criteria_breakdown_pct: Object.fromEntries(criteria.map(c=>[c.id, c.score_pct ?? null])),
       },
       hints,
-      metrics_detail
+      metrics_detail,
+      ui: {
+        labels: {
+          exercise: { he: 'סקוואט גוף', en: 'Bodyweight Squat' },
+          family:   { he: 'סקוואט', en: 'Squat' },
+          equipment:{ he: 'משקל גוף', en: 'Bodyweight' },
+        }
+      }
     };
   }
 
@@ -552,22 +771,24 @@
     const mode  = el.simMode.value || 'mixed';
     const noise = clamp(Number(el.simNoise.value||0.25), 0, 0.5);
 
+    // לאגירת דו"חות של הסט הנוכחי לצורך טבלת סט
+    function newSetCollector(){ return { list: [] }; }
+    let collector = newSetCollector();
+
     try {
-      // שרת
       const sim = await serverSimulate({ sets, reps, mode, noise });
       LAST_COLOR_RANGES = sim?.ui_ranges?.color_bar || LAST_COLOR_RANGES;
 
       for (const s of (sim.sets || [])) {
         const setIdx = s.set ?? 1;
-        const repArr = Array.isArray(s.reps) ? s.reps : [];
-        let setScores = [];
-        let lastRepLike = null;
+        collector = newSetCollector();
 
+        const repArr = Array.isArray(s.reps) ? s.reps : [];
         for (const r of repArr) {
           const criteria = Array.isArray(r.criteria) ? r.criteria : [];
           const repLike = {
             ui_ranges: sim.ui_ranges || null,
-            exercise: { id: r.exercise_id || s.exercise_id || 'squat.bodyweight' },
+            exercise: { id: r.exercise_id || s.exercise_id || 'squat.bodyweight', family: sim.exercise?.family, equipment: sim.exercise?.equipment, display_name: sim.exercise?.display_name },
             scoring: {
               score: (r.score_pct!=null ? r.score_pct/100 : (r.score ?? null)),
               quality: r.quality || (r.score_pct!=null ? (r.score_pct>=85?'full':(r.score_pct>=70?'partial':'poor')) : null),
@@ -578,49 +799,44 @@
                 : null),
             },
             hints: (r.notes||[]).map(n=> n.text || n.crit || ''),
-            metrics_detail: r.metrics_detail || null
+            metrics_detail: r.metrics_detail || sim.metrics_detail || null,
+            ui: sim.ui || null
           };
 
           pushRow(setIdx, r.rep ?? (repArr.indexOf(r)+1), repLike);
-          const rpct = repScorePct(repLike);
-          setGauge(gRep, rpct, LAST_COLOR_RANGES);
-          const t = criteriaTooltipText(repLike);
-          el.gaugeRep?.setAttribute('title', t);
-          el.gaugeSet?.setAttribute('title', t);
-          setScores.push(rpct ?? 0);
-          lastRepLike = repLike;
+          collector.list.push(repLike);
+
           await new Promise(res=>setTimeout(res, 60));
         }
 
-        const setPct = s.set_score_pct!=null ? s.set_score_pct : Math.round(setScores.reduce((a,b)=>a+b,0)/Math.max(1,setScores.length));
+        // סיום סט: גאוג' סט + סיכום + טבלת סט
+        const setScores = collector.list.map(x=> repScorePct(x)).filter(x=> x!=null);
+        const setPct = setScores.length ? Math.round(setScores.reduce((a,b)=>a+b,0)/setScores.length) : null;
         setGauge(gSet, setPct, LAST_COLOR_RANGES);
+
+        const lastRepLike = collector.list.slice(-1)[0] || null;
         pushSetSummary(setIdx, lastRepLike);
+        refreshSetTargetsTable(setIdx, collector.list);
       }
     } catch(e) {
       console.warn('serverSimulate failed, local fallback:', e);
-      // Fallback: סימולציה מקומית
       for(let s=1; s<=sets; s++){
-        let setScores = [];
-        let lastRepLike = null;
+        collector = newSetCollector();
         for(let r=1; r<=reps; r++){
           const pickedMode = (mode==='mixed')
             ? (Math.random()<.33?'good':(Math.random()<.5?'shallow':'missing'))
             : mode;
           const rep = fakeReport({mode: pickedMode, noisePct:noise});
-          LAST_COLOR_RANGES = rep?.ui_ranges?.color_bar || LAST_COLOR_RANGES;
           pushRow(s, r, rep);
-          const rpct = repScorePct(rep);
-          setGauge(gRep, rpct, LAST_COLOR_RANGES);
-          const t = criteriaTooltipText(rep);
-          el.gaugeRep?.setAttribute('title', t);
-          el.gaugeSet?.setAttribute('title', t);
-          setScores.push(rpct ?? 0);
-          lastRepLike = rep;
-          await new Promise(res=>setTimeout(res, 100));
+          collector.list.push(rep);
+          await new Promise(res=>setTimeout(res, 80));
         }
-        const setPct = Math.round(setScores.reduce((a,b)=>a+b,0)/setScores.length);
+        const setScores = collector.list.map(x=> repScorePct(x)).filter(x=> x!=null);
+        const setPct = setScores.length ? Math.round(setScores.reduce((a,b)=>a+b,0)/setScores.length) : null;
         setGauge(gSet, setPct, LAST_COLOR_RANGES);
+        const lastRepLike = collector.list.slice(-1)[0] || null;
         pushSetSummary(s, lastRepLike);
+        refreshSetTargetsTable(s, collector.list);
       }
     } finally {
       simRunning = false;
@@ -631,6 +847,8 @@
 
   el.btnClear?.addEventListener('click', ()=>{
     el.simTB.innerHTML='<tr><td colspan="9" class="py-6 text-center text-gray-400">נוקה.</td></tr>';
+    clearTable(el.repTargetsTable, 6);
+    clearTable(el.setTargetsTable, 5);
     setGauge(gRep,null);
     setGauge(gSet,null);
     el.gaugeRep?.removeAttribute('title');
@@ -665,12 +883,12 @@
     try{
       const j = await serverScore({ demo:true });
       LAST_COLOR_RANGES = j?.ui_ranges?.color_bar || LAST_COLOR_RANGES;
-      setGaugesFromReport(j);
-      LAST_REPORT = j;
+      setGaugesAndHeader(j);
 
       const rid = `r${REP_AUTO_ID++}`;
       REP_STORE.set(rid, j);
-      pushRow(1, REP_AUTO_ID, j);
+      pushRow(1, REP_AUTO_ID, j); // מוסיף גם לטבלת rep-targets
+      refreshSetTargetsTable(1, [j]); // רענון טבלת סט עם הדו"ח היחיד
     }catch(e){
       alert('קריאת score מהשרת נכשלה — ממשיכים מקומי. '+e);
     }
@@ -682,5 +900,8 @@
     if(!rep){ alert('אין דו״ח זמין עדיין. הרץ סימולציה או דוח שרת.'); return; }
     openJSONInNewTab(rep);
   });
+
+  // init language on load
+  applyLanguage();
 
 })();

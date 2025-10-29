@@ -623,8 +623,10 @@ def create_app() -> Flask:
     return app
 
 
+# === WSGI export (ל-Gunicorn) ===
+app = create_app()
+
 if __name__ == "__main__":
     port = int(os.getenv("PORT", "5000"))
-    app = create_app()
     logger.info("Server ready. /payload ו-/video זמינים. /capture לפתיחת מצלמה לשידור ingest.")
     app.run(host="0.0.0.0", port=port, debug=False, use_reloader=False, threaded=True)

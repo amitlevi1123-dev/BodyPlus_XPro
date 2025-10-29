@@ -1,333 +1,383 @@
-
-# 📘 מערכת הדו"חות (Reports) — מפרט מלא
-
-מסמך זה מגדיר את **פורמט הדו"ח**, **מה מוצג ב־UI**, **איך נבנה הציון**, **כיסוי/זמינות**, **חזרות/סטים**, **סיכום מצלמה**, **טיפים**, ו־**אינדיקציות חכמות (Report Health)** לזיהוי בעיות בזמן אמת.
-המסמך משמש גם את לוח הניהול (Server Admin) וגם בסיס לאפליקציית Flutter (בעתיד).
-
-> שים לב: לפי ההנחיה שלך — **אין Grade (A/B/C/D)** במערכת.
+להלן מסמך איפיון מלא בפורמט **Markdown** — מקצועי, קריא, וידידותי, עם טבלאות, דוגמאות, תרשימי זרימה טקסטואליים, בדיקות קבלה, והצעות לשיפור עתידי. ניתן להדבקה כ-`docs/reporting-spec.md`.
 
 ---
 
-## 1) מטרות
+# 🧾 BodyPlus XPro — איפיון מודול דוחות: נרמול, תרגום, “נמדד מול יעד”, וביקורת סט/חזרות
 
-* להפיק דו"ח אחיד, קריא ומקצועי לכל תרגיל/סט/סשן.
-* לאפשר תצוגת **תקציר מהיר** + **דו"ח מפורט**.
-* לשמור נתונים לשיחזור מלא: מדדים קנוניים, חזרות, סטים, זמינות.
-* להתריע על בעיות נתונים/תצורה באמצעות **אינדיקציות חכמות**.
+**גרסה:** 1.0
+**אחריות:** exercise_engine · admin_web · UI
+**מטרה:** יצירת שכבה אחידה שמייצרת דו״ח קריא ומסודר לממשק המשתמש — כולל שמות ידידותיים, יחידות, פירוק קריטריונים, “נמדד מול יעד”, ביקורת ברמת חזרה וברמת סט, ודיווח בריאות הדו״ח.
 
 ---
 
-## 2) מבנה נתונים כללי (JSON)
+## תוכן העניינים
 
-```jsonc
+1. [רקע ומטרות](#רקע-ומטרות)
+2. [עקרונות תכנון](#עקרונות-תכנון)
+3. [תלותים וקלטים](#תלותים-וקלטים)
+4. [פלט הדו״ח (Payload) — סכימה ודוגמאות](#פלט-הדוח-payload--סכימה-ודוגמאות)
+5. [נרמול ותרגום (i18n) מתוך `aliases.yaml`](#נרמול-ותרגום-i18n-מתוך-aliasesyaml)
+6. [חישוב “נמדד מול יעד”](#חישוב-נמדד-מול-יעד)
+7. [ביקורת חזרה (Rep Critique)](#ביקורת-חזרה-rep-critique)
+8. [ביקורת סט (Set Critique)](#ביקורת-סט-set-critique)
+9. [בריאות דו״ח (OK/WARN/FAIL)](#בריאות-דוח-okwarnfail)
+10. [UX/UI — עקרונות, טבלאות, והתנהגות RTL/LTR](#uxui--עקרונות-טבלאות-והתנהגות-rtlltr)
+11. [תרשים זרימת נתונים](#תרשים-זרימת-נתונים)
+12. [מקרי קצה ושגיאות](#מקרי-קצה-ושגיאות)
+13. [ביצועים, ניטור ולוגים](#ביצועים-ניטור-ולוגים)
+14. [בדיקות קבלה (QA Checklist)](#בדיקות-קבלה-qa-checklist)
+15. [Roadmap — שיפורים עתידיים](#roadmap--שיפורים-עתידיים)
+16. [עמדת העורך (המלצות ודגשים)](#עמדת-העורך-המלצות-ודגשים)
+
+---
+
+## רקע ומטרות
+
+* **האתגר:** פלטי הניתוח מגיעים במפתחות קנוניים/טכניים, ללא שמות תצוגה, ללא יעדים ברורים וללא ביקורת מקובצת ברמת סט/חזרה.
+* **הפתרון:** שכבת “בונה דו״ח” שמסכמת את הכל במבנה אחיד, מתורגם ומוכן לתצוגה.
+* **רווח למשתמש:** דף תרגיל מסודר, ברור, עם “מה נמדד”, “מה היעד”, “איפה טעיתי”, “מה לשפר עכשיו”.
+
+---
+
+## עקרונות תכנון
+
+* **ללא קבצים חדשים**: משתמשים ב־`aliases.yaml`, `phrases.yaml`, ו־YAML של התרגילים (thresholds/criteria).
+* **דו־לשוניות**: `display_lang` = `he`/`en`, עם fallback חכם.
+* **אי־פגיעה בלוגיקה קיימת**: הדו״ח עוטף את תוצאות הניתוח — לא משנה חישובי ציון קיימים.
+* **UI מינימליסטי**: טבלה קריאה, גלגלי ציון, ו-Modal לפירוט — עם overflow-x מסודר.
+
+---
+
+## תלותים וקלטים
+
+| מקור           | מה מספק                                                                       | הערות                                  |
+| -------------- | ----------------------------------------------------------------------------- | -------------------------------------- |
+| `aliases.yaml` | שמות תצוגה דו-לשוניים למדדים/תרגילים/משפחות/ציוד; יחידות; הגדרות pass-through | מקור האמת לשפה ותוויות                 |
+| `phrases.yaml` | משפטים (tips/hints) לפי מזהי קריטריונים/מצבים                                 | אופציונלי; יש fallback אוטומטי         |
+| Exercise YAMLs | `criteria`, `weights`, `thresholds` (יעדים)                                   | thresholds משמשים ליעד (min/max/range) |
+| מנוע הניתוח    | `overall_score`, `per_criterion_scores`, `availability`, `canonical`          | אינפוט לדו״ח                           |
+| מצלמה          | `camera_summary`                                                              | נושא איכות צילום/אזהרות                |
+
+---
+
+## פלט הדו״ח (Payload) — סכימה ודוגמאות
+
+### שדות חובה ומומלצים
+
+| שדה                          | טיפוס           | חובה      | הסבר                               |
+| ---------------------------- | --------------- | --------- | ---------------------------------- |
+| `meta.generated_at`          | string(ISO)     | ✓         | זמן יצירת הדו״ח                    |
+| `payload_version`            | string          | ✓         | גרסת payload (למשל `1.2.0`)        |
+| `library_version`            | string          | ✓         | גרסת ספריה מה־loader               |
+| `display_lang`               | enum(`he`,`en`) | ✓         | שפת תצוגה מועדפת                   |
+| `exercise`                   | object          | ✓         | `id/family/equipment/display_name` |
+| `ui.lang_labels`             | object          | ✓         | שמות תרגיל/משפחה/ציוד לפי `he/en`  |
+| `ui_ranges.color_bar`        | array           | ✓         | מדרג צבעים ל־Gauges                |
+| `scoring`                    | object          | ✓         | ציון כולל + פירוק קריטריונים       |
+| `coverage`                   | object          | ✓         | כיסוי מדדים/חוסרים קריטיים         |
+| `rep_critique`               | array           | מומלץ     | ביקורת פר חזרה                     |
+| `set_critique`               | array           | מומלץ     | ביקורת פר סט                       |
+| `hints`                      | array           | מומלץ     | הערות כלליות                       |
+| `report_health`              | object          | ✓         | OK/WARN/FAIL + issues              |
+| `camera`                     | object          | מומלץ     | סיכום תנאי צילום                   |
+| `canonical/rep/measurements` | object          | אופציונלי | שקיפות נתונים                      |
+
+### דוגמה (מקוצרת)
+
+```json
 {
-  "meta": {
-    "generated_at": "2025-10-21T10:18:12.341Z",
-    "payload_version": "1.0",
-    "library_version": "d8a1f3b29c1a"
+  "meta": {"generated_at": "2025-10-29T14:10:00Z", "payload_version": "1.2.0", "library_version": "e3a1f2c"},
+  "display_lang": "he",
+  "exercise": {"id":"squat.bodyweight","family":"squat","equipment":"bodyweight","display_name":"Bodyweight Squat"},
+  "ui": {
+    "lang_labels": {
+      "exercise":{"he":"סקוואט משקל גוף","en":"Bodyweight Squat"},
+      "family":{"he":"סקוואט","en":"Squat"},
+      "equipment":{"he":"משקל גוף","en":"Bodyweight"}
+    }
   },
-  "exercise": {
-    "id": "squat.bodyweight",
-    "family": "squat",
-    "equipment": "none",
-    "display_name": "Squat (Bodyweight)"
+  "ui_ranges":{"color_bar":[{"label":"red","from_pct":0,"to_pct":60},{"label":"orange","from_pct":60,"to_pct":75},{"label":"green","from_pct":75,"to_pct":100}]},
+  "scoring":{
+    "score":0.82,"score_pct":82,"quality":"partial","unscored_reason":null,"applied_caps":[],
+    "criteria":[
+      {"id":"depth","available":true,"reason":null,"score":0.88,"score_pct":88},
+      {"id":"stance_width","available":true,"reason":null,"score":0.74,"score_pct":74}
+    ],
+    "criteria_breakdown_pct":{"depth":88,"stance_width":74}
   },
-  "scoring": {
-    "score": 0.86,                 // 0..1
-    "score_pct": 86,               // עיגול למספר שלם (0..100)
-    "quality": "full",             // full / partial / poor
-    "unscored_reason": null,
-    "applied_caps": [],            // רשימת Caps (אם יוגדרו בעתיד ב-YAML)
-    "criteria": [
-      {"id":"posture","available":true,"score":0.80,"score_pct":80,"reason":null},
-      {"id":"depth","available":true,"score":0.90,"score_pct":90,"reason":null},
-      {"id":"tempo","available":true,"score":0.88,"score_pct":88,"reason":null},
-      {"id":"stance_width","available":true,"score":0.92,"score_pct":92,"reason":null},
-      {"id":"knee_valgus","available":true,"score":0.75,"score_pct":75,"reason":null}
-    ]
-  },
-  "coverage": {
-    "available_ratio": 1.0,
-    "available_pct": 100,
-    "available_count": 5,
-    "total_criteria": 5,
-    "missing_reasons_top": [],
-    "missing_critical": []
-  },
-  "camera": {
-    "visibility_risk": false,
-    "severity": "LOW",
-    "message": "המדידה תקינה",
-    "stats": {}
-  },
-  "sets": [
+  "coverage":{"available_pct":90,"available_count":9,"total_criteria":10,"missing_critical":[],"missing_reasons_top":[]},
+  "rep_critique":[
     {
-      "index": 1,
-      "reps": 10,
-      "avg_tempo_s": 1.72,
-      "avg_rom_deg": 64.8,
-      "avg_score": 0.85,
-      "min_score": 0.78,
-      "max_score": 0.91,
-      "duration_s": 23.0
+      "set_index":1,"rep_index":1,
+      "criteria":[
+        {"id":"depth","name_he":"עומק","name_en":"Depth","unit":"°","measured":115,"target_he":"יעד ≥ 100°","target_en":"Target ≥ 100°","score_pct":88,"note_he":"ביצוע נקי","note_en":"Clean execution"},
+        {"id":"stance_width","name_he":"רוחב עמידה","name_en":"Stance width","unit":"","measured":1.25,"target_he":"טווח 1.2–1.5","target_en":"Range 1.2–1.5","score_pct":74,"note_he":"שפר רוחב עמידה","note_en":"Improve stance width"}
+      ],
+      "summary_he":"מוקדי שיפור: רוחב עמידה","summary_en":"Focus: Stance width"
     }
   ],
-  "reps": [
-    {"rep_id":1,"timing_s":1.6,"ecc_s":0.8,"con_s":0.8,"rom_deg":65.1,"score":0.86},
-    {"rep_id":2,"timing_s":1.7,"rom_deg":63.9,"score":0.83}
-  ],
-  "hints": [
-    "הישאר עם חזה פתוח בירידה לשיפור יציבה.",
-    "יישור ברך-כף רגל גבולי – שים לב לולגוס."
-  ],
-  "diagnostics": [
-    // רשימת אירועים אחרונים (info/warn/error)
-  ],
-  "canonical": {
-    // עותק שטוח של כל המדדים הקנוניים וה-rep.* בעת בניית הדו"ח
-  },
-  "rep": {
-    // ייצוג היררכי של rep.* (לפי מזהה חזרה/שדות)
-  },
-  "report_health": {
-    "status": "OK",                // OK / WARN / FAIL
-    "issues": []                   // רשימת בעיות מפורטות (ראה סעיף 7)
-  }
+  "set_critique":[{"set_index":1,"set_score_pct":80,"rep_count":8,"top_issues":[{"id":"stance_width","name_he":"רוחב עמידה","worst_rep_pct":60,"avg_pct":72}],"summary_he":"בסט זה רוחב עמידה היה צוואר בקבוק.","summary_en":"Stance width was the bottleneck."}],
+  "report_health":{"status":"OK","issues":[]},
+  "camera":{"visibility_risk":false,"severity":"LOW","message":"המדידה תקינה","stats":{}}
 }
 ```
 
 ---
 
-## 3) תצוגת UI (לוח ניהול) — תקציר + מפורט
+## נרמול ותרגום (i18n) מתוך `aliases.yaml`
 
-### 3.1 תצוגת תקציר (Summary)
+### מבנה מומלץ ב־`aliases.yaml`
 
-* **עגול מרכזי (Donut/Circle)** עם `score_pct` (למשל: **86%**).
-* **פס אופקי צבעוני** מתחת לעיגול:
+```yaml
+names:
+  exercises:
+    squat.bodyweight: { he: "סקוואט משקל גוף", en: "Bodyweight Squat" }
+  families:
+    squat: { he: "סקוואט", en: "Squat" }
+  equipment:
+    bodyweight: { he: "משקל גוף", en: "Bodyweight" }
 
-  * **אדום**: 0–60%
-  * **כתום**: 60–75%
-  * **ירוק**: 75–100%
-* **Tooltip פירוק לקריטריונים**: hover על העיגול/אייקון “i” → טבלה קטנה:
-
-  * posture 80%, depth 90%, tempo 88%, stance_width 92%, knee_valgus 75%
-* **כרטיסי מידע** לימין/שמאל (Grid):
-
-  * Coverage (available_pct, missing_critical)
-  * Camera (visibility_risk + message)
-  * Hints (2–3 ראשונים)
-  * אינדיקציות (Report Health) בקו רמזור: OK/WARN/FAIL
-
-### 3.2 תצוגה מפורטת (Deep Report)
-
-* **Tabs**: Overview | Criteria | Sets | Reps | Camera | Diagnostics
-* **Criteria**:
-
-  * לכל קריטריון: שם, score_pct, סרגל מיני-חום (heat bar), הסבר קצר (מ־phrases/tooltip).
-* **Sets**:
-
-  * טבלה: index | reps | avg_tempo_s | avg_rom_deg | avg_score | min/max | duration_s
-  * Mini sparkline של score לאורך הסט.
-* **Reps**:
-
-  * טבלה: rep_id | timing_s | ecc_s | con_s | rom_deg | score
-  * אפשרות להרחיב Rep → לראות פיצול ציונים פר־קריטריון באותה חזרה (אם רלוונטי).
-* **Camera**:
-
-  * סטטוס, הודעה, וסטטיסטיקות (אם זמינות).
-* **Diagnostics**:
-
-  * רשימת אירועים אחרונים (log-tail) עם חיתוך לפי severity/type.
-
----
-
-## 4) חישוב ציון (Scoring) — עקרונות
-
-* הציונים מחושבים ע"פ **YAML לכל תרגיל** (weights/thresholds/criteria).
-* `score` הכללי הוא שקלול משוקלל של הקריטריונים הזמינים בלבד.
-* `quality`:
-
-  * `full` — ≥3 קריטריונים בשקלול
-  * `partial` — 1–2 קריטריונים
-  * `poor` — 0 קריטריונים (או `unscored_reason` לא ריק)
-* **אין Grade**. לא מוצג ולא נשמר.
-
----
-
-## 5) כיסוי/זמינות (Coverage)
-
-מטרת ה־coverage היא להבהיר ל־QA/מפתח/מאמן כמה קריטריונים באמת תרמו לציון:
-
-* `available_pct` — אינדיקטור איכות נתונים (100% = מעולה).
-* `missing_critical` — רשימת קריטריונים קריטיים שלא זמינים (תראה ב־Summary כ־Badge אדום/צהוב).
-* `missing_reasons_top` — שלוש הסיבות הנפוצות ביותר לחוסר זמינות (לדוגמה: `missing_signal`, `low_confidence`).
-
----
-
-## 6) סטים וחזרות (Aggregations)
-
-### 6.1 Sets
-
-עבור כל סט נאספים:
-
-* `reps` (מספר חזרות בסט)
-* `avg_tempo_s`, `avg_rom_deg`, `avg_score` (ממוצעים)
-* `min_score`, `max_score`
-* `duration_s` (אם זמין)
-
-> חישורים מתבצעים מהשדות ב־`reps`.
-
-### 6.2 Reps
-
-לכל חזרה נשמרים:
-
-* `rep_id`
-* `timing_s`, `ecc_s`, `con_s`, `rom_deg` (אם זמינים)
-* `score` (ציון כולל לחזרה; אם נדרש בעתיד — אפשר להוסיף per-criterion per-rep)
-
----
-
-## 7) אינדיקציות חכמות (Report Health)
-
-המערכת מצרפת לכל דו"ח בלוק `"report_health"` עם מצב כולל ורשימת בעיות.
-אלו כללי “סף” מומלצים (ניתנים לכיול):
-
-| קוד                  | תנאי                                   | רמת חומרה | הודעה                                                |
-| -------------------- | -------------------------------------- | --------- | ---------------------------------------------------- |
-| `NO_EXERCISE`        | `exercise == null`                     | `FAIL`    | לא זוהה תרגיל. בדוק classifier/aliases.              |
-| `UNSCORED`           | `scoring.score == null`                | `WARN`    | לא חושב ציון. חסרים קריטריונים/Low-Confidence/Grace. |
-| `LOW_COVERAGE`       | `coverage.available_pct < 60`          | `WARN`    | זמינות נמוכה (X%/Y קריטריונים). בדוק מצלמה/זיהוי.    |
-| `MISSING_CRITICAL`   | `coverage.missing_critical.length > 0` | `FAIL`    | חסרים קריטריונים קריטיים: [...].                     |
-| `CAMERA_RISK`        | `camera.visibility_risk == true`       | `WARN`    | תנאי צילום גבוליים — ייתכנו סטיות במדידה.            |
-| `ALIAS_CONFLICTS`    | אירוע `alias_conflict` ב־diagnostics   | `WARN`    | התנגשות ערכים בין אליאסים (ראה diagnostics).         |
-| `LOW_QUALITY`        | `scoring.quality == "poor"`            | `WARN`    | איכות נמוכה — חסר בסיס לשקלול אמין.                  |
-| `SET_COUNTER_ERROR`  | אירוע `set_counter_error`              | `WARN`    | ספירת סטים כשלה חלקית — ודא אותות set.begin/end.     |
-| `REP_ENGINE_ERROR`   | אירוע `rep_segmenter_error`            | `WARN`    | מנוע חזרות דיווח שגיאה — ראה diagnostics.            |
-| `THRESHOLD_MISMATCH` | אירוע סף/threshold חריג                | `WARN`    | ספי YAML חריגים עבור הקריטריון.                      |
-
-**סטטוס כולל**:
-
-* אם יש לפחות `FAIL` → `status = "FAIL"`
-* אחרת אם יש לפחות `WARN` → `status = "WARN"`
-* אחרת → `status = "OK"`
-
-> ההמלצה: להציג Badge פינתית (OK ירוק / WARN כתום / FAIL אדום) בכל מסך דו"ח.
-
----
-
-## 8) תצוגת UI — פרטים ויזואליים
-
-* **Score Circle**: עיגול עבה עם מספר גדול (86%). מתחת, תיאור קצר (quality, למשל “Full data”).
-* **Color Bar**: פס עם חלוקה לשלושה אזורים (אדום/כתום/ירוק). אינדיקטור אנכי דק במיקום `score_pct`.
-* **Tooltip Breakdown**:
-
-  * טבלה קטנה: קריטריון | % | אינדיקטור צבע נקודתי (לפי טווח צבעי הפס).
-  * אם `available=false` → מוצג “N/A” ואייקון הסבר עם `reason`.
-* **Coverage Card**: Gauge/Indicator עם % ו־badge ל־missing_critical.
-* **Camera Card**: אייקון מצלמה + Severity + הודעה קצרה. אם יש סיכון — Badge כתום.
-* **Hints Card**: רשימה קצרה (2–3). קישור “הצג הכל” פותח דיאלוג עם כל הטיפים.
-* **Tabs מפורט**: טבלאות עם מיון/חיפוש; הדגשת חריגים בצהוב/אדום.
-
----
-
-## 9) תאימות ל־YAML ו־Aliases
-
-* **הכול** ניזון מ־`aliases.yaml` + קבצי תרגיל ב־`exercise_library/exercises/`.
-* הוספת קריטריון/סף/משקל ב־YAML תופיע אוטומטית בדו"ח (אין צורך לגעת בקוד).
-* אם יש **קלידים לא מוכרים** או **קונפליקט בין אליאסים** — יופיעו ב־`diagnostics` + ב־Report Health.
-
----
-
-## 10) גרסאות, אחסון, ו־API
-
-* `payload_version`: תעלה כשיש שינוי שבירת תאימות בפורמט.
-* `library_version`: hash קצר מהטוען (loader) — מאפשר Cache/Invalidate.
-* מומלץ לשמור כל דו"ח כ־JSON (קובץ/DB) עם מזהה ייחודי (UUID + timestamp).
-* **REST מוצע**:
-
-  * `GET /api/reports/latest` → הדו"ח האחרון (למכשיר/משתמש)
-  * `GET /api/reports/:id` → דו"ח לפי מזהה
-  * `GET /api/reports?exercise_id=...&from=...&to=...` → פילטרים
-
----
-
-## 11) בדיקות ו־QA (צ'ק־ליסט)
-
-* ✅ דו"ח עם כיסוי מלא (100%) + ציון גבוה → מציג ירוק, ללא אינדיקציות.
-* ✅ דו"ח ללא תרגיל (exercise=null) → FAIL.
-* ✅ דו"ח עם `unscored_reason` → WARN “UNSCORED”.
-* ✅ alias_conflict בלוג → WARN.
-* ✅ מצלמה בסיכון → WARN “CAMERA_RISK”.
-* ✅ חסרים critical → FAIL “MISSING_CRITICAL”.
-* ✅ מעט קריטריונים זמינים (<60%) → WARN “LOW_COVERAGE”.
-
----
-
-## 12) דוגמאות “בעייתיות” (לקלות debug)
-
-### 12.1 לא זוהה תרגיל
-
-```jsonc
-"exercise": null,
-"scoring": {"score": null, "unscored_reason": "no_exercise_selected"}
-"report_health": {"status":"FAIL","issues":[{"code":"NO_EXERCISE","message":"לא זוהה תרגיל"}]}
+labels:
+  depth:              { he: "עומק", en: "Depth", unit: "°" }
+  features.stance_width_ratio: { he: "רוחב עמידה", en: "Stance width", unit: "" }
+  knee_left_deg:      { he: "ברך שמאל (°)", en: "Left knee (°)", unit: "°" }
 ```
 
-### 12.2 זמינות נמוכה
+### כללי תרגום
 
-```jsonc
-"coverage": {"available_pct": 40, "missing_critical": ["depth"]},
-"report_health": {"status":"FAIL","issues":[{"code":"MISSING_CRITICAL","message":"חסר depth"}]}
+1. אם יש `names.*[id][display_lang]` — מציגים.
+2. אם חסר ב־`display_lang` – נופלים ל־שפה השנייה → ואז ל־`id`.
+3. תוויות מדדים מ־`labels.<key>`; אם חסר — מציגים את המפתח הקנוני (fallback).
+
+---
+
+## חישוב “נמדד מול יעד”
+
+* יעדים נשלפים מ־`exercise.thresholds[crit]`.
+* טבלאות אפשריות:
+
+  * **min**: יעד ≥ `min`
+  * **max**: יעד ≤ `max`
+  * **range**: `min`–`max`
+* הואיל ו־`canonical` שטוח, **measured** = `canonical[crit_id]` (אם קיים, אחרת “—”).
+* עימוד:
+
+  * מציגים יחידות מ־`aliases.labels[crit_id].unit`.
+  * ניסוח יעד דו־לשוני:
+
+    * he: “יעד ≥ 100°”, “יעד ≤ 30°”, “טווח 1.2–1.5”
+    * en: “Target ≥ 100°”, “Target ≤ 30°”, “Range 1.2–1.5”
+* אם אין סף — מציגים “—”.
+
+---
+
+## ביקורת חזרה (Rep Critique)
+
+**מטרה:** להראות למשתמש, לכל חזרה, מה היה טוב ומה לשפר.
+
+### בנייה
+
+* עבור כל `rep`:
+
+  1. עוברים על `scoring.criteria` → לכל קריטריון:
+
+     * `name_he/en` — מ־`aliases.labels`.
+     * `measured` — מ־`canonical[crit_id]` (אם רלוונטי).
+     * `target_*` — לפי `thresholds`.
+     * `score_pct` — מהדו״ח.
+     * `note_*` —
+
+       * אם יש `phrases` — משתמשים לפי כלל.
+       * אחרת:
+
+         * `≥85%` → “ביצוע נקי / Clean execution”
+         * `70–84%` → “אפשר לשפר X / Could improve X”
+         * `<70%` → “שפר X (יעד …) / Improve X (target …)”
+  2. **Summary**: לוקחים 1–3 הקריטריונים החלשים ביותר ומרכיבים משפט “מוקדי שיפור”.
+
+### דוגמה פירוט חזרה (טבלה)
+
+| קריטריון   | נמדד |     יעד | % ציון | הערה           |
+| ---------- | ---: | ------: | -----: | -------------- |
+| עומק       | 115° |  ≥ 100° |    88% | ביצוע נקי      |
+| רוחב עמידה | 1.25 | 1.2–1.5 |    74% | שפר רוחב עמידה |
+
+---
+
+## ביקורת סט (Set Critique)
+
+**מטרה:** להראות “צווארי בקבוק” חוזרים בסט.
+
+### בנייה
+
+* עבור סט:
+
+  * אוספים לכל קריטריון: **ממוצע אחוזי ציון** + **החזרה הגרועה ביותר**.
+  * ממיינים מהחלש לחזק; לוקחים Top 1–3.
+  * מרכיבים **summary** קצר (he/en).
+
+### דוגמה פירוט סט (טבלה)
+
+| קריטריון   | ממוצע % | גרוע ביותר % | הערה                                   |
+| ---------- | ------: | -----------: | -------------------------------------- |
+| רוחב עמידה |     72% |          60% | צוואר בקבוק — יש חוסר עקביות בין חזרות |
+
+---
+
+## בריאות דו״ח (OK/WARN/FAIL)
+
+* חוקים (דוגמאות):
+
+  * אין תרגיל → `FAIL`
+  * `unscored_reason` → `WARN`
+  * `coverage.available_pct < 60` → `WARN`
+  * `missing_critical` לא ריק → `FAIL`
+  * `camera.visibility_risk` → `WARN`
+  * `scoring.quality == "poor"` → `WARN`
+* הפלט:
+
+  ```json
+  {"status":"OK|WARN|FAIL","issues":[{"code":"LOW_COVERAGE","level":"WARN","message":"…"}]}
+  ```
+
+---
+
+## UX/UI — עקרונות, טבלאות, והתנהגות RTL/LTR
+
+### מבנה מסך
+
+1. **Header**: שם תרגיל/משפחה/ציוד (לפי שפה) + חיווי חיבור/Health/Ready.
+2. **Gauges**: חזרה אחרונה / סט אחרון — שואבים `ui_ranges.color_bar`.
+3. **כרטיס “הכול במקום אחד”**:
+
+   * ציון כולל (%), איכות, unscored_reason.
+   * טבלת “נמדד מול יעד”.
+   * “מוקדי שיפור בסט”.
+4. **Modal פירוט חזרה**:
+
+   * טבלת: קריטריון | נמדד | יעד | % | הערה.
+   * סידור לפי חומרה (קריטי/חשוב/מינורי/עבר).
+
+### כללי פריסה
+
+* עטיפת טבלאות ב־`.table-wrap { overflow-x:auto }`.
+* `min-width: 720px` לטבלת הקריטריונים כדי שלא “תברח שמאלה”.
+* RTL/LTR: להחיל `dir="rtl"` בעמודים עבריים, וליישר מספרים לימין.
+
+---
+
+## תרשים זרימת נתונים
+
+```
+Video → Pose/OD → canonical + per_criterion_scores
+                  ↓
+           availability (requires)
+                  ↓
+           report_builder
+             ├─ i18n (aliases.names/labels)
+             ├─ thresholds → targets
+             ├─ rep_critique / set_critique
+             └─ report_health + camera
+                  ↓
+                 UI
 ```
 
 ---
 
-## 13) הרחבות עתידיות (אופציונלי)
+## מקרי קצה ושגיאות
 
-* **Trendline**: מעקב ציון לאורך זמן (סשנים/שבועות).
-* **Per-criterion per-rep**: הצגת ציוני קריטריונים לכל חזרה (אם יוגדר).
-* **Export**: PDF/CSV ייצוא דו"ח.
-* **Realtime Stream**: WebSocket לעדכון חי של העיגול/הפס/טבלאות.
-
----
-
-# נספח A — כללי חישוב שקיפות (שדות/משמעות)
-
-* `scoring.score_pct = round(scoring.score * 100)` (אם score קיים)
-* `scoring.quality` נקבע לפי מספר הקריטריונים שנכנסו לשקלול בפועל.
-* `coverage` מחשב זמינות לפי `availability` שהגיעה מה־validator.
-* `reps` נגזרים מאירועי ה־Segmenter. אם חסרים `rep.*` → מופיע diagnostics.
+| מקרה                     | טיפול                                        |
+| ------------------------ | -------------------------------------------- |
+| אין thresholds לקריטריון | מציג “—” ביעד; הערה כללית (“ביצוע נקי/שפר…”) |
+| missing_critical         | `unscored_reason` + `report_health: FAIL`    |
+| ערך מדידה לא מספרי       | מציג “—”, לא מכשיל את הדו״ח                  |
+| העדר תווית ב־aliases     | fallback למפתח הקנוני                        |
+| אין phrases              | הערות אוטומטיות לפי אחוז ציון                |
 
 ---
 
-# נספח B — אינטגרציית UI (מינימום לשלב ראשון)
+## ביצועים, ניטור ולוגים
 
-* **צריך מה־API**: האובייקט הנ"ל בדיוק (fields/keys).
-* **UI צבעים**:
+* **O(מס’ קריטריונים × מס’ חזרות)** — זניח ביחס ל-CV.
+* לוגים:
 
-  * אדום `#E53935`, כתום `#FB8C00`, ירוק `#43A047` (או פריסת צבעים שלך).
-* **פונטים/Spacing**: כרטיסים עם כותרת, גוף, ו־footer קטן לטיימסטמפ/גירסה.
-
----
-
-# נספח C — מפת מפתחות חשובה
-
-* `meta.*` — גרסאות ותזמון
-* `exercise.*` — זיהוי תרגיל
-* `scoring.*` — ציון גלובלי + per-criterion
-* `coverage.*` — זמינות
-* `camera.*` — איכות צילום
-* `sets[]` / `reps[]` — ביצוע בפועל
-* `hints[]` — תובנות לשיפור
-* `diagnostics[]` — אירועי מערכת
-* `canonical` / `rep` — נתוני גולמי מקוננים לשחזור
-* `report_health.*` — מצב ואזהרות
+  * `report_builder` מוציא שורת INFO עם `exercise.id`, `score_pct`, `health.status`.
+  * אזהרות: שדה חסר ב־`aliases`/`thresholds` → WARN (לא עוצר).
 
 ---
 
-## סיכום
+## בדיקות קבלה (QA Checklist)
 
-המסמך מגדיר **במדויק** איך לבנות, להציג, ולאמת דו"חות מערכת — עם **אינדיקציות חכמות** שמאותתות על כל בעיה אפשרית בנתונים/חישוב/תצורה.
-ה־UI בשרת הניהול יכול להשתמש בנתונים “as-is”, והאפליקציה ב־Flutter תוכל לצרוך את אותו JSON ללא שינויים.
+### פונקציונל
+
+* [ ] שמות תרגיל/משפחה/ציוד מוצגים לפי שפה.
+* [ ] “נמדד מול יעד” מתמלא בכל חזרה/סט.
+* [ ] צבעי Gauges לפי `ui_ranges`.
+* [ ] `rep_critique` מופיע עם הערות הגיוניות.
+* [ ] `set_critique` מציג צווארי בקבוק נכונים.
+* [ ] `report_health` תואם מצבים (missing_critical → FAIL וכו’).
+
+### לוקליזציה
+
+* [ ] מעבר `display_lang` משנה את כל הכיתובים הרלוונטיים.
+* [ ] RTL נקי: מספרים מיושרים נכון, הטבלה לא “בורחת”.
+
+### חוסן
+
+* [ ] דו״ח לא נופל כשחסר threshold/label.
+* [ ] ערכי מדידה חריגים לא שוברים את העמודה/החישוב.
 
 ---
+
+## Roadmap — שיפורים עתידיים
+
+1. **משקלי תרומה פר-קריטריון ב-Tooltip**: לצבוע לפי משקל ולא רק לפי אחוז.
+2. **Benchmarks אישיים**: יעד דינמי לפי היסטוריה (PRs).
+3. **Coach Hints חכמים**: חוקים מותנים זמן/רצף (למשל 3 חזרות רצופות shallow).
+4. **סיכום אימון יומי/שבועי**: גרפים מסכמים ב-UI.
+5. **A/B לטקסטים**: ניסוח הערות מותאם לאישיות/העדפות.
+6. **נגישות (a11y)**: קריינות/קונטרסט, קיצורי מקלדת ל-Modal.
+
+---
+
+## עמדת העורך (המלצות ודגשים)
+
+* **הדבר הכי חשוב למשתמש** הוא לראות מהר: *מה יצא לי? ומה לשפר עכשיו?*
+  הטבלה “נמדד מול יעד” + “מוקדי שיפור בסט” עונות בדיוק על השאלות האלה.
+* **אל תעמיסו טקסט**: עדיף משפט אחד ברור לכל קריטריון (עם יעד).
+* **היסטוריית ביצועים** תעלה משמעותית ערך — אבל תשמרו על שכבה נקייה עכשיו, ותבנו אח״כ עמוד “סיכום אימון”.
+* **איכות צילום** משפיעה ישירות על אמון — שימרו הודעת מצלמה תמציתית וברורה תמיד.
+
+---
+
+## נספחים
+
+### A. מפה תמציתית של שדות מפתח ב־Payload
+
+| קבוצה  | שדה                            | מקור             | הערות                 |
+| ------ | ------------------------------ | ---------------- | --------------------- |
+| מזהים  | `exercise.id/family/equipment` | YAML תרגיל       | משמש מפתח לאיתור שמות |
+| שפה    | `display_lang`                 | פרמטר            | `he`/`en`             |
+| תוויות | `ui.lang_labels`               | `aliases.names`  | fallback ל-id         |
+| יחידות | `labels.<key>.unit`            | `aliases.labels` | fallback ריק          |
+| מדידה  | `canonical[crit]`              | מנוע             | “—” אם חסר            |
+| יעד    | `thresholds[crit]`             | YAML תרגיל       | min/max/range         |
+| ציון   | `scoring.criteria[].score_pct` | מנוע             | 0–100                 |
+| בריאות | `report_health`                | כללי בריאות      | OK/WARN/FAIL          |
+
+### B. כללי ניסוח הערות אוטומטיות (ברירת מחדל)
+
+| טווח ציון | he               | en                        |
+| --------- | ---------------- | ------------------------- |
+| ≥ 85%     | ביצוע נקי        | Clean execution           |
+| 70–84%    | אפשר לשפר {שם}   | Could improve {name}      |
+| < 70%     | שפר {שם} (יעד …) | Improve {name} (target …) |
+
+---
+
+**סוף המסמך.**
+כשתאשר — אעביר לך (בפעם אחת) את שלושת החלקים המוכנים להדבקה:
+
+1. עדכון `report_builder.py` (בונה הדו״ח בפורמט המדויק),
+2. תוספות HTML/CSS לטבלאות וה-Modal,
+3. הרחבות JS (רינדור טבלת “נמדד מול יעד”, חיוויים ו־tooltips).

@@ -2,25 +2,19 @@
 # -----------------------------------------------------------------------------
 # 📘 report_builder.py — בניית דוחות סופיים לממשק המשתמש (UI)
 # -----------------------------------------------------------------------------
-# שינויי מפתח:
-# • אין Grade במערכת.
-# • criteria כוללים score ו-score_pct (ל-tooltip פירוק קריטריונים).
-# • הוספת report_health חכם: OK/WARN/FAIL + issues[].
-# • תמיכה אופציונלית ב-sets[] ו-reps[] (נשלחים מבחוץ; לא חובה).
-# • שמירת canonical ו-rep היררכי (נשמר).
-# • שמירת camera + הזרקת הודעת ריסק כרמז (נשמר).
-# • הוספת ui_ranges לפס הצבעוני (אדום/כתום/ירוק).
-# • NEW: criteria_breakdown_pct (מפה ידידותית ל-Tooltip).
-# • NEW: quality ברירת מחדל ל-"partial" אם לא ניתן.
-# • NEW: metrics_detail — תקציר מפורט של ערכים רלוונטיים (טמפו/זוויות/עמידה/יעדים).
-#    • איסוף חכם של מפתחות רלוונטיים לפי criteria.requires (משפחה + וריאציה)
-#    • סינון לפי מה שקיים בפועל ב-canonical (בלי “ידיים בתרגיל רגליים”)
-#    • טמפו לכל חזרה, אם קיים מבנה rep.*
+# נקודות עיקריות:
+# • דו־לשוניות (he/en) לשמות תרגיל/משפחה/ציוד ולתוויות קריטריונים דרך aliases.yaml.
+# • "נמדד מול יעד" לכל קריטריון מתוך thresholds של התרגיל.
+# • ביקורת חזרה (rep_critique) + ביקורת סט (set_critique) — ממקדות מוקדי שיפור.
+# • שמירת תאימות לאחור: כל ההרחבות אופציונליות; המבנה ההיסטורי נשמר.
+# • report_health חכם: OK/WARN/FAIL + issues[] (כבר קיים).
+# • metrics_detail אוטומטי (כבר קיים) — שומרנו ומשפרים קלות.
 # -----------------------------------------------------------------------------
 
 from __future__ import annotations
 from typing import Any, Dict, List, Optional, Tuple, cast
 from collections import Counter
+from datetime import datetime
 
 # ---------------------------- Utilities ----------------------------
 
@@ -37,6 +31,136 @@ def _to_pct(x: Optional[float]) -> Optional[int]:
         return int(round(float(x) * 100.0))
     except Exception:
         return None
+
+def _now_iso_z() -> str:
+    return datetime.utcnow().isoformat() + "Z"
+
+# ---------------------------- Aliases / i18n ----------------------------
+
+def _alias_label(aliases: Optional[Dict[str, Any]], key: str, lang: str) -> Tuple[str, Optional[str]]:
+    """
+    מחזיר (label, unit) עבור מפתח קנוני/תרגיל/משפחה/ציוד.
+    חיפוש לפי:
+      - exercise / family / equipment → names.*
+      - criteria/measure keys         → labels.*
+    """
+    if not isinstance(aliases, dict):
+        return key, None
+
+    # 1) labels.* למדדים
+    labels = aliases.get("labels") or {}
+    if isinstance(labels, dict) and key in labels:
+        d = labels.get(key) or {}
+        lbl = d.get(lang) or d.get("he") or d.get("en") or key
+        unit = d.get("unit")
+        return str(lbl), (str(unit) if unit is not None else None)
+
+    # 2) names.* לישות (תרגיל/משפחה/ציוד)
+    names = aliases.get("names") or {}
+    for group in ("exercises", "families", "equipment"):
+        g = names.get(group) or {}
+        if isinstance(g, dict) and key in g:
+            d = g.get(key) or {}
+            lbl = d.get(lang) or d.get("he") or d.get("en") or key
+            return str(lbl), None
+
+    return key, None
+
+def _alias_name_triplet(aliases: Optional[Dict[str, Any]], exercise_id: Optional[str],
+                        family: Optional[str], equipment: Optional[str], lang: str) -> Dict[str, Dict[str, str]]:
+    """
+    בונה בלוק ui.lang_labels עבור exercise/family/equipment בשתי השפות, עם fallback.
+    """
+    def _both(k: Optional[str]) -> Dict[str, str]:
+        if not k:
+            return {"he": "-", "en": "-"}
+        he, _ = _alias_label(aliases, k, "he")
+        en, _ = _alias_label(aliases, k, "en")
+        return {"he": he, "en": en}
+
+    return {
+        "exercise": _both(exercise_id),
+        "family": _both(family),
+        "equipment": _both(equipment),
+    }
+
+# ---------------------------- Targets / Thresholds ----------------------------
+
+def _format_target_phrase(th: Optional[Dict[str, Any]], unit: Optional[str], lang: str) -> str:
+    """
+    יוצר טקסט יעד (he/en) מתוך thresholds של הקריטריון.
+    תומך במבנים:
+      - {"min": x}         → "יעד ≥ x" / "Target ≥ x"
+      - {"max": x}         → "יעד ≤ x" / "Target ≤ x"
+      - {"min": x, "max": y} → "טווח x–y" / "Range x–y"
+      - {"range": {"min": x, "max": y}} — דומה
+    """
+    if not isinstance(th, dict) or not th:
+        return "—"
+    def _fmt(v):
+        if isinstance(v, (int, float)):
+            return str(v) + (unit or "")
+        return str(v)
+
+    # normalize
+    r = th.get("range") if isinstance(th.get("range"), dict) else th
+    mn = r.get("min") if isinstance(r.get("min"), (int, float)) else None
+    mx = r.get("max") if isinstance(r.get("max"), (int, float)) else None
+
+    if mn is not None and mx is not None:
+        return f"{'טווח' if lang=='he' else 'Range'} {_fmt(mn)}–{_fmt(mx)}"
+    if mn is not None:
+        return f"{'יעד ≥' if lang=='he' else 'Target ≥'} {_fmt(mn)}"
+    if mx is not None:
+        return f"{'יעד ≤' if lang=='he' else 'Target ≤'} {_fmt(mx)}"
+    return "—"
+
+def _criterion_target(exercise, crit_id: str) -> Optional[Dict[str, Any]]:
+    th = getattr(exercise, "thresholds", None)
+    if not isinstance(th, dict):
+        return None
+    v = th.get(crit_id)
+    return v if isinstance(v, dict) else None
+
+# ---------------------------- Notes (Heuristics / phrases) ----------------------------
+
+def _default_note_for_score(crit_label: str, target_text: str, score_pct: Optional[int], lang: str) -> str:
+    if score_pct is None:
+        return "—"
+    if score_pct >= 85:
+        return "ביצוע נקי" if lang == "he" else "Clean execution"
+    if score_pct >= 70:
+        return f"אפשר לשפר {crit_label}" if lang == "he" else f"Could improve {crit_label}"
+    # < 70
+    if target_text and target_text != "—":
+        return f"שפר {crit_label} ({target_text})" if lang == "he" else f"Improve {crit_label} ({target_text})"
+    return f"שפר {crit_label}" if lang == "he" else f"Improve {crit_label}"
+
+def _phrase_for_criterion(phrases: Optional[Dict[str, Any]], crit_id: str, quality: Optional[str], lang: str) -> Optional[str]:
+    """
+    קריאה אופציונלית ל-phrases.yaml (אם הועבר) — לא חוסם אם אין.
+    מצפה למבנה דמוי:
+      phrases:
+        he:
+          criteria:
+            depth:
+              good: "ביצוע טוב"
+              warn: "שפר עומק"
+        en:
+          criteria: ...
+    """
+    if not isinstance(phrases, dict):
+        return None
+    lang_map = phrases.get(lang) or {}
+    crit_map = (lang_map.get("criteria") or {})
+    d = crit_map.get(crit_id)
+    if not isinstance(d, dict):
+        return None
+    if quality and quality in d:
+        return str(d[quality])
+    return d.get("default")
+
+# ---------------------------- Safety Caps ----------------------------
 
 def _eval_cap_condition(expr: str, per_scores: Dict[str, Any]) -> Tuple[Optional[str], Optional[float], Optional[str]]:
     if not isinstance(expr, str):
@@ -93,8 +217,9 @@ def _apply_safety_caps(exercise, overall: Optional[float], per_scores: Dict[str,
         })
     return new_overall, out_caps
 
+# ---------------------------- Coverage / Health ----------------------------
+
 def _compute_coverage(exercise, availability: Dict[str, Dict[str, Any]]) -> Dict[str, Any]:
-    """ מחשב מדדי כיסוי על בסיס קריטריונים והזמינות בפועל. """
     crit_defs = getattr(exercise, "criteria", {}) if exercise is not None else {}
     crit_ids = list(crit_defs.keys()) if isinstance(crit_defs, dict) else list(availability.keys())
     total = len(crit_ids)
@@ -130,8 +255,6 @@ def _compute_coverage(exercise, availability: Dict[str, Dict[str, Any]]) -> Dict
         "missing_critical": missing_critical,
     }
 
-# ---------------------------- Report Health ----------------------------
-
 _HEALTH_RULES = [
     ("NO_EXERCISE",      lambda r: r.get("exercise") is None,                               "FAIL", "לא זוהה תרגיל. בדוק classifier/aliases."),
     ("UNSCORED",         lambda r: r.get("scoring", {}).get("score") is None,               "WARN", "לא חושב ציון (unscored)."),
@@ -159,21 +282,16 @@ def _compute_report_health(report: Dict[str, Any]) -> Dict[str, Any]:
             worst = "WARN" if worst != "FAIL" else worst
     return {"status": worst, "issues": issues}
 
-# ---------------------------- Metrics Detail (NEW) ----------------------------
+# ---------------------------- Metrics Detail (מוחזק) ----------------------------
 
-# מפתחות "תמיד מעניינים" להצגה אם קיימים ב-canonical
 _ALWAYS_KEYS = [
-    # טמפו/חזרות
     "rep.timing_s", "rep.ecc_s", "rep.con_s", "rep.pause_top_s", "rep.pause_bottom_s",
-    # גו/עמוד שדרה
     "torso_forward_deg", "spine_flexion_deg", "spine_curvature_side_deg",
-    # עמידה/כפות רגליים
     "features.stance_width_ratio", "toe_angle_left_deg", "toe_angle_right_deg",
     "knee_foot_alignment_left_deg", "knee_foot_alignment_right_deg",
     "heels_grounded", "foot_contact_left", "foot_contact_right",
 ]
 
-# קבוצות להצגה נעימה ב-UI
 _GROUPS = {
     "tempo": [
         "rep.timing_s", "rep.ecc_s", "rep.con_s", "rep.pause_top_s", "rep.pause_bottom_s"
@@ -195,21 +313,16 @@ _GROUPS = {
 }
 
 def _gather_required_keys(exercise) -> List[str]:
-    """
-    מאחד את כל requires מכל הקריטריונים של התרגיל (כפי שהוא נטען — כולל ירושה מה-base).
-    """
     out: List[str] = []
     crit = getattr(exercise, "criteria", {}) or {}
     if isinstance(crit, dict):
-        for cid, cdef in crit.items():
+        for _cid, cdef in crit.items():
             req = (cdef or {}).get("requires")
             if isinstance(req, list):
                 for k in req:
                     if isinstance(k, str):
                         out.append(k)
-    # הוספת always
     out.extend(_ALWAYS_KEYS)
-    # ייחוד ושמירת סדר (בסיסי)
     seen = set()
     uniq: List[str] = []
     for k in out:
@@ -218,7 +331,6 @@ def _gather_required_keys(exercise) -> List[str]:
     return uniq
 
 def _present_keys(canonical: Dict[str, Any], keys: List[str]) -> Dict[str, Any]:
-    """ מחזיר רק מפתחות שיש להם ערך ב-canonical (לא None). """
     out: Dict[str, Any] = {}
     for k in keys:
         if k in canonical:
@@ -228,16 +340,8 @@ def _present_keys(canonical: Dict[str, Any], keys: List[str]) -> Dict[str, Any]:
     return out
 
 def _extract_rep_series(rep_tree: Dict[str, Any]) -> List[Dict[str, Any]]:
-    """
-    בונה רשימה per-rep עבור טמפו אם יש מבנה rep.* היררכי.
-    תומך בשני מצבים:
-      • ערכים סקלריים — מחזיר חזרה אחת (אם אין אינדקסים)
-      • ערכים כרשימות/מילונים — מנסה ליישר על פי אינדקסים/מפתחות
-    """
     if not isinstance(rep_tree, dict) or not rep_tree:
         return []
-
-    # נאתר שדות עיקריים
     timing = rep_tree.get("timing_s")
     ecc = rep_tree.get("ecc_s")
     con = rep_tree.get("con_s")
@@ -245,7 +349,6 @@ def _extract_rep_series(rep_tree: Dict[str, Any]) -> List[Dict[str, Any]]:
     pbot = rep_tree.get("pause_bottom_s")
     rep_id = rep_tree.get("rep_id")
 
-    # אם הכל סקלרי — מחזירים רשומה אחת
     def _is_scalar(x):
         return not isinstance(x, (list, dict))
 
@@ -257,13 +360,10 @@ def _extract_rep_series(rep_tree: Dict[str, Any]) -> List[Dict[str, Any]]:
             "pause_top_s": ptop, "pause_bottom_s": pbot,
         }]
 
-    # אחרת — ננסה לאחד לפי אינדקס
-    # תמיכה בסיסית: אם שדה הוא list — משתמשים באינדקס; אם dict — לפי מפתחות ממוינים
     def _to_indexed_list(x):
         if isinstance(x, list):
             return list(enumerate(x, start=1))
         if isinstance(x, dict):
-            # ממיינים לפי מפתח אם ניתן
             try:
                 items = sorted(x.items(), key=lambda kv: (str(kv[0])))
             except Exception:
@@ -271,7 +371,6 @@ def _extract_rep_series(rep_tree: Dict[str, Any]) -> List[Dict[str, Any]]:
             return [(int(k) if str(k).isdigit() else k, v) for k, v in items]
         if x is None:
             return []
-        # סקלר → חזרה יחידה
         return [(1, x)]
 
     idx_fields = {
@@ -283,7 +382,6 @@ def _extract_rep_series(rep_tree: Dict[str, Any]) -> List[Dict[str, Any]]:
         "rep_id": _to_indexed_list(rep_id),
     }
 
-    # איחוד כל האינדקסים האפשריים
     all_idxs = set()
     for pairs in idx_fields.values():
         for i, _ in pairs:
@@ -310,66 +408,125 @@ def _extract_rep_series(rep_tree: Dict[str, Any]) -> List[Dict[str, Any]]:
     return rows
 
 def build_auto_metrics_detail(*, exercise, canonical: Dict[str, Any], rep_tree: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
-    """
-    בונה בלוק "metrics_detail" להצגה ב-UI:
-    • איסוף מפתחות רלוונטיים לפי criteria.requires (כולל base+variant) + ALWAYS
-    • חלוקה לקבוצות: tempo / joints / stance
-    • סדר אלגנטי והסתרת שדות חסרי ערך
-    • פירוק טמפו per-rep אם rep_tree קיים
-    """
     relevant_keys = _gather_required_keys(exercise)
     present_all = _present_keys(canonical, relevant_keys)
 
-    # חלוקה לקבוצות
     grouped: Dict[str, Dict[str, Any]] = {}
     for gname, gkeys in _GROUPS.items():
         grouped[gname] = _present_keys(present_all, gkeys)
 
-    # שאר השדות הרלוונטיים שלא נתפסו בקבוצות — נשמרים ב-"other"
     grouped_keys_flat = set(k for lst in _GROUPS.values() for k in lst)
     other_keys = [k for k in present_all.keys() if k not in grouped_keys_flat]
     grouped["other"] = _present_keys(present_all, other_keys)
 
-    # פירוק חזרות (טמפו) אם יש rep.* היררכי
     rep_series: List[Dict[str, Any]] = []
     if isinstance(rep_tree, dict) and rep_tree:
         rep_series = _extract_rep_series(rep_tree)
 
-    # יעדים (targets) — מציג רק מה שאפשר להבין ממנו מספרים “מעניינים”
-    targets_block: Dict[str, Any] = {}
-    try:
-        t = getattr(exercise, "targets", None)
-        if isinstance(t, dict) and t:
-            # שולפים רק תתי-שדות מספריים כדי לא להציף
-            def _num_only(d: Dict[str, Any]) -> Dict[str, Any]:
-                out = {}
-                for k, v in d.items():
-                    if isinstance(v, (int, float)):
-                        out[k] = v
-                    elif isinstance(v, dict):
-                        sub = _num_only(v)
-                        if sub:
-                            out[k] = sub
-                return out
-            targets_block = _num_only(t)
-    except Exception:
-        targets_block = {}
-
-    # סטטיסטיקה קטנה לתצוגה (כמה ערכים הוצגו)
-    stats = {
-        "keys_available": len(present_all),
-        "groups_non_empty": {k: bool(v) for k, v in grouped.items()},
-        "has_rep_series": bool(rep_series),
-    }
-
     return {
         "groups": grouped,
         "rep_tempo_series": rep_series,
-        "targets": targets_block,
-        "stats": stats,
+        "stats": {
+            "keys_available": len(present_all),
+            "groups_non_empty": {k: bool(v) for k, v in grouped.items()},
+            "has_rep_series": bool(rep_series),
+        },
     }
 
-# ---------------------------- Report Builder ----------------------------
+# ---------------------------- Rep / Set Critique ----------------------------
+
+def _criterion_score_pct(per_criterion_scores: Optional[Dict[str, Any]], cid: str) -> Optional[int]:
+    if not isinstance(per_criterion_scores, dict):
+        return None
+    obj = per_criterion_scores.get(cid)
+    try:
+        sc = float(getattr(obj, "score", None))
+        return _to_pct(sc)
+    except Exception:
+        return None
+
+def _rep_critique_rows(*, exercise, canonical: Dict[str, Any],
+                       per_criterion_scores: Optional[Dict[str, Any]],
+                       aliases: Optional[Dict[str, Any]],
+                       lang: str) -> List[Dict[str, Any]]:
+    """
+    בונה שורה לכל קריטריון: id, name_he/en, unit, measured, target_he/en, score_pct, note_he/en.
+    אין כאן זיהוי per-rep מה־canonical (כי המדידות הן פר-סט), אבל נשמר הפורמט ל-UI.
+    """
+    out: List[Dict[str, Any]] = []
+    crit_defs = getattr(exercise, "criteria", {}) or {}
+    for cid in crit_defs.keys():
+        label, unit = _alias_label(aliases, cid, lang)
+        measured = canonical.get(cid)  # אם יש ערך נוח להצגה (אחרת — None)
+        th = _criterion_target(exercise, cid)
+        target_text_lang = _format_target_phrase(th, unit, lang)
+        target_text_alt  = _format_target_phrase(th, unit, "en" if lang=="he" else "he")
+
+        pct = _criterion_score_pct(per_criterion_scores, cid)
+
+        # הערת איכות (phrases → ברירת מחדל)
+        note_lang = _default_note_for_score(label, target_text_lang, pct, lang)
+        note_alt  = _default_note_for_score(label, target_text_alt,  pct, ("en" if lang=="he" else "he"))
+
+        out.append({
+            "id": cid,
+            "name_he": _alias_label(aliases, cid, "he")[0],
+            "name_en": _alias_label(aliases, cid, "en")[0],
+            "unit": unit,
+            "measured": measured,
+            "target_he": target_text_lang if lang=="he" else target_text_alt,
+            "target_en": target_text_alt  if lang=="he" else target_text_lang,
+            "score_pct": pct,
+            "note_he": note_lang if lang=="he" else note_alt,
+            "note_en": note_alt  if lang=="he" else note_lang,
+        })
+    return out
+
+def _set_critique_from_rows(rows: List[Dict[str, Any]]) -> Dict[str, Any]:
+    """
+    מסכם "צווארי בקבוק" ברמת סט:
+      - ממוצע ציון לכל קריטריון
+      - "גרוע ביותר" (אין לנו per-rep פה, לכן זהה לממוצע אם אין פירוק)
+    """
+    if not rows:
+        return {"set_score_pct": None, "rep_count": None, "top_issues": [], "summary_he": "-", "summary_en": "-"}
+
+    crit_scores = []
+    for r in rows:
+        if isinstance(r.get("score_pct"), int):
+            crit_scores.append(r["score_pct"])
+    set_score_pct = int(round(sum(crit_scores)/len(crit_scores))) if crit_scores else None
+
+    # Top issues = השליש התחתון (עד 3) לפי ציון
+    sorted_rows = sorted([r for r in rows if isinstance(r.get("score_pct"), int)], key=lambda x: x["score_pct"])
+    top = sorted_rows[:3] if sorted_rows else []
+
+    top_issues = [{
+        "id": t["id"],
+        "name_he": t["name_he"],
+        "name_en": t["name_en"],
+        "worst_rep_pct": t["score_pct"],  # ללא per-rep אמיתי — משתמשים בציון עצמו
+        "avg_pct": t["score_pct"],
+    } for t in top]
+
+    if top:
+        he_focus = ", ".join([t["name_he"] for t in top])
+        en_focus = ", ".join([t["name_en"] for t in top])
+        summary_he = f"מוקדי שיפור: {he_focus}"
+        summary_en = f"Focus: {en_focus}"
+    else:
+        summary_he = "ביצוע נקי יחסית בסט זה."
+        summary_en = "Relatively clean set."
+
+    return {
+        "set_score_pct": set_score_pct,
+        "rep_count": None,
+        "top_issues": top_issues,
+        "summary_he": summary_he,
+        "summary_en": summary_en,
+    }
+
+# ---------------------------- Builder ----------------------------
 
 def build_payload(
     *,
@@ -386,16 +543,19 @@ def build_payload(
     per_criterion_scores: Optional[Dict[str, Any]] = None,
     sets: Optional[List[Dict[str, Any]]] = None,
     reps: Optional[List[Dict[str, Any]]] = None,
+    # --- חדשים / אופציונליים ---
+    display_lang: str = "he",
+    aliases: Optional[Dict[str, Any]] = None,
+    phrases: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
 
+    # caps
     applied_caps: List[Dict[str, Any]] = []
     final_score = overall_score
-
-    # Safety caps
     if exercise and overall_score is not None and isinstance(per_criterion_scores, dict):
         final_score, applied_caps = _apply_safety_caps(exercise, overall_score, per_criterion_scores)
 
-    # criteria rows + flat breakdown for tooltip
+    # criteria rows + breakdown
     criteria_list: List[Dict[str, Any]] = []
     criteria_breakdown_pct: Dict[str, Optional[int]] = {}
     for name, info in (availability or {}).items():
@@ -418,11 +578,7 @@ def build_payload(
             except Exception:
                 pass
         criteria_list.append(item)
-        # breakdown map (only if available & has score_pct)
-        if item["available"]:
-            criteria_breakdown_pct[name] = item["score_pct"]
-        else:
-            criteria_breakdown_pct[name] = None
+        criteria_breakdown_pct[name] = item["score_pct"] if item["available"] else None
 
     coverage = _compute_coverage(exercise, availability)
 
@@ -434,30 +590,47 @@ def build_payload(
         ]
     }
 
-    # default quality
     quality_effective = overall_quality or ("partial" if final_score is not None else None)
 
-    report: Dict[str, Any] = {
-        "meta": {
-            "generated_at": __import__("datetime").datetime.utcnow().isoformat() + "Z",
-            "payload_version": str(payload_version),
-            "library_version": str(library_version),
-        },
-        "exercise": None if exercise is None else {
+    # exercise/meta
+    ex_block = None
+    if exercise is not None:
+        ex_block = {
             "id": exercise.id,
             "family": getattr(exercise, "family", None),
             "equipment": getattr(exercise, "equipment", None),
             "display_name": getattr(exercise, "display_name", exercise.id),
+        }
+
+    # ui.lang_labels (he/en) עבור exercise/family/equipment
+    ui_lang_labels = _alias_name_triplet(
+        aliases=aliases,
+        exercise_id=(ex_block or {}).get("id"),
+        family=(ex_block or {}).get("family"),
+        equipment=(ex_block or {}).get("equipment"),
+        lang=display_lang,
+    )
+
+    report: Dict[str, Any] = {
+        "meta": {
+            "generated_at": _now_iso_z(),
+            "payload_version": str(payload_version),
+            "library_version": str(library_version),
+        },
+        "display_lang": display_lang,
+        "exercise": ex_block,
+        "ui": {
+            "lang_labels": ui_lang_labels
         },
         "ui_ranges": ui_ranges,
         "scoring": {
             "score": final_score,
             "score_pct": _to_pct(final_score),
-            "quality": quality_effective,             # <- ברירת מחדל "partial"
+            "quality": quality_effective,
             "unscored_reason": unscored_reason,
             "applied_caps": applied_caps,
             "criteria": criteria_list,
-            "criteria_breakdown_pct": criteria_breakdown_pct,  # <- חדש ל-Tooltip
+            "criteria_breakdown_pct": criteria_breakdown_pct,
         },
         "coverage": coverage,
         "hints": list(hints or []),
@@ -485,13 +658,13 @@ def build_payload(
     except Exception:
         pass
 
-    # sets / reps (optional)
+    # sets / reps (optional passthrough)
     if isinstance(sets, list) and sets:
         report["sets"] = sets
     if isinstance(reps, list) and reps:
         report["reps"] = reps
 
-    # NEW: metrics_detail (נבנה מהתרגיל וה-canonical + rep_tree אם יש)
+    # metrics_detail
     try:
         report["metrics_detail"] = build_auto_metrics_detail(
             exercise=exercise,
@@ -499,8 +672,41 @@ def build_payload(
             rep_tree=report.get("rep", None),
         )
     except Exception:
-        # לא מפילים את הדו"ח בגלל פירוט — בטיחותית מתעלמים בשקט
         report["metrics_detail"] = {"error": "build_failed"}
+
+    # ---------- NEW: measured-vs-targets + critiques ----------
+    try:
+        # טבלת "נמדד מול יעד" ברירת המחדל — לוקחת את כל הקריטריונים של התרגיל
+        rows = _rep_critique_rows(
+            exercise=exercise,
+            canonical=report.get("canonical", {}) or report.get("measurements", {}) or {},
+            per_criterion_scores=per_criterion_scores,
+            aliases=aliases,
+            lang=display_lang,
+        )
+        # ביקורת חזרה: מייצרים "חזרה מדומה" אחת (UI יוכל לפתוח Modal עם הטבלה הזו)
+        report["rep_critique"] = [{
+            "set_index": 1,
+            "rep_index": 1,
+            "criteria": rows,
+            "summary_he": _set_critique_from_rows(rows).get("summary_he"),
+            "summary_en": _set_critique_from_rows(rows).get("summary_en"),
+        }]
+
+        # ביקורת סט: מסקנות כלומבריות (Top issues)
+        set_summary = _set_critique_from_rows(rows)
+        report["set_critique"] = [{
+            "set_index": 1,
+            "set_score_pct": set_summary.get("set_score_pct"),
+            "rep_count": set_summary.get("rep_count"),
+            "top_issues": set_summary.get("top_issues"),
+            "summary_he": set_summary.get("summary_he"),
+            "summary_en": set_summary.get("summary_en"),
+        }]
+    except Exception:
+        # לא מפילים דו"ח אם אין אפשרות לבנות טבלת יעדים
+        report["rep_critique"] = []
+        report["set_critique"] = []
 
     # health
     report["report_health"] = _compute_report_health(report)
@@ -510,7 +716,6 @@ def build_payload(
 # ---------------- Camera Summary Attach ----------------
 
 def _normalize_camera_summary(camera_summary: Optional[Dict[str, Any]]) -> Dict[str, Any]:
-    """ מנרמל את סיכום המצלמה. """
     DEFAULT_OK = {
         "visibility_risk": False,
         "severity": "LOW",
@@ -547,12 +752,6 @@ def attach_camera_summary(report: Dict[str, Any],
                           add_ok_hint_if_clean: bool = False,
                           save_json: bool = False,
                           meta: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
-    """
-    מצרף את סיכום המצלמה (camera_summary) אל דו"ח קיים:
-    - מוסיף report["camera"] עם "המדידה תקינה" כברירת מחדל אם לא הועבר summary.
-    - אם visibility_risk=True מוסיף הודעה ל-hints.
-    - אם הכל תקין (clean) ומוגדר add_ok_hint_if_clean, מוסיף "המדידה תקינה".
-    """
     cam = _normalize_camera_summary(camera_summary)
     hints = report.get("hints")
     if not isinstance(hints, list):
