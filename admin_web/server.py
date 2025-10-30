@@ -47,7 +47,7 @@ try:
 except Exception:
     bp_exercise = None  # type: ignore
 
-# System/health/diagnostics
+# System/health/diagnostics (אם קיים הוא יחשוף /healthz כבר)
 try:
     from admin_web.routes_system import bp_system
 except Exception:
@@ -295,31 +295,32 @@ def create_app() -> Flask:
 
     # ----- Register blueprints -----
     app.register_blueprint(video_bp)
-    logger.info("[Server] Registered video_bp blueprint")
-
     if upload_video_bp is not None:
         app.register_blueprint(upload_video_bp)
-        logger.info("[Server] Registered upload_video_bp blueprint")
-
     if actions_bp is not None:
         app.register_blueprint(actions_bp)
-        logger.info("[Server] Registered actions_bp (/api/action)")
-
     if state_bp is not None:
         app.register_blueprint(state_bp)
-        logger.info("[Server] Registered state_bp (/api/video/state)")
-
     if bp_logs is not None:
         app.register_blueprint(bp_logs)
-        logger.info("[Server] Registered logs_bp (/api/logs*)")
-
     if bp_exercise is not None:
         app.register_blueprint(bp_exercise)
-        logger.info("[Server] Registered exercise_bp (/api/exercise*)")
-
     if bp_system is not None:
         app.register_blueprint(bp_system)
-        logger.info("[Server] Registered system_bp (/version,/healthz,…)")
+
+    # ----- Fallback health endpoints (אם bp_system לא סיפק) -----
+    if "system._healthz" not in app.view_functions:
+        @app.get("/healthz")
+        def _healthz():
+            return "ok", 200
+    if "system._health" not in app.view_functions:
+        @app.get("/health")
+        def _health():
+            return "ok", 200
+    if "system._ping" not in app.view_functions:
+        @app.get("/ping")
+        def _ping():
+            return "pong", 200
 
     # אתחול Persist (DB) — no-op אם לא זמין
     try:
@@ -340,7 +341,6 @@ def create_app() -> Flask:
         resp.headers["X-Accel-Buffering"] = "no"
         resp.headers["Access-Control-Allow-Origin"] = "*"
         resp.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
-        # חשוב: לאפשר גם X-Ingest-Token מהדפדפן
         resp.headers["Access-Control-Allow-Headers"] = "Content-Type, X-Ingest-Token"
         return resp
 
@@ -388,12 +388,9 @@ def create_app() -> Flask:
             gz = STATIC_DIR / (filename + ".gz")
             if gz.exists():
                 mime = "application/octet-stream"
-                if filename.endswith(".js"):
-                    mime = "application/javascript"
-                elif filename.endswith(".css"):
-                    mime = "text/css"
-                elif filename.endswith(".html"):
-                    mime = "text/html"
+                if filename.endswith(".js"): mime = "application/javascript"
+                elif filename.endswith(".css"): mime = "text/css"
+                elif filename.endswith(".html"): mime = "text/html"
                 resp = make_response(send_file(gz, mimetype=mime))
                 resp.headers["Content-Encoding"] = "gzip"
                 return resp
@@ -480,7 +477,6 @@ def create_app() -> Flask:
                             "objdet": _get_empty_objdet_payload(),
                             "payload_version": PAYLOAD_VERSION}), 500
 
-    # חדש: תואם ל-JS שלך
     @app.route("/api/payload_last", methods=["GET"])
     def api_payload_last():
         try:
@@ -496,7 +492,7 @@ def create_app() -> Flask:
         except Exception as e:
             return jsonify({"ok": False, "error": str(e)}), 500
 
-    # ----- OD ingest (כמו אצלך) -----
+    # ----- OD ingest -----
     REQUIRED_KEYS = ("detections",)
     MAX_DETS = int(os.getenv("MAX_DETECTIONS", "500"))
 
@@ -602,15 +598,6 @@ def create_app() -> Flask:
         return Response("Server error:\n" + str(e), status=500,
                         mimetype="text/plain; charset=utf-8")
 
-    # ----- כלי דיבוג מהיר ללוגים -----
-    @app.post("/api/debug/logs_burst")
-    def logs_burst():
-        logger.debug("debug ping")
-        logger.info("info ping")
-        logger.warning("warning ping")
-        logger.error("error ping")
-        return {"ok": True}
-
     # ----- MJPEG quick test -----
     @app.get("/test_stream")
     def test_stream():
@@ -622,6 +609,7 @@ def create_app() -> Flask:
 
     return app
 
+
 # === WSGI export (ל-Gunicorn) ===
 app = create_app()
 
@@ -629,16 +617,6 @@ app = create_app()
 # ריצה מקומית בלבד (לא בענן / RunPod)
 # ================================================================
 if __name__ == "__main__":
-    # מקומית: אפשר להריץ על פורט 5000 כדי לבדוק
     port = int(os.getenv("PORT", "5000"))
     logger.info(f"[Local] Flask server running at http://127.0.0.1:{port}")
-    logger.info("Available endpoints: /payload, /video, /capture, /healthz, etc.")
     app.run(host="0.0.0.0", port=port, debug=True, use_reloader=False, threaded=True)
-
-# === WSGI export (ל-Gunicorn) ===
-app = create_app()
-
-# ✅ הוסף /ping כדי שלא יהיה 404 בבדיקות בריאות
-@app.get("/ping")
-def _ping():
-    return "pong", 200
