@@ -1,39 +1,46 @@
 # ============================================================
-# 🚀 BodyPlus_XPro — Full Cloud System (Flask + API + Proxy)
+# 🧱 Dockerfile — BodyPlus_XPro (RunPod Ready, no constraints.txt)
 # ------------------------------------------------------------
-# גרסה אחת שעובדת בענן (RunPod או מקומית)
-# מריצה את ה-Flask Admin UI + כל ה-API + RunPod Proxy
+# מריץ את ממשק Flask בענן (Gunicorn) בלי מצלמה ובלי tkinter.
+# אין שימוש בקובץ constraints.txt בכלל.
 # ============================================================
 
 FROM python:3.11-slim
 
-# --- הגדרות סביבה ---
+# --- הגדרות סביבת ריצה בסיסיות ---
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1 \
     PYTHONNOUSERSITE=1 \
     PORT=8000 \
     NO_CAMERA=1 \
-    RUNPOD=1 \
-    PROXY_DEBUG=1
+    NO_TK=1
 
+# --- תיקיית עבודה אחידה ---
 WORKDIR /app
 
-# --- התקנת חבילות מערכת ---
+# --- התקנת חבילות מערכת קלות (curl / tzdata / libgl) ---
 RUN apt-get update && apt-get install -y --no-install-recommends \
       curl ca-certificates tzdata libgl1 \
     && rm -rf /var/lib/apt/lists/*
 
-# --- התקנת תלויות פייתון ---
-COPY requirements.txt constraints.txt /app/
+# --- העתקת דרישות בלבד (לא constraints.txt) ---
+COPY requirements.txt /app/
+
+# --- התקנת ספריות פייתון ---
 RUN pip install --upgrade pip setuptools wheel && \
-    pip install --no-cache-dir -r requirements.txt -c constraints.txt \
+    pip install --no-cache-dir -r requirements.txt \
       --extra-index-url https://download.pytorch.org/whl/cpu
 
-# --- העתקת קוד האפליקציה ---
+# --- העתקת כל קבצי הפרויקט ---
 COPY . /app
 
+# --- חשיפת פורט השרת ---
 EXPOSE 8000
 
-# --- הפעלת הכל ---
-CMD ["python", "admin_web/runpod_proxy.py"]
+# --- בדיקת בריאות אוטומטית ---
+HEALTHCHECK --interval=30s --timeout=5s --retries=5 \
+  CMD curl -fsS "http://127.0.0.1:${PORT}/healthz" || exit 1
+
+# --- פקודת ריצה (Gunicorn) ---
+CMD ["bash","-lc","gunicorn -k gthread -w 1 --threads 8 -t 120 --bind 0.0.0.0:${PORT} 'admin_web.server:create_app'"]
