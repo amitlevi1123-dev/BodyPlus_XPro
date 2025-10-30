@@ -1,8 +1,14 @@
-# admin_web/runpod_proxy.py — Proxy יחיד + UI בדיקה + לוגים מלאים
+# -*- coding: utf-8 -*-
+"""
+admin_web/runpod_proxy.py — גרסה משולבת (Proxy + Dashboard + Main)
+-------------------------------------------------------------------
+קובץ זה מפעיל את כל המערכת: גם Flask Proxy, גם ה-Admin Dashboard וגם את ה-main app.
+אם Flask או main נכשלים, הוא חוזר אוטומטית רק לפרוקסי כדי שלא תישאר בלי שרת.
+"""
+
 from __future__ import annotations
 from flask import Flask, request, Response, jsonify, make_response
-import os, json, time, traceback
-import requests
+import os, json, time, traceback, requests, threading, subprocess, sys
 
 # ========= קונפיג (ניתן לדרוס ע"י משתני סביבה) =========
 RUNPOD_BASE = (os.getenv("RUNPOD_BASE") or "https://api.runpod.ai/v2/1fmkdasa1l0x06").rstrip("/")
@@ -10,28 +16,20 @@ API_KEY     = os.getenv("RUNPOD_API_KEY") or "rpa_4PXVVU7WW1RON92M9VQTT5V2ZOA4T8
 PORT        = int(os.getenv("PORT", "8000"))
 DEBUG_LOG   = (os.getenv("PROXY_DEBUG", "1") == "1")  # 1=on, 0=off
 
-_LAST = {
-    "when": None, "path": None, "method": None, "status": None,
-    "upstream": None, "resp_head": {}, "resp_text": None
-}
-
+_LAST = {"when": None, "path": None, "method": None, "status": None, "upstream": None, "resp_head": {}, "resp_text": None}
 app = Flask(__name__)
 
 # ========= עזרי לוג =========
 def log(*args):
-    if not DEBUG_LOG:
-        return
-    ts = time.strftime("[%H:%M:%S]")
-    print(ts, *args, flush=True)
+    if DEBUG_LOG:
+        ts = time.strftime("[%H:%M:%S]")
+        print(ts, *args, flush=True)
 
 def _mask_key(k: str) -> str:
-    if not k:
-        return ""
-    return "***" if len(k) <= 8 else f"{k[:6]}...{k[-5:]}"
+    return "***" if not k or len(k) <= 8 else f"{k[:6]}...{k[-5:]}"
 
 def _short_headers(h: dict, drop=None):
-    if drop is None:
-        drop = {"cookie", "authorization"}
+    if drop is None: drop = {"cookie", "authorization"}
     out = {}
     for k, v in h.items():
         out[k] = "<hidden>" if k.lower() in drop else (v if len(str(v)) < 200 else str(v)[:200] + " ...")
@@ -39,15 +37,14 @@ def _short_headers(h: dict, drop=None):
 
 def _json_or_text(r: requests.Response) -> str:
     text = r.text
-    return text if len(text) < 2000 else (text[:2000] + "\n... [truncated] ...")
+    return text if len(text) < 2000 else text[:2000] + "\n... [truncated] ..."
 
-# ========= עזרי HTTP ל-Upstream =========
+# ========= עזרי HTTP =========
 def _auth_headers() -> dict:
     return {"Authorization": f"Bearer {API_KEY}", "Accept-Encoding": "identity"}
 
 def _post(url: str, payload: dict, timeout=(5, 300)) -> requests.Response:
-    h = {"Content-Type": "application/json", **_auth_headers()}
-    return requests.post(url, json=payload, headers=h, timeout=timeout)
+    return requests.post(url, json=payload, headers={"Content-Type": "application/json", **_auth_headers()}, timeout=timeout)
 
 def _get(url: str, timeout=(5, 60)) -> requests.Response:
     return requests.get(url, headers=_auth_headers(), timeout=timeout)
@@ -60,110 +57,32 @@ def _cors(response):
     response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization"
     return response
 
-@app.route("/", methods=["OPTIONS"])
-@app.route("/run-submit", methods=["OPTIONS"])
-@app.route("/run-sync", methods=["OPTIONS"])
-@app.route("/status/<job_id>", methods=["OPTIONS"])
-@app.route("/healthz", methods=["OPTIONS"])
-def _opts(job_id=None):
-    _ = job_id  # Unused parameter for route matching
-    return Response(status=204)
-
-# ========= דפי בית / UI =========
-@app.get("/")
+# ========= Routes =========
+@app.route("/", methods=["GET"])
 def home():
     payload = {
         "ok": True,
-        "msg": "RunPod proxy alive. Use POST /run-submit (async) or /run-sync (sync).",
+        "msg": "BodyPlus_XPro full system active (Proxy + Main + Admin)",
         "port": PORT,
         "upstream": RUNPOD_BASE,
         "api_key_mask": _mask_key(API_KEY),
     }
-    log(">>> HOME GET /")
-    log("    headers:", json.dumps(_short_headers(dict(request.headers)), ensure_ascii=False))
     return jsonify(payload), 200
 
-@app.get("/ui")
-def simple_ui():
-    html = f"""<!doctype html>
-<html lang="he"><head><meta charset="utf-8"><title>RunPod Proxy · UI</title>
-<style>
-body{{font-family:system-ui,Arial;margin:24px;line-height:1.5}}
-.card{{border:1px solid #e5e7eb;border-radius:12px;padding:16px;max-width:860px}}
-pre{{white-space:pre-wrap;word-break:break-word;background:#0a0a0a;color:#e5e5e5;padding:12px;border-radius:8px;max-height:50vh;overflow:auto}}
-label, input, button{{font-size:16px}}
-input[type=text]{{width:420px}}
-small{{color:#6b7280}}
-</style>
-</head>
-<body>
-  <h2>RunPod Proxy · UI בדיקה</h2>
-  <div class="card">
-    <p><b>Upstream:</b> {RUNPOD_BASE}<br><b>API Key:</b> {_mask_key(API_KEY)}</p>
-    <p><label>Prompt: <input id="p" type="text" value="Hello from proxy"/></label>
-       <button onclick="runSync()">Run Sync</button></p>
-    <p><small>לחיצה על Run Sync תבצע POST אל /run-sync ותציג את תשובת ה־Serverless (אם מוגדר נכון).</small></p>
-    <pre id="out">—</pre>
-  </div>
-<script>
-async function runSync(){{
-  const out = document.getElementById('out');
-  out.textContent = "⏳ Running /run-sync ...";
-  try {{
-    const r = await fetch('/run-sync', {{
-      method:'POST',
-      headers:{{'Content-Type':'application/json'}},
-      body: JSON.stringify({{ prompt: document.getElementById('p').value }})
-    }});
-    const text = await r.text();
-    out.textContent = "HTTP "+r.status+"\\n\\n"+text;
-  }} catch(e) {{
-    out.textContent = "ERR: "+e;
-  }}
-}}
-</script>
-</body></html>"""
-    return make_response(html, 200)
-
-# ========= Health / WhoAmI / Last =========
 @app.get("/healthz")
 def healthz():
-    """
-    נקודת בריאות ל-RunPod: מחזירה 200 מהר מאוד ללא תלות בשום שירות חיצוני.
-    """
     return jsonify(ok=True, ts=time.time(), upstream=RUNPOD_BASE), 200
-
-@app.get("/_proxy/health")
-def proxy_health():
-    ok = bool(RUNPOD_BASE) and bool(API_KEY)
-    return jsonify(ok=ok, upstream=RUNPOD_BASE, api_key_set=bool(API_KEY)), (200 if ok else 503)
-
-@app.get("/_proxy/whoami")
-def whoami():
-    return jsonify(client_ip=request.remote_addr, method=request.method, path=request.path), 200
 
 @app.get("/_proxy/last")
 def last():
     return jsonify(_LAST), 200
 
-# ========= מגני קלט =========
-def _require_key():
-    if not API_KEY or API_KEY == "REPLACE_WITH_YOUR_KEY":
-        return jsonify(ok=False, error="missing_api_key", hint="set RUNPOD_API_KEY env"), 401
-    return None
-
-# ========= נתיבים עיקריים =========
 @app.post("/run-sync")
 def run_sync():
-    if (err_resp := _require_key()) is not None:
-        return err_resp
-    body = request.get_json(silent=True) or {}
-    log(">>> /run-sync ←", json.dumps(body, ensure_ascii=False))
     try:
-        t0 = time.time()
+        body = request.get_json(silent=True) or {}
         up = f"{RUNPOD_BASE}/run-sync"
-        r  = _post(up, {"input": body})
-        dt = int((time.time() - t0) * 1000)
+        r = _post(up, {"input": body})
         text = _json_or_text(r)
         _LAST.update({
             "when": time.strftime("%Y-%m-%d %H:%M:%S"),
@@ -171,102 +90,44 @@ def run_sync():
             "method": "POST",
             "status": r.status_code,
             "upstream": up,
-            "resp_head": _short_headers(dict(r.headers)),
             "resp_text": text,
         })
-        log(f"    → upstream {up} | HTTP {r.status_code} | {dt} ms")
-        log("    resp.head:", json.dumps(_short_headers(dict(r.headers)), ensure_ascii=False))
-        log("    resp.body:", text)
-        return Response(
-            r.content,
-            status=r.status_code,
-            headers={"Content-Type": r.headers.get("Content-Type", "application/json")},
-        )
-    except Exception as exc:
-        log("    EXC /run-sync:", repr(exc))
-        log(traceback.format_exc())
-        return jsonify(ok=False, error="proxy_exception", detail=str(exc)), 500
+        return Response(r.content, status=r.status_code, headers={"Content-Type": r.headers.get("Content-Type", "application/json")})
+    except Exception as e:
+        return jsonify(ok=False, error="proxy_exception", detail=str(e)), 500
 
-@app.post("/run-submit")
-def run_submit():
-    if (err_resp := _require_key()) is not None:
-        return err_resp
-    body = request.get_json(silent=True) or {}
-    log(">>> /run-submit ←", json.dumps(body, ensure_ascii=False))
-    try:
-        up = f"{RUNPOD_BASE}/run"
-        r  = _post(up, {"input": body})
-        text = _json_or_text(r)
-        _LAST.update({
-            "when": time.strftime("%Y-%m-%d %H:%M:%S"),
-            "path": "/run-submit",
-            "method": "POST",
-            "status": r.status_code,
-            "upstream": up,
-            "resp_head": _short_headers(dict(r.headers)),
-            "resp_text": text,
-        })
-        log(f"    → upstream {up} | HTTP {r.status_code}")
-        log("    resp.head:", json.dumps(_short_headers(dict(r.headers)), ensure_ascii=False))
-        log("    resp.body:", text)
-        return Response(
-            r.content,
-            status=r.status_code,
-            headers={"Content-Type": r.headers.get("Content-Type", "application/json")},
-        )
-    except Exception as exc:
-        log("    EXC /run-submit:", repr(exc))
-        log(traceback.format_exc())
-        return jsonify(ok=False, error="proxy_exception", detail=str(exc)), 500
-
-@app.get("/status/<job_id>")
-def status(job_id: str):
-    if (err_resp := _require_key()) is not None:
-        return err_resp
-    log(f">>> /status/{job_id}")
-    try:
-        up = f"{RUNPOD_BASE}/status/{job_id}"
-        r  = _get(up)
-        text = _json_or_text(r)
-        _LAST.update({
-            "when": time.strftime("%Y-%m-%d %H:%M:%S"),
-            "path": f"/status/{job_id}",
-            "method": "GET",
-            "status": r.status_code,
-            "upstream": up,
-            "resp_head": _short_headers(dict(r.headers)),
-            "resp_text": text,
-        })
-        log(f"    → upstream {up} | HTTP {r.status_code}")
-        log("    resp.head:", json.dumps(_short_headers(dict(r.headers)), ensure_ascii=False))
-        log("    resp.body:", text)
-        return Response(
-            r.content,
-            status=r.status_code,
-            headers={"Content-Type": r.headers.get("Content-Type", "application/json")},
-        )
-    except Exception as exc:
-        log("    EXC /status:", repr(exc))
-        log(traceback.format_exc())
-        return jsonify(ok=False, error="proxy_exception", detail=str(exc)), 500
-
-# חסימת סטרים – Serverless לא תומך ב-MJPEG
 @app.get("/video/stream.mjpg")
 def no_stream():
-    return jsonify(
-        ok=False,
-        error="serverless_no_stream",
-        detail="Serverless לא תומך ב-MJPEG. השתמש ב-Pod/שרת קבוע."
-    ), 400
+    return jsonify(ok=False, error="serverless_no_stream", detail="Serverless לא תומך ב-MJPEG. השתמש בשרת קבוע."), 400
+
+# ========= הפעלת main של BodyPlus =========
+def start_main_app():
+    """פותח את app/main.py בתהליך נפרד כדי לא לחסום את Flask"""
+    try:
+        log("🧠 Launching BodyPlus_XPro main app...")
+        cmd = [sys.executable, "app/main.py"]
+        env = os.environ.copy()
+        env["NO_CAMERA"] = "1"
+        subprocess.Popen(cmd, env=env)
+        log("✅ main.py started in background.")
+    except Exception as e:
+        log("❌ Failed to start main.py:", e)
 
 # ========= main =========
 if __name__ == "__main__":
-    # מקומית בלבד — בענן (RunPod) אסור להריץ app.run, אלא רק דרך gunicorn.
-    if os.getenv("RUNPOD") == "1" or os.getenv("RUNPOD_BASE", "").startswith("https://api.runpod.ai"):
-        print("⚠️  Detected RunPod environment — skipping Flask dev server (use gunicorn).")
-    else:
-        print(f"🔁 Proxy running at http://127.0.0.1:{PORT} → {RUNPOD_BASE}")
-        print(f"🔐 API key loaded? {_mask_key(API_KEY) if API_KEY else 'NO'}")
-        print(f"🪵 DEBUG_LOG={'True' if DEBUG_LOG else 'False'}")
-        app.run(host="0.0.0.0", port=PORT, debug=True, threaded=True)
+    print(f"🚀 Launching BodyPlus_XPro full system on http://0.0.0.0:{PORT}")
+    print(f"🔐 API key loaded? {_mask_key(API_KEY) if API_KEY else 'NO'}")
+    print(f"🪵 DEBUG_LOG={'True' if DEBUG_LOG else 'False'}")
 
+    # מפעיל את main app (כולל הוידאו, הזיהוי, החישובים וכו’)
+    threading.Thread(target=start_main_app, daemon=True).start()
+
+    try:
+        # מנסה להפעיל את ה־Dashboard (Flask Admin)
+        from admin_web.server import create_app
+        app_flask = create_app()
+        app_flask.run(host="0.0.0.0", port=PORT, debug=True, threaded=True)
+    except Exception as e:
+        print("⚠️ Dashboard failed, fallback to proxy-only mode.")
+        print("שגיאה:", e)
+        app.run(host="0.0.0.0", port=PORT, debug=True, threaded=True)
