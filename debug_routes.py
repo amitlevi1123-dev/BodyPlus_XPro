@@ -13,3 +13,4 @@ def print_routes(app):
 if __name__ == "__main__":
     app = runpod_proxy.app  # או main.app / server.create_app() אם זה יוצר את האפליקציה
     print_routes(app)
+ASD
