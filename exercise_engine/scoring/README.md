@@ -118,7 +118,7 @@ class VoteResult:
 > (את הטמפלטים המלאים כבר בנית — זה רק מה שמעניין למנוע הציון)
 
 ```yaml
-id: squat.bodyweight
+id: squat.bodyweight.md
 family: squat
 meta:
   selectable: true

@@ -80,7 +80,7 @@ def test_files_exist_and_loadable():
     base = load_yaml(BASE)
     bw = load_yaml(BW)
     assert base["id"] == "squat.base"
-    assert bw["id"] == "squat.bodyweight"
+    assert bw["id"] == "squat.bodyweight.md"
     assert bw.get("extends") == "squat.base"
 
 def test_autodetect_bodyweight_when_no_bar_present():

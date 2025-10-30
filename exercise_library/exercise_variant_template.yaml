@@ -17,7 +17,7 @@
 # ===================================================================
 
 # מזהה ייחודי לתרגיל
-id: <family>.<variant>                  # דוגמה: squat.bodyweight
+id: <family>.<variant>                  # דוגמה: squat.bodyweight.md
 
 # שם המשפחה
 family: <family>                        # דוגמה: squat

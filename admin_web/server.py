@@ -5,7 +5,8 @@ server.py — Admin UI + API (Browser-only video ingest)
 • Flask (דשבורד, וידאו, לוגים כ-Blueprint) — /video/stream.mjpg
 • /payload ו-/api/payload_last
 • סטרים MJPEG דרך admin_web.routes_video (ingest מהדפדפן)
-• Upload-Video (FFmpeg) נשאר אופציונלי
+• Upload-Video (FFmpeg) אופציונלי
+• נקודות בריאות (/ping, /healthz) תמיד קיימות גם אם bp_system לא נטען
 """
 
 from __future__ import annotations
@@ -47,7 +48,7 @@ try:
 except Exception:
     bp_exercise = None  # type: ignore
 
-# System/health/diagnostics (אם קיים הוא יחשוף /healthz כבר)
+# System/health/diagnostics (אם קיים יחשוף /healthz בעצמו)
 try:
     from admin_web.routes_system import bp_system
 except Exception:
@@ -66,7 +67,7 @@ try:
 except Exception:
     PAYLOAD_VERSION = "1.2.0"
 
-# ===== payload משותף =====
+# ===== payload משותף (אם אין state, נשתמש במשתנה פנימי) =====
 try:
     from admin_web.state import get_payload as get_shared_payload  # type: ignore
 except Exception:
@@ -101,6 +102,7 @@ LAST_PAYLOAD: Optional[Dict[str, Any]] = None
 
 START_TS = time.time()
 
+
 # ===== Internals / Utils =====
 def _background_log_heartbeat() -> None:
     i = 0
@@ -112,6 +114,7 @@ def _background_log_heartbeat() -> None:
         except Exception:
             pass
 
+
 def _flatten_dict(d: Dict[str, Any], prefix: str = "") -> Dict[str, Any]:
     out: Dict[str, Any] = {}
     for k, v in d.items():
@@ -122,12 +125,14 @@ def _flatten_dict(d: Dict[str, Any], prefix: str = "") -> Dict[str, Any]:
             out[nk] = v
     return out
 
+
 def _get_empty_objdet_payload() -> Dict[str, Any]:
     return {
         "frame": {"w": 1280, "h": 720, "mirrored": False, "ts_ms": _NOW_MS()},
         "objects": [], "tracks": [],
         "detector_state": {"ok": False, "err": "no_detection_engine", "provider": "none", "fps": 0.0},
     }
+
 
 def normalize_payload(raw: Dict[str, Any]) -> Dict[str, Any]:
     res: Dict[str, Any] = {"metrics": [], "ts": time.time()}
@@ -159,6 +164,7 @@ def normalize_payload(raw: Dict[str, Any]) -> Dict[str, Any]:
         res["ts"] = float(raw["ts"])
     return res
 
+
 def _coerce_scalar(x):
     if isinstance(x, list) and len(x) == 1:
         x = x[0]
@@ -173,6 +179,7 @@ def _coerce_scalar(x):
         except Exception:
             return x
     return x
+
 
 def _try_parse_non_json_body(raw: str):
     if not raw or not isinstance(raw, str):
@@ -196,8 +203,10 @@ def _try_parse_non_json_body(raw: str):
     except Exception:
         return None
 
+
 def _finite(x: Any) -> bool:
     return isinstance(x, (int, float)) and math.isfinite(x)
+
 
 def _sanitize_numbers_inplace(obj: Any):
     if isinstance(obj, dict):
@@ -212,6 +221,7 @@ def _sanitize_numbers_inplace(obj: Any):
         return float(obj)
     return obj
 
+
 def _ensure_ts_frameid(d: Dict[str, Any]) -> None:
     if "ts" not in d:
         ts_ms = d.get("ts_ms")
@@ -225,6 +235,7 @@ def _ensure_ts_frameid(d: Dict[str, Any]) -> None:
             d["frame_id"] = int(frm["frame_id"])
         else:
             d["frame_id"] = 0
+
 
 def _ensure_detections_from_objdet(d: Dict[str, Any]) -> None:
     if "detections" in d and isinstance(d["detections"], list):
@@ -261,6 +272,7 @@ def _ensure_detections_from_objdet(d: Dict[str, Any]) -> None:
                 dets.append(item)
     d["detections"] = dets
 
+
 def _server_side_schema_fixups(d: Dict[str, Any]) -> Dict[str, Any]:
     if not isinstance(d, dict):
         return d
@@ -268,6 +280,7 @@ def _server_side_schema_fixups(d: Dict[str, Any]) -> Dict[str, Any]:
     _ensure_detections_from_objdet(d)
     _sanitize_numbers_inplace(d)
     return d
+
 
 # ===== App factory =====
 def create_app() -> Flask:
@@ -308,29 +321,21 @@ def create_app() -> Flask:
     if bp_system is not None:
         app.register_blueprint(bp_system)
 
-    # ----- Fallback health endpoints (אם bp_system לא סיפק) -----
-    if "system._healthz" not in app.view_functions:
-        @app.get("/healthz")
-        def _healthz():
-            return "ok", 200
-    if "system._health" not in app.view_functions:
-        @app.get("/health")
-        def _health():
-            return "ok", 200
-    if "system._ping" not in app.view_functions:
-        @app.get("/ping")
-        def _ping():
-            return "pong", 200
+    # ----- Jinja helpers (חובה לטמפלטים כמו base.html, dashboard.html) -----
+    @app.context_processor
+    def _inject():
+        def has_endpoint(name: str) -> bool:
+            return name in app.view_functions
 
-    # אתחול Persist (DB) — no-op אם לא זמין
-    try:
-        db_persist_init(default_user_name=os.getenv("DEFAULT_USER_NAME", "Amit"))
-        logger.info("DB persist layer: %s", "ON" if DB_PERSIST_AVAILABLE else "OFF")
-    except Exception as _e:
-        logger.warning(f"DB persist init failed: {_e}")
+        def url_for_safe(name: str, **kwargs) -> str:
+            return url_for(name, **kwargs) if name in app.view_functions else "#"
 
-    logger.info("=== Admin UI (Flask – Browser ingest) ===")
-    logger.info(f"APP_VERSION={APP_VERSION}  DEFAULT_BACKEND={DEFAULT_BACKEND or '(none)'}")
+        return {
+            "has_endpoint": has_endpoint,
+            "url_for_safe": url_for_safe,
+            "app_endpoints": set(app.view_functions.keys()),
+            "app_version": APP_VERSION,
+        }
 
     # ----- Global headers / CORS / cache bust -----
     @app.after_request
@@ -343,20 +348,6 @@ def create_app() -> Flask:
         resp.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
         resp.headers["Access-Control-Allow-Headers"] = "Content-Type, X-Ingest-Token"
         return resp
-
-    # ----- Jinja helpers -----
-    @app.context_processor
-    def _inject():
-        def has_endpoint(name: str) -> bool:
-            return name in app.view_functions
-        def url_for_safe(name: str, **kwargs) -> str:
-            return url_for(name, **kwargs) if name in app.view_functions else "#"
-        return {
-            "app_endpoints": set(app.view_functions.keys()),
-            "has_endpoint": has_endpoint,
-            "url_for_safe": url_for_safe,
-            "app_version": APP_VERSION,
-        }
 
     # ----- Static/SPAs -----
     def _serve_gz_or_plain(path_no_gz: Path, default_mime: str) -> Response:
@@ -607,6 +598,16 @@ def create_app() -> Flask:
         <img src="/video/stream.mjpg?hud=1" style="max-width:100%;max-height:100vh;object-fit:contain">
         """, mimetype="text/html")
 
+    # ----- Fallback health (אם bp_system לא סיפק) -----
+    if "system._healthz" not in app.view_functions:
+        @app.get("/healthz")
+        def _healthz():
+            return "ok", 200
+    if "system._ping" not in app.view_functions:
+        @app.get("/ping")
+        def _ping():
+            return "pong", 200
+
     return app
 
 
@@ -614,9 +615,11 @@ def create_app() -> Flask:
 app = create_app()
 
 # ================================================================
-# ריצה מקומית בלבד (לא בענן / RunPod)
+# ריצה מקומית (לא בענן / RunPod)
 # ================================================================
 if __name__ == "__main__":
+    # ← ברירת מחדל 5000 כדי לא לשבור את main.py
     port = int(os.getenv("PORT", "5000"))
     logger.info(f"[Local] Flask server running at http://127.0.0.1:{port}")
+    logger.info("Available endpoints: / (dashboard), /video, /payload, /ping, /healthz")
     app.run(host="0.0.0.0", port=port, debug=True, use_reloader=False, threaded=True)

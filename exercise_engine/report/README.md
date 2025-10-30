@@ -88,7 +88,7 @@
 {
   "meta": {"generated_at": "2025-10-29T14:10:00Z", "payload_version": "1.2.0", "library_version": "e3a1f2c"},
   "display_lang": "he",
-  "exercise": {"id":"squat.bodyweight","family":"squat","equipment":"bodyweight","display_name":"Bodyweight Squat"},
+  "exercise": {"id":"squat.bodyweight.md","family":"squat","equipment":"bodyweight","display_name":"Bodyweight Squat"},
   "ui": {
     "lang_labels": {
       "exercise":{"he":"סקוואט משקל גוף","en":"Bodyweight Squat"},

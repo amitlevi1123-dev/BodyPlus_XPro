@@ -701,7 +701,7 @@
   }
 
   // ---------- Local Simulation (fallback) ----------
-  const SAMPLE_EX = 'squat.bodyweight';
+  const SAMPLE_EX = 'squat.bodyweight.md';
   function randf(a=0,b=1){ return a + Math.random()*(b-a); }
   function jitter(v,noise){ return clamp(v + (randf(-noise,noise)*100), 0, 100); }
   function makeCriteria(mode){
@@ -790,7 +790,7 @@
           const criteria = Array.isArray(r.criteria) ? r.criteria : [];
           const repLike = {
             ui_ranges: sim.ui_ranges || null,
-            exercise: { id: r.exercise_id || s.exercise_id || 'squat.bodyweight', family: sim.exercise?.family, equipment: sim.exercise?.equipment, display_name: sim.exercise?.display_name },
+            exercise: { id: r.exercise_id || s.exercise_id || 'squat.bodyweight.md', family: sim.exercise?.family, equipment: sim.exercise?.equipment, display_name: sim.exercise?.display_name },
             scoring: {
               score: (r.score_pct!=null ? r.score_pct/100 : (r.score ?? null)),
               quality: r.quality || (r.score_pct!=null ? (r.score_pct>=85?'full':(r.score_pct>=70?'partial':'poor')) : null),

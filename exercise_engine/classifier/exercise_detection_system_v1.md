@@ -175,7 +175,7 @@ match_hints:
   "candidates": [
     {"id": "squat.barbell",   "score": 0.86},
     {"id": "squat.dumbbell",  "score": 0.44},
-    {"id": "squat.bodyweight","score": 0.22}
+    {"id": "squat.bodyweight.md","score": 0.22}
   ],
   "diagnostics": []
 }

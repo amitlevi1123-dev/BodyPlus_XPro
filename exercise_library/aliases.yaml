@@ -13,12 +13,6 @@
 # • אל תכפלו מפתחות קנוניים — הרחיבו רשימות aliases בלבד.
 # =============================================================================
 
-# -----------------------------------------------------------------------------
-# (אופציונלי) הגדרות מנרמל/קונפליקטים — לא שוברות תאימות.
-# הערך כאן הוא תיעודי עד שתפעיל תמיכה בקוד:
-#   settings.normalizer.conflict_strategy.numeric: mean | first
-#   settings.normalizer.conflict_strategy.text:    first
-# -----------------------------------------------------------------------------
 settings:
   normalizer:
     conflict_strategy:
@@ -30,35 +24,34 @@ settings:
 canonical_keys:
 
   # ────────────────────────────────────────────────────────────────────────────
-  # מטא/תזמון פריים/איכות חישוב
+  # מטא / איכות חישוב / נראות / נוכחות
   # ────────────────────────────────────────────────────────────────────────────
   dt_ms:
     unit: ms
     aliases: [dt_ms, dt]
 
+  max_dt_ms:
+    unit: ms
+    aliases: [max_dt_ms, max_dt]    # לשימוש בסיכומי set_visibility_audit
+
   average_visibility:
     unit: ratio
-    aliases: [average_visibility]
+    aliases: [average_visibility, vis_avg]
 
   quality_score:
     unit: ratio
     aliases: [quality_score, view_score]
 
-  weight_shift:
-    unit: ratio
-    aliases: [weight_shift]
-
-  measurements.ok:
-    unit: bool
-    aliases: [measurements.ok]
-
-  # יחסי נוכחות אדם בפריים (לאיכות מדידה/אודיט)
   person_ratio:
     unit: ratio
     aliases: [person_ratio, presence_ratio]
 
+  measurements.ok:
+    unit: bool
+    aliases: [measurements.ok, measurements_ok, measure_ok]
+
   # ────────────────────────────────────────────────────────────────────────────
-  # תצוגה / מצב מצלמה / זווית צפייה
+  # מצב מצלמה / פוזה
   # ────────────────────────────────────────────────────────────────────────────
   view.mode:
     unit: text
@@ -73,7 +66,7 @@ canonical_keys:
     aliases: [pose.confidence, pose.average_confidence, confidence]
 
   # ────────────────────────────────────────────────────────────────────────────
-  # בר/אובייקטים (ציוד)
+  # ציוד / אובייקטים + פרוקסי גובה
   # ────────────────────────────────────────────────────────────────────────────
   bar.y_px:
     unit: px
@@ -91,7 +84,10 @@ canonical_keys:
     unit: bool
     aliases: [objdet.kettlebell_present, kettlebell.present]
 
-  # ✅ תוספות גנריות לציוד/אובייקט (לזיהוי ותאימות עתידית)
+  objdet.trapbar_present:
+    unit: bool
+    aliases: [objdet.trapbar_present, trapbar.present]
+
   objdet.object_present:
     unit: bool
     aliases: [objdet.object_present, equipment.present, object.present]
@@ -101,28 +97,20 @@ canonical_keys:
     aliases: [objdet.object_kind, equipment.kind, object.kind]
     # ערכים מומלצים: barbell, dumbbell, kettlebell, trapbar, plate, band, bodyweight, unknown
 
-  # ציוד: טרפ-בר (לשימוש עתידי)
-  objdet.trapbar_present:
-    unit: bool
-    aliases: [objdet.trapbar_present, trapbar.present]
-
-  # סיגנל גובה כלל-מערכתי לאובייקט (מוט/דאמבלים/קטלבל/גוף)
   object_y:
     unit: px
     aliases: [object_y, object.y_px, equipment.y, equipment.y_px]
 
-  # מרכז כפות הידיים — פרוקסי מצוין ל-object_y כשאין מוט (DB/KB/BW)
   hands_center_y:
     unit: px
     aliases: [hands_center_y, hands_center_y_px, hands.centroid_y_px]
 
-  # גובה האגן — fallback ל-BW/כללי
   hip_y_px:
     unit: px
     aliases: [hip_y_px, hip.y_px]
 
   # ────────────────────────────────────────────────────────────────────────────
-  # נקודות עוגן ביד/שורש כף היד (ל־reps auto-pick)
+  # נקודות יד (לעוגני rep/מסלולי מוט/Press)
   # ────────────────────────────────────────────────────────────────────────────
   wrist_left_y_px:
     unit: px
@@ -132,8 +120,22 @@ canonical_keys:
     unit: px
     aliases: [wrist_right_y_px, wrist_y_right, hand_y_right]
 
+  # יחסי עומק Press
+  press.hand_y_rel_chest:
+    unit: ratio
+    aliases: [press.hand_y_rel_chest, hand_y_rel_chest]
+
+  press.hand_y_rel_head:
+    unit: ratio
+    aliases: [press.hand_y_rel_head, hand_y_rel_head]
+
+  # מסלולי מוט (שיפוע/אנכיות)
+  bar.path_angle_from_vertical_deg:
+    unit: deg
+    aliases: [bar.path_angle_from_vertical_deg, bar_path_angle_from_vertical_deg]
+
   # ────────────────────────────────────────────────────────────────────────────
-  # יציבה / גו (Torso & Spine)
+  # יציבה / גו / עמוד שדרה
   # ────────────────────────────────────────────────────────────────────────────
   torso_forward_deg:
     unit: deg
@@ -151,6 +153,10 @@ canonical_keys:
     unit: deg
     aliases: [spine_curvature_side_deg]
 
+  head_delta_deg:
+    unit: deg
+    aliases: [head_delta_deg, head_vs_torso_deg, head_torso_delta_deg]
+
   torso_forward_vel_deg_s:
     unit: deg_s
     aliases: [torso_forward_vel_deg_s]
@@ -160,7 +166,7 @@ canonical_keys:
     aliases: [torso_forward_acc_deg_s2]
 
   spine_curvature_side_vel_deg_s:
-    unit: deg
+    unit: deg_s
     aliases: [spine_curvature_side_vel_deg_s]
 
   spine_curvature_side_acc_deg_s2:
@@ -183,7 +189,7 @@ canonical_keys:
     aliases: [pelvis_rotation_deg]
 
   # ────────────────────────────────────────────────────────────────────────────
-  # כתפיים / מרפקים / ירכיים / ברכיים (Joints)
+  # מפרקים עיקריים
   # ────────────────────────────────────────────────────────────────────────────
   shoulder_left_deg:
     unit: deg
@@ -226,7 +232,7 @@ canonical_keys:
     aliases: [knee_delta_deg]
 
   # ────────────────────────────────────────────────────────────────────────────
-  # קרסול / שורש כף-יד (Ankle / Wrist)
+  # קרסול / שורש-כף-יד
   # ────────────────────────────────────────────────────────────────────────────
   ankle_dorsi_left_deg:
     unit: deg
@@ -253,11 +259,11 @@ canonical_keys:
     aliases: [wrist_radial_ulnar_right_deg]
 
   # ────────────────────────────────────────────────────────────────────────────
-  # עמידה / כפות רגליים (Feet & Stance)
+  # עמידה / כפות רגליים / יישור ברך
   # ────────────────────────────────────────────────────────────────────────────
   features.stance_width_ratio:
     unit: ratio
-    aliases: [features.stance_width_ratio, feet_w_over_shoulders_w, stance_width_ratio]
+    aliases: [features.stance_width_ratio, feet_w_over_shoulders_w, stance_width_ratio, stance_ratio]
 
   toe_angle_left_deg:
     unit: deg
@@ -275,6 +281,7 @@ canonical_keys:
     unit: deg
     aliases: [knee_foot_alignment_right_deg, knee_toe_alignment_right_deg, knee_valgus_right_deg, kfa_right_deg, knee_toe_right_deg]
 
+  # סעיפים בוליאניים למגע/עקבים
   heel_lift_left:
     unit: bool
     aliases: [heel_lift_left]
@@ -291,6 +298,11 @@ canonical_keys:
     unit: bool
     aliases: [foot_contact_right]
 
+  heels_grounded:
+    unit: bool
+    aliases: [heels_grounded, heels.on_floor, heels_contact_ok]
+
+  # מרחקים עוזרי־אבחנה (פיצ'רים עתידיים/איזון)
   feet_width_px:
     unit: px
     aliases: [feet_width_px]
@@ -306,11 +318,6 @@ canonical_keys:
   hips_delta_px:
     unit: px
     aliases: [hips_delta_px]
-
-  # עקבים נעוצים (לתנאי נעילה)
-  heels_grounded:
-    unit: bool
-    aliases: [heels_grounded, heels.on_floor, heels_contact_ok]
 
   # ────────────────────────────────────────────────────────────────────────────
   # ראש (Head)
@@ -336,11 +343,11 @@ canonical_keys:
     aliases: [head_ok, head.ok]
 
   # ────────────────────────────────────────────────────────────────────────────
-  # חזרות: מצב/טיימינג/ROM/דגלי איכות (Rep Metrics)
+  # חזרות: מצב / טיימינג / ROM / דגלים
   # ────────────────────────────────────────────────────────────────────────────
   rep.state:
     unit: text
-    aliases: [rep.state]  # start / towards / turn / away
+    aliases: [rep.state]   # start / towards / turn / away
 
   rep.phase:
     unit: text
@@ -348,7 +355,7 @@ canonical_keys:
 
   rep.dir:
     unit: text
-    aliases: [rep.dir]    # inc / dec
+    aliases: [rep.dir]     # inc / dec
 
   rep.active:
     unit: bool
@@ -370,24 +377,24 @@ canonical_keys:
     unit: text
     aliases: [rep.units]
 
-  # טיימינג ו-Tempo
+  # טמפו
   rep.timing_s:
     unit: s
     aliases: [rep.timing_s, rep_time_s, rep_duration_s]
 
   rep.ecc_s:
     unit: s
-    aliases: [rep.ecc_s]
+    aliases: [rep.ecc_s, ecc_s]
 
   rep.con_s:
     unit: s
-    aliases: [rep.con_s]
+    aliases: [rep.con_s, con_s]
 
   rep.rest_s:
     unit: s
     aliases: [rep.rest_s]
 
-  # עצירות (לנעילה/סט-אפ)
+  # עצירות
   rep.pause_top_s:
     unit: s
     aliases: [rep.pause_top_s, rep_hold_top_s, top_hold_s]
@@ -396,7 +403,7 @@ canonical_keys:
     unit: s
     aliases: [rep.pause_bottom_s, rep_hold_bottom_s, bottom_hold_s]
 
-  # טווח תנועה/התקדמות
+  # ROM/התקדמות
   rep.rom:
     unit: deg
     aliases: [rep.rom]
@@ -442,6 +449,79 @@ canonical_keys:
     unit: bool
     aliases: [rep.warnings.auto_target_used]
 
+  # ────────────────────────────────────────────────────────────────────────────
+  # Hinge ROM מפורק + יחס משולב (תמיכה ל־phrases.hinge.common.rom_joint)
+  # ────────────────────────────────────────────────────────────────────────────
+  hinge.hip_rom_deg:
+    unit: deg
+    aliases: [hinge.hip_rom_deg, hip_rom_deg]
+
+  hinge.torso_rom_deg:
+    unit: deg
+    aliases: [hinge.torso_rom_deg, torso_rom_deg]
+
+  hinge.rom_joint_ratio:
+    unit: ratio
+    aliases: [hinge.rom_joint_ratio, rom_joint_ratio]
+
+  # ────────────────────────────────────────────────────────────────────────────
+  # מפתחות "יעד/טווחי יעד" להצגה/כללים (נתוני יעד המגיעים מה-Engine/Config)
+  # ────────────────────────────────────────────────────────────────────────────
+  target.deg:
+    unit: deg
+    aliases: [target_deg, target.deg, rom_target_deg]
+
+  measured.deg:
+    unit: deg
+    aliases: [measured_deg, rom_measured_deg]
+
+  target.hip_deg:
+    unit: deg
+    aliases: [target_hip_deg, target.hip_deg]
+
+  target.torso_deg:
+    unit: deg
+    aliases: [target_torso_deg, target.torso_deg]
+
+  target.knee_min_deg:
+    unit: deg
+    aliases: [knee_min_deg, target.knee_min_deg]   # עומק מינימלי שנמדד/נדרש
+
+  target.posture.max_good_deg:
+    unit: deg
+    aliases: [max_good_deg, target.posture.max_good_deg]
+
+  target.tempo.min_s:
+    unit: s
+    aliases: [min_s, tempo_min_s, target.tempo.min_s]
+
+  target.tempo.max_s:
+    unit: s
+    aliases: [max_s, tempo_max_s, target.tempo.max_s]
+
+  target.stance_ratio.min:
+    unit: ratio
+    aliases: [target.stance_ratio.min, stance_min_ok, min_ok]
+
+  target.stance_ratio.max:
+    unit: ratio
+    aliases: [target.stance_ratio.max, stance_max_ok, max_ok]
+
+  target.valgus_deg:
+    unit: deg
+    aliases: [valgus_deg, target.valgus_deg]  # להצגה בטקסטים קצרים
+
+  # ────────────────────────────────────────────────────────────────────────────
+  # העברת משקל (גם כללית וגם ratio מפורש)
+  # ────────────────────────────────────────────────────────────────────────────
+  weight_shift:
+    unit: ratio
+    aliases: [weight_shift]
+
+  weight_shift_ratio:
+    unit: ratio
+    aliases: [weight_shift_ratio, weight_shift]  # לשימוש בטקסט (ממופה ליחס)
+
 # =============================================================================
 # טולרנסים בין aliases של אותו מפתח קנוני
 # =============================================================================
@@ -460,10 +540,10 @@ tolerances:
 # =============================================================================
 # 🛠️ רעיונות עתידיים (תיעוד בלבד)
 # =============================================================================
-# 1) ROM מפורק למפרקים: knee_rom_deg / hip_rom_deg / elbow_rom_deg (deg)
-# 2) שליטה בטמפו מורחב: rep.pause_bottom_s / rep.pause_top_s (s)
+# 1) ROM מפורק למפרקים נוספים: knee_rom_deg / elbow_rom_deg (deg)
+# 2) מדדי “turn quality” כמותיים: turn_sharpness (ratio), turn_dt_s (s)
 # 3) מדדי סימטריה: symmetry.knee_diff_deg / symmetry.hip_diff_deg / symmetry.shoulder_diff_deg
-# 4) Hinge Ratio: torso_forward_deg / avg(knee_left/right_deg) (ratio)
+# 4) Hinge Ratio מורחב: torso_forward_deg / avg(knee_left/right_deg)
 # 5) balance_score מתנועה צדית מנורמלת (shoulders_delta_px / hips_delta_px)
-# 6) object_x (px) למסלול אופקי של האובייקט (לתזמון “בר קרוב לגוף”)
-# 7) grip_width_px (px) והשלכות על torque במפרקי כתף/מרפק
+# 6) bar/object_x (px) למסלול אופקי (“קרב את העומס לגוף”)
+# 7) grip_width_px (px) והשפעות על torque כתף/מרפק

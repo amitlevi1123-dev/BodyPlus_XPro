@@ -7,17 +7,16 @@ admin_web/exercise_analyzer.py
 מטרות:
 - יצירת דו"חות מלאים (score + hints + health + coverage)
 - הפקת דו"ח אמיתי ממדידות (detect_once)
-- ניקוד בסיסי ללא מנוע (analyze_exercise)
-- סימולציה מלאה (simulate_full_reports / simulate_exercise)
+- סימולציה מלאה (simulate_exercise)
 - שמירת דו"ח אחרון ל-UI
 - טעינת שמות תצוגה (exercises/family/equipment) + תוויות מדדים (metrics)
 - הזרקת שמות תצוגה לדו"ח שחוזר מהמנוע
-- API פנימי: get_ui_labels()/reload_ui_labels()/settings_dump()
+- API פנימי: get_ui_labels()/reload_ui_labels() + settings_dump() + analyze_exercise()
 """
 
 from __future__ import annotations
 import os, math, random, time, json, threading
-from typing import Any, Dict, List, Optional, Tuple, Callable
+from typing import Any, Dict, List, Optional, Tuple
 from pathlib import Path
 
 # ─────────────────────────────────────────────────────────────
@@ -77,15 +76,9 @@ _UI_LABELS: Dict[str, Any] = {"names": {}, "labels": {}}
 _UI_LABELS_LOCK = threading.Lock()
 
 def _ui_files_base() -> Path:
-    """
-    מיקום ברירת מחדל של קבצי התוויות:
-    exercise_engine/report/exercise_names.yaml
-    exercise_engine/report/metrics_labels.yaml
-    """
     return (Path(__file__).resolve().parent.parent / "exercise_engine" / "report")
 
 def _load_ui_labels(root: Optional[Path] = None) -> Dict[str, Any]:
-    """טוען YAML של שמות תצוגה ותוויות מדדים."""
     base = (root or _ui_files_base())
     out = {"names": {}, "labels": {}}
     try:
@@ -104,13 +97,11 @@ def _load_ui_labels(root: Optional[Path] = None) -> Dict[str, Any]:
     return out
 
 def get_ui_labels() -> Dict[str, Any]:
-    """החזרת המפות הטעונות (ל־API/UI)."""
     with _UI_LABELS_LOCK:
         return {"names": dict(_UI_LABELS.get("names", {})),
                 "labels": dict(_UI_LABELS.get("labels", {}))}
 
 def reload_ui_labels() -> Dict[str, Any]:
-    """טעינה מחדש של קבצי התוויות (ללא אתחול שרת)."""
     global _UI_LABELS
     new_maps = _load_ui_labels()
     with _UI_LABELS_LOCK:
@@ -125,13 +116,10 @@ def reload_ui_labels() -> Dict[str, Any]:
     return {"ok": True, "counts": counts}
 
 def _apply_ui_names(report: Dict[str, Any], *, display_lang: str = "he") -> Dict[str, Any]:
-    """מוסיף/מעדכן ui.lang_labels לדו״ח לפי exercise_names.yaml (ללא שינוי ציונים/מדידות)."""
     if not isinstance(report, dict):
         return report
-
     ui = report.setdefault("ui", {})
     names = get_ui_labels().get("names", {}) or {}
-
     ex = (report.get("exercise") or {})
     ex_id = ex.get("id")
     family = ex.get("family")
@@ -153,24 +141,20 @@ def _apply_ui_names(report: Dict[str, Any], *, display_lang: str = "he") -> Dict
     return report
 
 # ─────────────────────────────────────────────────────────────
-# Utilities
+# Utils
 # ─────────────────────────────────────────────────────────────
-def _clamp01(x: float) -> float:
-    return max(0.0, min(1.0, float(x)))
-
+def _clamp01(x: float) -> float: return max(0.0, min(1.0, float(x)))
 def _pct(v: Optional[float]) -> Optional[int]:
     if v is None: return None
     try: return int(round(float(v) * 100))
     except Exception: return None
-
 def _quality_from_score(score: Optional[float]) -> Optional[str]:
     if score is None: return None
     s = float(score)
     if s >= 0.85: return "full"
     if s >= 0.70: return "partial"
     return "poor"
-
-def _ui_ranges() -> Dict[str, Any]:
+def _ui_ranges():
     return {"color_bar": [
         {"label": "red", "from_pct": 0, "to_pct": 60},
         {"label": "orange", "from_pct": 60, "to_pct": 75},
@@ -178,12 +162,11 @@ def _ui_ranges() -> Dict[str, Any]:
     ]}
 
 # ─────────────────────────────────────────────────────────────
-# Sanitization (ניקוי מדדים גולמיים)
+# Sanitize
 # ─────────────────────────────────────────────────────────────
 def sanitize_metrics_payload(obj: Any) -> Dict[str, Any]:
     out: Dict[str, Any] = {}
-    if not isinstance(obj, dict):
-        return out
+    if not isinstance(obj, dict): return out
     for k, v in obj.items():
         try:
             if isinstance(v, bool):
@@ -195,53 +178,36 @@ def sanitize_metrics_payload(obj: Any) -> Dict[str, Any]:
                 if t in ("true", "false"):
                     out[k] = (t == "true")
                 else:
-                    try:
-                        out[k] = float(v)
-                    except Exception:
-                        out[k] = v
+                    try: out[k] = float(v)
+                    except Exception: out[k] = v
         except Exception:
             continue
     return out
 
 # ─────────────────────────────────────────────────────────────
-# Settings dump (למסך הגדרות)
+# Settings dump (בשביל /settings)
 # ─────────────────────────────────────────────────────────────
 def settings_dump() -> Dict[str, Any]:
-    """מצב מנוע/ספרייה להצגה ב־/api/exercise/settings."""
-    try:
-        engine_ok = EXR_SETTINGS is not None
-        lib_root = None
-        families_count = exercises_count = 0
-        if engine_ok:
-            try:
-                lib = get_engine_library()
-                lib_root = getattr(lib, "root_dir", None) or getattr(lib, "root", None)
-                families_count = len(getattr(lib, "families", {}) or {})
-                exercises_count = len(getattr(lib, "exercises", {}) or {})
-            except Exception as e:
-                return {"ok": False, "error": f"library_load_failed: {e}", "engine": {"available": False}}
-
-        return {
-            "ok": True,
-            "engine": {"available": engine_ok, "settings_present": bool(EXR_SETTINGS is not None)},
-            "library": {
-                "loaded": bool(engine_ok),
-                "root": str(lib_root) if lib_root else None,
-                "families_count": families_count,
-                "exercises_count": exercises_count,
-            },
-        }
-    except Exception as e:
-        return {"ok": False, "error": str(e)}
+    labels = get_ui_labels()
+    counts = {
+        "exercises": len((labels.get("names") or {}).get("exercises", {})),
+        "families":  len((labels.get("names") or {}).get("families", {})),
+        "equipment": len((labels.get("names") or {}).get("equipment", {})),
+        "metrics":   len(labels.get("labels") or {}),
+    }
+    return {
+        "ok": True,
+        "engine_available": bool(_EXR_OK and exr_run_once),
+        "labels_counts": counts,
+        "ts": time.time(),
+    }
 
 # ─────────────────────────────────────────────────────────────
-# Detect once (הרצה אמיתית של מנוע)
+# Detect once (runtime)
 # ─────────────────────────────────────────────────────────────
 def detect_once(raw_metrics: Dict[str, Any],
                 exercise_id: Optional[str] = None,
-                payload_version: str = "1.0",
-                persist_cb: Optional[Callable[[Dict[str, Any]], None]] = None) -> Dict[str, Any]:
-    """הרצה אחת אמיתית של מנוע הזיהוי."""
+                payload_version: str = "1.0") -> Dict[str, Any]:
     if not _EXR_OK or exr_run_once is None:
         return {"ok": False, "error": "engine_unavailable"}
 
@@ -260,107 +226,77 @@ def detect_once(raw_metrics: Dict[str, Any],
         logger.error(f"detect_once runtime failed: {e}")
         return {"ok": False, "error": f"runtime_failed: {e}"}
 
-    # עיטור תצוגה
     try:
         report = _apply_ui_names(report, display_lang="he")
     except Exception as e:
         logger.warning(f"[UI] failed to apply ui names: {e}")
 
-    # שמירה + התמדה (אופציונלי)
-    try:
-        set_last_report(report)
-    except Exception:
-        pass
-    try:
-        if callable(persist_cb):
-            persist_cb(report)
-    except Exception as e:
-        logger.warning(f"[DB] persist callback failed: {e}")
-
     took_ms = int((time.time() - t0) * 1000)
     return {"ok": True, "took_ms": took_ms, "report": report}
 
 # ─────────────────────────────────────────────────────────────
-# ניקוד בסיסי ללא מנוע (לראוט /score)
+# analyze_exercise (שירות ניקוד פשוט בלי המנוע)
 # ─────────────────────────────────────────────────────────────
 def analyze_exercise(payload: Dict[str, Any]) -> Dict[str, Any]:
     """
-    קולט: { metrics: {...}, exercise?: {id/family/equipment} }
-    מחזיר דו"ח בדומה ל-runtime אך על בסיס היוריסטיקות פשוטות.
+    קלט:
+      { "metrics": {...}, "exercise": {"id": "squat.bodyweight"} }
+    פלט דו"ח ידידותי ל-UI (score/criteria/hints + ui_ranges)
     """
     metrics = sanitize_metrics_payload(payload.get("metrics") or {})
     ex = payload.get("exercise") or {}
-    ex_id = (ex.get("id") or "squat.bodyweight")
-    family = ex.get("family") or ("squat" if ex_id.startswith("squat") else None)
-    equipment = ex.get("equipment") or ("none" if ".bodyweight" in ex_id else None)
+    ex_id = ex.get("id") or "squat.bodyweight"
+    family = ex.get("family") or "squat"
+    equipment = ex.get("equipment") or "none"
 
-    # היוריסטיקה מאוד עדינה: ממוצע של כמה אינדיקטורים אם קיימים
-    parts: List[float] = []
-    def add(key: str, transform: Callable[[float], float]) -> None:
-        v = metrics.get(key)
-        if isinstance(v, (int, float)):
-            try:
-                parts.append(_clamp01(transform(float(v))))
-            except Exception:
-                pass
+    # מדד בסיסי לדוגמה
+    rom = float(metrics.get("rep.rom") or metrics.get("torso_forward_deg") or 60.0)
+    tempo_ok = 0.6 <= float(metrics.get("rep.timing_s", 1.5)) <= 4.0
+    depth_score = _clamp01((rom - 40.0) / 50.0)  # 40..90 → 0..1
+    tempo_score = 0.85 if tempo_ok else 0.55
+    knees_score = 0.8
+    torso_score = 0.75
+    stance_score = 0.8
 
-    # עומק סקוואט (ברך נמוכה=טוב) 90° יעד
-    add("knee_left_deg",  lambda x: (150 - min(150, x)) / 150.0)
-    add("knee_right_deg", lambda x: (150 - min(150, x)) / 150.0)
-
-    # זווית גו (הימנעות מקיצוניות)
-    add("torso_forward_deg", lambda x: 1.0 - min(abs(x - 35.0), 60.0) / 60.0)
-
-    # טמפו
-    add("rep.timing_s", lambda s: 1.0 - min(abs(s - 1.5), 2.0) / 2.0)
-
-    if not parts:
-        parts = [0.72]  # ברירת מחדל נעימה לעין אם אין מדדים
-
-    base = sum(parts) / len(parts)
-    base = _clamp01(base)
-
-    crit = [
-        {"id": "depth",        "available": True, "score": _clamp01(base - 0.05)},
-        {"id": "knees",        "available": True, "score": _clamp01(base - 0.03)},
-        {"id": "torso_angle",  "available": True, "score": _clamp01(base - 0.02)},
-        {"id": "stance_width", "available": True, "score": _clamp01(base - 0.02)},
-        {"id": "tempo",        "available": True, "score": _clamp01(base - 0.02)},
+    criteria = [
+        {"id": "depth",        "available": True, "score": depth_score},
+        {"id": "tempo",        "available": True, "score": tempo_score},
+        {"id": "knees",        "available": True, "score": knees_score},
+        {"id": "torso_angle",  "available": True, "score": torso_score},
+        {"id": "stance_width", "available": True, "score": stance_score},
     ]
-    for c in crit:
+    for c in criteria:
+        c["score"] = float(_clamp01(c["score"]))
         c["score_pct"] = _pct(c["score"])
 
-    overall = sum(c["score"] for c in crit) / len(crit)
-    quality = _quality_from_score(overall)
+    overall = sum(c["score"] for c in criteria) / len(criteria)
+    quality = "full" if overall >= 0.85 else "partial" if overall >= 0.70 else "poor"
     hints: List[str] = []
-    if overall < 0.7: hints.append("העמק מעט יותר ותשמור על קצב קבוע")
-    elif overall < 0.8: hints.append("שפר קלות את היציבות והעומק")
+    if overall < 0.7: hints.append("העמק מעט יותר ושמור קצב יציב.")
+    elif overall < 0.8: hints.append("שפר קלות את היציבות והעומק.")
 
     report = {
         "exercise": {"id": ex_id, "family": family, "equipment": equipment},
         "ui_ranges": _ui_ranges(),
         "scoring": {
-            "score": round(overall, 3),
+            "score": round(float(overall), 3),
             "score_pct": _pct(overall),
             "quality": quality,
-            "criteria": crit,
+            "criteria": criteria,
         },
         "hints": hints,
         "report_health": {
             "status": ("FAIL" if overall < 0.6 else "WARN" if overall < 0.7 else "OK"),
-            "issues": [] if overall >= 0.7 else [{"code": "LOW_SCORE", "message": "ציון נמוך"}]
+            "issues": [] if overall >= 0.7 else [{"code": "LOW_SCORE", "message": "ציון נמוך"}],
         },
-        "metrics": metrics,  # נחמד לדיבוג
+        "metrics": metrics,  # משאיר מקוריות למקרה שה-UI מציג RAW
     }
-
-    # עיטור תצוגה ושמירה אחרונה
     report = _apply_ui_names(report, display_lang="he")
-    try: set_last_report(report)
-    except Exception: pass
+    set_last_report(report)
     return {"ok": True, "report": report}
 
 # ─────────────────────────────────────────────────────────────
-# סימולציה מלאה (כולל דו"חות)
+# סימולציה מלאה (כולל דו"חות) + עטיפה בשם המקורי simulate_exercise
 # ─────────────────────────────────────────────────────────────
 def simulate_full_reports(sets: int = 2,
                           reps: int = 5,
@@ -368,34 +304,28 @@ def simulate_full_reports(sets: int = 2,
                           noise: float = 0.2,
                           mean_score: float = 0.75,
                           std: float = 0.10,
-                          seed: Optional[int] = None) -> Dict[str, Any]:
-    """
-    יוצר דו"חות מלאים (כמו analyze_exercise) לכל חזרה.
-    כולל אינדיקציות, סטטוס, ציונים וטיפים.
-    """
+                          seed: Optional[int] = 42) -> Dict[str, Any]:
     stats = {"reports": 0, "ok": 0, "warn": 0, "fail": 0, "avg_score_pct": 0}
     sets_out = []
     rng = random.Random(seed if seed is not None else time.time())
 
-    def clamp(x): return max(0.0, min(1.0, x))
-
     for s in range(1, sets + 1):
         reps_out = []
         for r in range(1, reps + 1):
-            base = clamp(rng.gauss(mean_score, std))
+            base = max(0.0, min(1.0, rng.gauss(mean_score, std)))
             crit = [
-                {"id": "depth",        "available": True, "score": clamp(base - rng.uniform(0, noise))},
-                {"id": "knees",        "available": True, "score": clamp(base - rng.uniform(0, noise * 0.8))},
-                {"id": "torso_angle",  "available": True, "score": clamp(base - rng.uniform(0, noise * 0.6))},
-                {"id": "stance_width", "available": True, "score": clamp(base - rng.uniform(0, noise * 0.6))},
-                {"id": "tempo",        "available": True, "score": clamp(base - rng.uniform(0, noise * 0.6))},
+                {"id": "depth", "available": True, "score": max(0.0, min(1.0, base - rng.uniform(0, 0.2)))},
+                {"id": "knees", "available": True, "score": max(0.0, min(1.0, base - rng.uniform(0, 0.15)))},
+                {"id": "torso_angle", "available": True, "score": max(0.0, min(1.0, base - rng.uniform(0, 0.1)))},
+                {"id": "stance_width", "available": True, "score": max(0.0, min(1.0, base - rng.uniform(0, 0.1)))},
+                {"id": "tempo", "available": True, "score": max(0.0, min(1.0, base - rng.uniform(0, 0.1)))},
             ]
             for c in crit:
                 c["score_pct"] = _pct(c["score"])
 
             overall = sum(c["score"] for c in crit) / len(crit)
             quality = _quality_from_score(overall)
-            hints: List[str] = []
+            hints = []
             if overall < 0.7: hints.append("העמק מעט יותר ותשמור על קצב קבוע")
             elif overall < 0.8: hints.append("שפר קלות את היציבות והעומק")
 
@@ -414,7 +344,6 @@ def simulate_full_reports(sets: int = 2,
                     "issues": [] if overall >= 0.7 else [{"code": "LOW_SCORE", "message": "ציון נמוך"}]
                 },
             }
-
             report = _apply_ui_names(report, display_lang="he")
             reps_out.append({"rep": r, "report": report})
             stats["reports"] += 1
@@ -428,23 +357,9 @@ def simulate_full_reports(sets: int = 2,
     stats["avg_score_pct"] = int(stats["avg_score_pct"] / max(1, stats["reports"]))
     return {"ok": True, "ui_ranges": _ui_ranges(), "sets": sets_out, "stats": stats}
 
-# תאימות: ה-UI קורא ל-simulate_exercise עם mean_score/std
-def simulate_exercise(sets: int = 1,
-                      reps: int = 6,
-                      mean_score: float = 0.75,
-                      std: float = 0.10,
-                      mode: str | None = None,
-                      noise: float | None = None,
-                      seed: int | None = 42) -> Dict[str, Any]:
-    return simulate_full_reports(
-        sets=sets,
-        reps=reps,
-        mode=mode or "mixed",
-        noise=noise if noise is not None else 0.2,
-        mean_score=mean_score,
-        std=std,
-        seed=seed,
-    )
+def simulate_exercise(**kwargs) -> Dict[str, Any]:
+    """עטיפה בשם הישן לצורך תאימות ל־routes/Frontend קיימים."""
+    return simulate_full_reports(**kwargs)
 
 # ─────────────────────────────────────────────────────────────
 # דו"ח אחרון (לכפתור פירוט)

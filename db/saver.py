@@ -8,7 +8,7 @@
 #   from db.saver import ensure_user, start_workout, open_set, save_report_snapshot, save_reps, close_set, close_workout
 #   uid = ensure_user("Amit")
 #   wid = start_workout(uid)
-#   sid = open_set(wid, "squat.bodyweight")
+#   sid = open_set(wid, "squat.bodyweight.md")
 #   rep_id = save_report_snapshot(uid, wid, sid, report)
 #   save_reps(sid, report.get("reps", []))
 #   close_set(sid, report["scoring"]["score_pct"], {...}, len(report.get("reps", [])))

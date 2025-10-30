@@ -73,7 +73,7 @@ class TestFullStackOffline(unittest.TestCase):
             "feet_w_over_shoulders_w": 1.2,
             "rep_time_s": 1.5
         }
-        rv2 = client.post("/api/exercise/score", json={"metrics": metrics_good, "exercise":{"id":"squat.bodyweight"}})
+        rv2 = client.post("/api/exercise/score", json={"metrics": metrics_good, "exercise":{"id":"squat.bodyweight.md"}})
         self.assertEqual(rv2.status_code, 200, rv2.data)
         j2 = _j(rv2); data2 = j2.get("data") if isinstance(j2.get("data"), dict) else j2
         self.assertIn("scoring", data2)
