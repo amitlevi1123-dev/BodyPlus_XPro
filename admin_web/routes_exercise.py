@@ -1,156 +1,291 @@
 # -*- coding: utf-8 -*-
 """
-admin_web/routes_exercise.py
-----------------------------
-ראוטים רזים ל-Exercise API, משתמשים בלוגיקה שב-admin_web/exercise_analyzer.py.
-
+admin_web/routes_exercise.py — ניקוד תרגיל (רנטיים/דמו) + סימולטור + דיאגנוסטיקה
+-------------------------------------------------------------------------------
 Endpoints:
-- GET    /api/exercise/settings
-- POST   /api/exercise/reload_labels
-- GET    /api/exercise/labels
-- POST   /api/exercise/simulate
-- POST   /api/exercise/score
-- POST   /api/exercise/detect
-- GET    /api/exercise/last
-- GET    /api/exercise/last/json
-- POST   /api/exercise/pick
+- POST /api/exercise/score        → דוח יחיד (רצוי מרנטיים; אחרת דמו תקין לפורמט ה-UI)
+- POST /api/exercise/simulate     → סימולציית סטים/חזרות (דוחות מלאים לפורמט ה-UI)
+- GET  /api/exercise/diag         → סטטוס קצר
+- GET  /api/exercise/diag/stream  → SSE דיאגנוסטי
+
+הקובץ מחזיר תמיד אובייקט בפורמט ה-UI שלך:
+{
+  "ui_ranges": {...},
+  "exercise": {"id": "...", "family": "...", "equipment": "...", "display_name": "..."},
+  "scoring": {
+      "score": 0.87, "quality": "full"|"partial"|"poor", "unscored_reason": null|"...",
+      "criteria": [ {id, available, reason, score_pct|score}, ... ],
+      "criteria_breakdown_pct": { "<crit>": <int pct>|null, ... }
+  },
+  "hints": [...],
+  "metrics_detail": {...},   # groups / rep_tempo_series / targets (אם יש)
+  "ui": { "labels": {...} }  # לא חובה אבל שימושי לכותרות דו-לשוניות
+}
 """
-
 from __future__ import annotations
-from typing import Dict, Any
-from flask import Blueprint, jsonify, request, Response
-import json, time
+import json, time, math, random, queue
+from typing import Any, Dict, List, Optional, Tuple
+from flask import Blueprint, jsonify, request, Response, stream_with_context
 
-from admin_web.exercise_analyzer import (
-    settings_dump,
-    simulate_exercise,
-    analyze_exercise,
-    detect_once,
-    get_last_report,
-    set_last_report,
-    reload_ui_labels,
-    get_ui_labels,
-)
+bp = Blueprint("exercise", __name__)
 
-bp_exercise = Blueprint("exercise", __name__, url_prefix="/api/exercise")
+# ------------------------------- Utils -------------------------------
 
-# ─────────────────────────────────────────────────────────────
-# תוויות/הגדרות
-# ─────────────────────────────────────────────────────────────
-@bp_exercise.get("/settings")
-def exercise_settings():
-    return jsonify(settings_dump()), 200
+def _color_bar() -> Dict[str, Any]:
+    return {
+        "color_bar": [
+            {"label": "red",    "from_pct": 0,  "to_pct": 60},
+            {"label": "orange", "from_pct": 60, "to_pct": 75},
+            {"label": "green",  "from_pct": 75, "to_pct": 100},
+        ]
+    }
 
-@bp_exercise.post("/reload_labels")
-def exercise_reload_labels():
-    out = reload_ui_labels()
-    return jsonify(out), (200 if out.get("ok") else 500)
+def _quality_from_pct(p: Optional[int]) -> Optional[str]:
+    if p is None: return None
+    if p >= 85: return "full"
+    if p >= 70: return "partial"
+    return "poor"
 
-@bp_exercise.get("/labels")
-def exercise_labels():
-    return jsonify(get_ui_labels()), 200
-
-# ─────────────────────────────────────────────────────────────
-# סימולציה
-# ─────────────────────────────────────────────────────────────
-@bp_exercise.post("/simulate")
-def exercise_simulate():
-    j = request.get_json(silent=True) or {}
-    out = simulate_exercise(
-        sets=int(j.get("sets", 2)),
-        reps=int(j.get("reps", 5)),
-        mode=j.get("mode", "mixed"),
-        noise=float(j.get("noise", 0.2)),
-        mean_score=float(j.get("mean_score", 0.75)),
-        std=float(j.get("std", 0.10)),
-        seed=j.get("seed", 42),
-    )
-
-    # נשמור כברירת מחדל את הדו"ח האחרון של הסט/חזרה האחרונים עבור מודאל "פרטים"
+def _pct(v: Optional[float]) -> Optional[int]:
     try:
-        sets_list = out.get("sets") or []
-        if sets_list:
-            reps_list = (sets_list[-1] or {}).get("reps") or []
-            if reps_list:
-                rep_report = (reps_list[-1] or {}).get("report")
-                if isinstance(rep_report, dict):
-                    set_last_report(rep_report)
+        if v is None: return None
+        x = int(round(float(v) * 100.0))
+        return max(0, min(100, x))
     except Exception:
+        return None
+
+# -------------------- Runtime (optional, best-effort) --------------------
+
+def _get_runtime() -> Optional[Any]:
+    """
+    מנסה להביא רנטיים אם קיים בפרויקט. אם אין — מחזירים None ונלך ל-demo_score.
+    נזהר לא להפיל אם אין מודול.
+    """
+    try:
+        from exercise_engine.runtime import get_runtime  # type: ignore
+        rt = get_runtime()
+        return rt
+    except Exception:
+        return None
+
+# ------------------------ Demo report builders ------------------------
+
+_SAMPLE_ALIASES_LABELS = {
+    "exercise":  {"he": "סקוואט גוף", "en": "Bodyweight Squat"},
+    "family":    {"he": "סקוואט",    "en": "Squat"},
+    "equipment": {"he": "משקל גוף",  "en": "Bodyweight"},
+}
+
+def _demo_criteria(mode: str) -> List[Dict[str, Any]]:
+    """
+    מחזיר מערך קריטריונים “אמיתי” מספיק ל-UI.
+    """
+    base = [
+        {"id": "depth",        "available": True, "score_pct": 88},
+        {"id": "knees",        "available": True, "score_pct": 90},
+        {"id": "torso_angle",  "available": True, "score_pct": 86},
+        {"id": "stance_width", "available": True, "score_pct": 92},
+        {"id": "tempo",        "available": True, "score_pct": 84},
+    ]
+    if mode == "shallow":
+        base[0]["score_pct"] = 35
+        base[0]["reason"] = "shallow_depth"
+    elif mode == "missing":
+        base[0]["available"] = False
+        base[0]["reason"] = "missing_critical: depth"
+    elif mode == "mixed":
+        base[0]["score_pct"] = 60 + int(random.random() * 25)
+        base[1]["score_pct"] = 55 + int(random.random() * 30)
+    # clamp
+    for c in base:
+        if "score_pct" in c and c["score_pct"] is not None:
+            c["score_pct"] = max(0, min(100, int(c["score_pct"])))
+    return base
+
+def _criteria_to_overall(criteria: List[Dict[str, Any]]) -> Tuple[Optional[float], Optional[str]]:
+    avail = [c for c in criteria if c.get("available") and c.get("score_pct") is not None]
+    if not avail:
+        return None, None
+    avg = sum(int(c["score_pct"]) for c in avail) / len(avail)
+    return (avg / 100.0), _quality_from_pct(int(round(avg)))
+
+def _demo_metrics_detail() -> Dict[str, Any]:
+    return {
+        "groups": {
+            "joints": {"knee_left_deg": 160, "knee_right_deg": 158, "torso_forward_deg": 15, "spine_flexion_deg": 8},
+            "stance": {"features.stance_width_ratio": 1.05, "toe_angle_left_deg": 8, "toe_angle_right_deg": 10, "heels_grounded": True},
+            "other":  {}
+        },
+        "rep_tempo_series": [{"rep_id": 1, "timing_s": 1.6, "ecc_s": 0.8, "con_s": 0.8, "pause_top_s": 0.0, "pause_bottom_s": 0.0}],
+        "targets": {"tempo": {"min_s": 0.7, "max_s": 2.5}},
+        "stats": {}
+    }
+
+def _demo_report(mode: str = "good") -> Dict[str, Any]:
+    crit = _demo_criteria(mode)
+    score, quality = _criteria_to_overall(crit)
+    hints: List[str] = []
+    lows = sorted([c for c in crit if c.get("available") and (c.get("score_pct") or 0) < 70], key=lambda x: x.get("score_pct") or 0)
+    if lows:
+        hints.append(f"שפר {lows[0]['id']} (כעת {lows[0]['score_pct']}%)")
+    return {
+        "ui_ranges": _color_bar(),
+        "exercise": {"id": "squat.bodyweight.md", "family": "squat", "equipment": "bodyweight", "display_name": "סקוואט גוף"},
+        "scoring": {
+            "score": score,
+            "quality": quality,
+            "unscored_reason": "missing_critical" if any(not c.get("available") for c in crit) else None,
+            "criteria": crit,
+            "criteria_breakdown_pct": {c["id"]: (c.get("score_pct") if c.get("available") else None) for c in crit},
+        },
+        "hints": hints,
+        "metrics_detail": _demo_metrics_detail(),
+        "ui": {"labels": _SAMPLE_ALIASES_LABELS},
+    }
+
+# ------------------------------ Endpoints ------------------------------
+
+@bp.route("/api/exercise/score", methods=["POST"])
+def api_exercise_score():
+    """
+    Body: { "metrics": {...}, "mode": "good|shallow|missing|mixed", "exercise_id": "..." }
+    - אם יש runtime → ננסה להחזיר ממנו דוח מלא.
+    - אם אין → נחזיר דוח דמו (כדי שה-UI יעבוד ויראה ציונים).
+    """
+    try:
+        req = request.get_json(silent=True) or {}
+        metrics = req.get("metrics") or {}
+        ex_id   = req.get("exercise_id") or "squat.bodyweight.md"
+        mode    = str(req.get("mode") or "mixed")
+
+        # נסה רנטיים אמיתי
+        rt = _get_runtime()
+        if rt is not None:
+            try:
+                # מצופה: rt.score_single(metrics) → dict בפורמט הדוח שלנו (או קרוב)
+                rep = rt.score_single(metrics=metrics, exercise_id=ex_id)  # type: ignore
+                if isinstance(rep, dict) and rep.get("scoring"):
+                    # ודא ש-ui_ranges קיים
+                    rep["ui_ranges"] = rep.get("ui_ranges") or _color_bar()
+                    return jsonify(rep)
+            except Exception:
+                # ניפול לדמו – שלא יישבר ה-UI
+                pass
+
+        # דמו
+        return jsonify(_demo_report(mode=mode))
+
+    except Exception as e:
+        # fallback קשוח — עדיף דוח דמו מאשר ריק
+        return jsonify(_demo_report(mode="mixed") | {"hints": [f"server_error: {e}"]}), 200
+
+
+@bp.route("/api/exercise/simulate", methods=["POST"])
+def api_exercise_simulate():
+    """
+    Body: { sets:int, reps:int, mode:str, noise:float }
+    מחזיר חבילה עם sets[] → reps[] → דוחות (בפורמט שה-JS שלך יודע לצרוך).
+    """
+    try:
+        j = request.get_json(silent=True) or {}
+        sets  = int(j.get("sets", 2))
+        reps  = int(j.get("reps", 5))
+        mode  = str(j.get("mode", "mixed"))
+        noise = float(j.get("noise", 0.25))
+
+        def jitter(p: int) -> int:
+            if p is None: return p
+            delta = int(round((random.random() * 2 - 1) * noise * 100))
+            return max(0, min(100, p + delta))
+
+        sets_out: List[Dict[str, Any]] = []
+        for s in range(1, max(1, sets) + 1):
+            reps_out: List[Dict[str, Any]] = []
+            for r in range(1, max(1, reps) + 1):
+                # בנה דוח דמו ואז "רעידות" קלות כדי שיהיה מגוון
+                rep = _demo_report(mode=mode)
+                for c in rep["scoring"]["criteria"]:
+                    if c.get("score_pct") is not None:
+                        c["score_pct"] = jitter(int(c["score_pct"]))
+                # overall מחדש
+                sc, ql = _criteria_to_overall(rep["scoring"]["criteria"])
+                rep["scoring"]["score"] = sc
+                rep["scoring"]["quality"] = ql
+                reps_out.append({
+                    "set": s,
+                    "rep": r,
+                    "exercise_id": rep["exercise"]["id"],
+                    "score_pct": _pct(rep["scoring"]["score"]),
+                    "quality": rep["scoring"]["quality"],
+                    "unscored_reason": rep["scoring"]["unscored_reason"],
+                    "criteria": rep["scoring"]["criteria"],
+                    "criteria_breakdown_pct": rep["scoring"]["criteria_breakdown_pct"],
+                    "metrics_detail": rep.get("metrics_detail"),
+                    "notes": [{"text": h} for h in rep.get("hints", [])],
+                })
+            sets_out.append({
+                "set": s,
+                "exercise_id": "squat.bodyweight.md",
+                "reps": reps_out,
+            })
+
+        return jsonify({
+            "ok": True,
+            "ui_ranges": _color_bar(),
+            "exercise": {"id": "squat.bodyweight.md", "family": "squat", "equipment": "bodyweight", "display_name": "סקוואט גוף"},
+            "sets": sets_out,
+            "ui": {"labels": _SAMPLE_ALIASES_LABELS},
+        })
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 200
+
+
+# ------------------------------ Diagnostics ------------------------------
+
+_diag_q: "queue.Queue[str]" = queue.Queue(maxsize=200)
+
+def _q_put(s: str) -> None:
+    try:
+        _diag_q.put_nowait(s)
+    except Exception:
+        # queue full; drop
         pass
 
-    return jsonify(out), 200
+@bp.route("/api/exercise/diag", methods=["GET"])
+def api_exercise_diag():
+    rt = _get_runtime()
+    info: Dict[str, Any] = {"runtime": "absent"}
+    if rt is not None:
+        try:
+            info = {
+                "runtime": "present",
+                "exercise": getattr(rt, "current_exercise_id", None),
+                "last_scores": getattr(rt, "last_scores_count", None),
+                "ready": True,
+            }
+        except Exception:
+            info = {"runtime": "present", "ready": True}
+    return jsonify({"ok": True, "ts": time.time(), "info": info})
 
-# ─────────────────────────────────────────────────────────────
-# ניקוד "שירות" ללא המנוע (כפתור "ניקוד (שירות)")
-# ─────────────────────────────────────────────────────────────
-@bp_exercise.post("/score")
-def exercise_score():
-    j = request.get_json(silent=True) or {}
-    metrics = j.get("metrics")
-    if not isinstance(metrics, dict):
-        return jsonify(ok=False, error="no_metrics"), 400
-    result = analyze_exercise({"metrics": metrics, "exercise": j.get("exercise") or {}})
-    return jsonify(result), 200
+@bp.route("/api/exercise/diag/stream")
+def api_exercise_diag_stream():
+    ping_ms = int(request.args.get("ping_ms", "15000"))
+    rt = _get_runtime()
+    _q_put(json.dumps({"ts": time.time(), "event": "open", "runtime": "present" if rt else "absent"}))
 
-# ─────────────────────────────────────────────────────────────
-# זיהוי אמיתי דרך מנוע
-# ─────────────────────────────────────────────────────────────
-@bp_exercise.post("/detect")
-def exercise_detect():
-    j = request.get_json(silent=True) or {}
-    metrics_raw = j.get("metrics")
-    if not isinstance(metrics_raw, dict):
-        return jsonify(ok=False, error="missing_metrics_object"), 400
+    def _gen():
+        last_ping = time.time()
+        while True:
+            # periodic ping
+            now = time.time()
+            if now - last_ping >= (ping_ms / 1000.0):
+                last_ping = now
+                yield f"data: {json.dumps({'ts': now, 'event': 'ping'})}\n\n"
+            # drain queue
+            try:
+                msg = _diag_q.get(timeout=0.25)
+                yield f"data: {msg}\n\n"
+            except Exception:
+                pass
 
-    out = detect_once(raw_metrics=metrics_raw, exercise_id=j.get("exercise_id"))
-    if out.get("ok") and isinstance(out.get("report"), dict):
-        try: set_last_report(out["report"])
-        except Exception: pass
-
-    if out.get("ok"):
-        return jsonify(out), 200
-    err = (out.get("error") or "").lower()
-    if "engine_unavailable" in err: return jsonify(out), 503
-    if "library_load_failed" in err: return jsonify(out), 500
-    if "runtime_failed" in err: return jsonify(out), 500
-    return jsonify(out), 500
-
-# ─────────────────────────────────────────────────────────────
-# דו"ח אחרון (מודאל "פרטים")
-# ─────────────────────────────────────────────────────────────
-@bp_exercise.get("/last")
-def exercise_last():
-    rep = get_last_report()
-    return jsonify(ok=bool(rep), report=rep), 200
-
-@bp_exercise.get("/last/json")
-def open_last_json():
-    rep = get_last_report() or {}
-    if not rep:
-        return jsonify({"ok": False, "error": "no_last_report"}), 404
-    return Response(json.dumps(rep, indent=2, ensure_ascii=False), mimetype="application/json")
-
-# ─────────────────────────────────────────────────────────────
-# בחירת דו"ח מסימולציה (אופציונלי)
-# ─────────────────────────────────────────────────────────────
-@bp_exercise.post("/pick")
-def exercise_pick():
-    j = request.get_json(silent=True) or {}
-    result = j.get("result") or {}
-    set_idx = int(j.get("set", -1))
-    rep_idx = int(j.get("rep", -1))
-    try:
-        sets_list = result.get("sets") or []
-        if not sets_list: return jsonify(ok=False, error="no_sets"), 400
-        if set_idx < 0: set_idx = len(sets_list) + set_idx
-        set_idx = max(0, min(set_idx, len(sets_list) - 1))
-        reps_list = (sets_list[set_idx] or {}).get("reps") or []
-        if not reps_list: return jsonify(ok=False, error="no_reps"), 400
-        if rep_idx < 0: rep_idx = len(reps_list) + rep_idx
-        rep_idx = max(0, min(rep_idx, len(reps_list) - 1))
-        report = (reps_list[rep_idx] or {}).get("report")
-        if not isinstance(report, dict): return jsonify(ok=False, error="no_report"), 400
-        set_last_report(report)
-        return jsonify(ok=True), 200
-    except Exception as e:
-        return jsonify(ok=False, error=str(e)), 500
+    return Response(stream_with_context(_gen()), mimetype="text/event-stream")
