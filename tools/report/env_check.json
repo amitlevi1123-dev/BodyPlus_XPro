@@ -1,0 +1,41 @@
+{
+  "python": "3.11.9 (tags/v3.11.9:de54cf5, Apr  2 2024, 10:12:12) [MSC v.1938 64 bit (AMD64)]",
+  "exe": "C:\\Users\\Owner\\AppData\\Local\\Programs\\Python\\Python311\\python.exe",
+  "cwd": "C:\\Users\\Owner\\Desktop\\BodyPlus\\BodyPlus_XPro\\tools",
+  "PYTHONPATH": "C:\\Users\\Owner\\Desktop\\BodyPlus\\BodyPlus_XPro;C:\\Users\\Owner\\Desktop\\BodyPlus\\BodyPlus_XPro\\admin_web;C:\\Users\\Owner\\Desktop\\BodyPlus\\BodyPlus_XPro\\app;C:\\Users\\Owner\\Desktop\\BodyPlus\\BodyPlus_XPro\\core;C:\\Users\\Owner\\Desktop\\BodyPlus\\BodyPlus_XPro\\exercise_engine;C:\\Users\\Owner\\Desktop\\BodyPlus\\BodyPlus_XPro\\exercise_library;C:\\Users\\Owner\\Desktop\\BodyPlus\\BodyPlus_XPro\\db;C:/Program Files/JetBrains/PyCharm 2025.2.2/plugins/python-ce/helpers/pycharm_plotly_backend;C:/Program Files/JetBrains/PyCharm 2025.2.2/plugins/python-ce/helpers/pycharm_altair_backend;C:/Program Files/JetBrains/PyCharm 2025.2.2/plugins/python-ce/helpers/pycharm_matplotlib_backend;C:/Program Files/JetBrains/PyCharm 2025.2.2/plugins/python-ce/helpers/pycharm_display",
+  "modules": {
+    "flask": "3.0.3",
+    "flask_cors": "4.0.0",
+    "werkzeug": "UNKNOWN",
+    "jinja2": "3.1.6",
+    "loguru": "0.7.3",
+    "coloredlogs": "15.0.1",
+    "humanfriendly": "10.0",
+    "yaml": "6.0.2",
+    "psutil": "7.1.0",
+    "requests": "2.32.5",
+    "tqdm": "4.67.1",
+    "pandas": "2.3.2",
+    "numpy": "1.26.4",
+    "protobuf": "MISSING (ModuleNotFoundError: No module named 'protobuf')",
+    "mediapipe": "MISSING (ModuleNotFoundError: No module named 'cv2')",
+    "onnxruntime": "1.18.1",
+    "cv2": "MISSING (ModuleNotFoundError: No module named 'cv2')",
+    "torch": "2.3.1+cpu",
+    "torchvision": "0.18.1+cpu",
+    "ultralytics": "MISSING (ModuleNotFoundError: No module named 'cv2')",
+    "scipy": "1.16.2",
+    "typing_extensions": "UNKNOWN"
+  },
+  "extra": {
+    "torch_cuda_available": false,
+    "torch_device_count": 0,
+    "onnx_providers": [
+      "AzureExecutionProvider",
+      "CPUExecutionProvider"
+    ],
+    "cv2_built_with_ffmpeg": "ERROR: No module named 'cv2'",
+    "mediapipe_pose_import": "ERROR: No module named 'cv2'",
+    "ultralytics_ok": "ERROR: No module named 'cv2'"
+  }
+}

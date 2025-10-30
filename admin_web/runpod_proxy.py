@@ -18,32 +18,54 @@ from flask import Flask, Blueprint, request, Response, jsonify
 # ========= קונפיג (דריסת ENV) =========
 CLOUD_PUBLIC_BASE = (os.getenv("CLOUD_PUBLIC_BASE") or "https://1fmkdasa1l0x06-8000.proxy.runpod.net").rstrip("/")
 RUNPOD_BASE       = (os.getenv("RUNPOD_BASE") or "https://api.runpod.ai/v2/1fmkdasa1l0x06").rstrip("/")
-RUNPOD_API_KEY    = os.getenv("RUNPOD_API_KEY") or "rpa_xxx"  # תחליף במפתח שלך
+RUNPOD_API_KEY    = os.getenv("RUNPOD_API_KEY") or "rpa_4PXVVU7WW1RON92M9VQTT5V2ZOA4T8FZMM68ZUOE0fsl21"  # החלף במפתח שלך בסביבת הרצה
 PORT              = int(os.getenv("PORT", "8000"))
 DEBUG             = (os.getenv("PROXY_DEBUG", "1") == "1")
 
 app = Flask(__name__)
 
 # ========= עזרי Proxy =========
+# Hop-by-hop headers שאסור להעביר
 HOP_BY_HOP = {
-    "connection","keep-alive","proxy-authenticate","proxy-authorization",
-    "te","trailers","transfer-encoding","upgrade"
+    "connection", "keep-alive", "proxy-authenticate", "proxy-authorization",
+    "te", "trailers", "transfer-encoding", "upgrade"
+}
+
+# כותרות ש-Cloudflare/פרוקסי ציבורי לא אוהבים כשמעבירים הלאה
+STRIP_ALWAYS = {
+    "host", "x-forwarded-for", "x-forwarded-host", "x-forwarded-proto",
+    "cf-connecting-ip", "cf-ipcountry", "cf-ray", "cf-visitor"
 }
 
 def log(*a):
-    if DEBUG: print(time.strftime("[%H:%M:%S]"), *a, flush=True)
+    if DEBUG:
+        print(time.strftime("[%H:%M:%S]"), *a, flush=True)
 
 def _auth_headers():
+    # שומר על encoding זהה כדי לא לשבור סטרימים
     return {"Authorization": f"Bearer {RUNPOD_API_KEY}", "Accept-Encoding": "identity"}
 
 def _copy_headers(src):
-    return {k: v for k, v in src.items() if k.lower() not in HOP_BY_HOP}
+    # מסיר hop-by-hop + כותרות שעלולות לגרום ל-403 בענן
+    out = {}
+    for k, v in src.items():
+        kl = k.lower()
+        if kl in HOP_BY_HOP or kl in STRIP_ALWAYS:
+            continue
+        out[k] = v
+    # הבטחת עקביות בסטרים (ללא דחיסות משונות בצד המקור)
+    out.setdefault("Accept-Encoding", "identity")
+    return out
 
 # ========= /api/runpod/* =========
 runpod_bp = Blueprint("runpod_api", __name__, url_prefix="/api/runpod")
 
 @runpod_bp.post("/run-sync")
 def run_sync():
+    """
+    קריאה סינכרונית ל-RunPod (חוסמת עד החזרה)
+    גוף הבקשה שלנו: JSON כללי → נעטוף תחת {"input": ...} לפי API של RunPod
+    """
     try:
         payload = request.get_json(silent=True) or {}
         r = requests.post(
@@ -59,6 +81,9 @@ def run_sync():
 
 @runpod_bp.post("/run-submit")
 def run_submit():
+    """
+    קריאה אסינכרונית ל-RunPod (יוצרת job ומחזירה מזהה)
+    """
     try:
         payload = request.get_json(silent=True) or {}
         r = requests.post(
@@ -74,6 +99,9 @@ def run_submit():
 
 @runpod_bp.get("/status/<job_id>")
 def job_status(job_id: str):
+    """
+    סטטוס של job אסינכרוני
+    """
     try:
         r = requests.get(
             urljoin(RUNPOD_BASE + "/", f"status/{job_id}"),
@@ -91,7 +119,11 @@ app.register_blueprint(runpod_bp)
 @app.route('/', defaults={'path': ''}, methods=["GET","POST","PUT","PATCH","DELETE","OPTIONS"])
 @app.route('/<path:path>', methods=["GET","POST","PUT","PATCH","DELETE","OPTIONS"])
 def forward_all(path: str):
-    # שמור את /api/runpod ל-Blueprint
+    """
+    כל בקשה שאינה /api/runpod/* – מנותבת ל-CLOUD_PUBLIC_BASE, כולל querystring.
+    תומך גם ב-MJPEG ובכל זרימה ארוכה.
+    """
+    # השאר את /api/runpod ל-Blueprint
     if path.startswith("api/runpod"):
         return jsonify(ok=False, error="reserved_path"), 400
 
@@ -100,10 +132,12 @@ def forward_all(path: str):
     is_stream = path.endswith(".mjpg") or "stream" in path
 
     try:
-        log("→", method, upstream)
+        log("→", method, upstream, dict(request.args))
         r = requests.request(
-            method, upstream,
+            method,
+            upstream,
             headers=_copy_headers(request.headers),
+            params=request.args,                 # ✅ לשימור כל ה-querystring
             data=request.get_data(),
             stream=is_stream,
             timeout=(10, 300),
@@ -135,5 +169,6 @@ if __name__ == "__main__":
     print(f"[RUNPOD PROXY] 🌍 Local : http://127.0.0.1:{PORT}")
     print(f"[RUNPOD PROXY] 🔗 UI    : {CLOUD_PUBLIC_BASE}")
     print(f"[RUNPOD PROXY] 🔗 API   : {RUNPOD_BASE}")
-    print(f"[RUNPOD PROXY] 🔐 Key   : {RUNPOD_API_KEY[:6]}...{RUNPOD_API_KEY[-5:]}")
+    if RUNPOD_API_KEY and RUNPOD_API_KEY != "rpa_xxx":
+        print(f"[RUNPOD PROXY] 🔐 Key   : {RUNPOD_API_KEY[:6]}...{RUNPOD_API_KEY[-5:]}")
     app.run(host="0.0.0.0", port=PORT, debug=False, threaded=True)
