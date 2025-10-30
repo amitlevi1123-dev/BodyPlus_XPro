@@ -634,3 +634,11 @@ if __name__ == "__main__":
     logger.info(f"[Local] Flask server running at http://127.0.0.1:{port}")
     logger.info("Available endpoints: /payload, /video, /capture, /healthz, etc.")
     app.run(host="0.0.0.0", port=port, debug=True, use_reloader=False, threaded=True)
+
+# === WSGI export (ל-Gunicorn) ===
+app = create_app()
+
+# ✅ הוסף /ping כדי שלא יהיה 404 בבדיקות בריאות
+@app.get("/ping")
+def _ping():
+    return "pong", 200
