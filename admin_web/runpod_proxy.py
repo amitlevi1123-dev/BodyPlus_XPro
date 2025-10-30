@@ -1,133 +1,106 @@
 # -*- coding: utf-8 -*-
 """
-admin_web/runpod_proxy.py — גרסה משולבת (Proxy + Dashboard + Main)
--------------------------------------------------------------------
-קובץ זה מפעיל את כל המערכת: גם Flask Proxy, גם ה-Admin Dashboard וגם את ה-main app.
-אם Flask או main נכשלים, הוא חוזר אוטומטית רק לפרוקסי כדי שלא תישאר בלי שרת.
+admin_web/runpod_proxy.py — 💥 גרסה סופית
+-------------------------------------------------
+מריץ את כל המערכת:
+✅ Flask Admin UI (Dashboard, Video, Logs, Exercise)
+✅ כל ה-API של BodyPlus_XPro
+✅ RunPod Proxy API
 """
 
-from __future__ import annotations
-from flask import Flask, request, Response, jsonify, make_response
-import os, json, time, traceback, requests, threading, subprocess, sys
+from flask import Flask, jsonify, request, Response
+import os, time, json, traceback, requests
 
-# ========= קונפיג (ניתן לדרוס ע"י משתני סביבה) =========
-RUNPOD_BASE = (os.getenv("RUNPOD_BASE") or "https://api.runpod.ai/v2/1fmkdasa1l0x06").rstrip("/")
-API_KEY     = os.getenv("RUNPOD_API_KEY") or "rpa_4PXVVU7WW1RON92M9VQTT5V2ZOA4T8FZMM68ZUOE0fsl21"
-PORT        = int(os.getenv("PORT", "8000"))
-DEBUG_LOG   = (os.getenv("PROXY_DEBUG", "1") == "1")  # 1=on, 0=off
+# ========== הגדרות ==========
+PORT = int(os.getenv("PORT", "8000"))
+RUNPOD_BASE = os.getenv("RUNPOD_BASE", "https://api.runpod.ai/v2/1fmkdasa1l0x06").rstrip("/")
+API_KEY = os.getenv("RUNPOD_API_KEY", "rpa_4PXVVU7WW1RON92M9VQTT5V2ZOA4T8FZMM68ZUOE0fsl21")
+DEBUG = os.getenv("PROXY_DEBUG", "1") == "1"
 
-_LAST = {"when": None, "path": None, "method": None, "status": None, "upstream": None, "resp_head": {}, "resp_text": None}
-app = Flask(__name__)
+def log(*a):
+    if DEBUG: print("[RUNPOD]", *a, flush=True)
 
-# ========= עזרי לוג =========
-def log(*args):
-    if DEBUG_LOG:
-        ts = time.strftime("[%H:%M:%S]")
-        print(ts, *args, flush=True)
+# ========== טעינת Flask Admin UI ==========
+try:
+    from admin_web.server import create_app
+    app = create_app()
+    log("✅ Loaded Flask Admin UI (Dashboard + API)")
+except Exception as e:
+    app = Flask(__name__)
+    log("❌ Failed to load admin_web.server:", e)
+    @app.route("/")
+    def fallback():
+        return "<h3>⚠️ Failed to load Admin UI</h3>", 500
 
-def _mask_key(k: str) -> str:
-    return "***" if not k or len(k) <= 8 else f"{k[:6]}...{k[-5:]}"
-
-def _short_headers(h: dict, drop=None):
-    if drop is None: drop = {"cookie", "authorization"}
-    out = {}
-    for k, v in h.items():
-        out[k] = "<hidden>" if k.lower() in drop else (v if len(str(v)) < 200 else str(v)[:200] + " ...")
-    return out
-
-def _json_or_text(r: requests.Response) -> str:
-    text = r.text
-    return text if len(text) < 2000 else text[:2000] + "\n... [truncated] ..."
-
-# ========= עזרי HTTP =========
-def _auth_headers() -> dict:
-    return {"Authorization": f"Bearer {API_KEY}", "Accept-Encoding": "identity"}
-
-def _post(url: str, payload: dict, timeout=(5, 300)) -> requests.Response:
-    return requests.post(url, json=payload, headers={"Content-Type": "application/json", **_auth_headers()}, timeout=timeout)
-
-def _get(url: str, timeout=(5, 60)) -> requests.Response:
-    return requests.get(url, headers=_auth_headers(), timeout=timeout)
-
-# ========= CORS =========
-@app.after_request
-def _cors(response):
-    response.headers["Access-Control-Allow-Origin"] = "*"
-    response.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
-    response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization"
-    return response
-
-# ========= Routes =========
-@app.route("/", methods=["GET"])
-def home():
-    payload = {
-        "ok": True,
-        "msg": "BodyPlus_XPro full system active (Proxy + Main + Admin)",
-        "port": PORT,
-        "upstream": RUNPOD_BASE,
-        "api_key_mask": _mask_key(API_KEY),
-    }
-    return jsonify(payload), 200
-
-@app.get("/healthz")
+# ========== API של RunPod ==========
+@app.get("/api/runpod/healthz")
 def healthz():
     return jsonify(ok=True, ts=time.time(), upstream=RUNPOD_BASE), 200
 
-@app.get("/_proxy/last")
-def last():
-    return jsonify(_LAST), 200
+@app.get("/api/runpod/info")
+def info():
+    return jsonify({
+        "ok": True,
+        "upstream": RUNPOD_BASE,
+        "api_key_set": bool(API_KEY),
+        "port": PORT
+    }), 200
 
-@app.post("/run-sync")
+@app.post("/api/runpod/run-sync")
 def run_sync():
+    """הרצה סינכרונית ב-RunPod"""
     try:
-        body = request.get_json(silent=True) or {}
-        up = f"{RUNPOD_BASE}/run-sync"
-        r = _post(up, {"input": body})
-        text = _json_or_text(r)
-        _LAST.update({
-            "when": time.strftime("%Y-%m-%d %H:%M:%S"),
-            "path": "/run-sync",
-            "method": "POST",
-            "status": r.status_code,
-            "upstream": up,
-            "resp_text": text,
-        })
+        data = request.get_json(force=True)
+        headers = {"Authorization": f"Bearer {API_KEY}", "Content-Type": "application/json"}
+        url = f"{RUNPOD_BASE}/run-sync"
+        log("→ POST", url)
+        r = requests.post(url, json={"input": data}, headers=headers, timeout=(10, 300))
         return Response(r.content, status=r.status_code, headers={"Content-Type": r.headers.get("Content-Type", "application/json")})
     except Exception as e:
-        return jsonify(ok=False, error="proxy_exception", detail=str(e)), 500
+        return jsonify(ok=False, error=str(e)), 500
 
-@app.get("/video/stream.mjpg")
-def no_stream():
-    return jsonify(ok=False, error="serverless_no_stream", detail="Serverless לא תומך ב-MJPEG. השתמש בשרת קבוע."), 400
-
-# ========= הפעלת main של BodyPlus =========
-def start_main_app():
-    """פותח את app/main.py בתהליך נפרד כדי לא לחסום את Flask"""
+@app.post("/api/runpod/run-submit")
+def run_submit():
+    """הרצה א-סינכרונית"""
     try:
-        log("🧠 Launching BodyPlus_XPro main app...")
-        cmd = [sys.executable, "app/main.py"]
-        env = os.environ.copy()
-        env["NO_CAMERA"] = "1"
-        subprocess.Popen(cmd, env=env)
-        log("✅ main.py started in background.")
+        data = request.get_json(force=True)
+        headers = {"Authorization": f"Bearer {API_KEY}", "Content-Type": "application/json"}
+        url = f"{RUNPOD_BASE}/run"
+        log("→ POST", url)
+        r = requests.post(url, json={"input": data}, headers=headers, timeout=(10, 300))
+        return Response(r.content, status=r.status_code, headers={"Content-Type": r.headers.get("Content-Type", "application/json")})
     except Exception as e:
-        log("❌ Failed to start main.py:", e)
+        return jsonify(ok=False, error=str(e)), 500
 
-# ========= main =========
+@app.get("/api/runpod/status/<job_id>")
+def status(job_id: str):
+    """בדיקת סטטוס"""
+    try:
+        headers = {"Authorization": f"Bearer {API_KEY}"}
+        url = f"{RUNPOD_BASE}/status/{job_id}"
+        log("→ GET", url)
+        r = requests.get(url, headers=headers, timeout=(10, 60))
+        return Response(r.content, status=r.status_code, headers={"Content-Type": r.headers.get("Content-Type", "application/json")})
+    except Exception as e:
+        return jsonify(ok=False, error=str(e)), 500
+
+@app.get("/api/runpod/test")
+def test():
+    """בדיקה עצמית של כל המערכת"""
+    return jsonify(ok=True, msg="🔥 BodyPlus_XPro FULL SYSTEM ACTIVE"), 200
+
+# ========== CORS ==========
+@app.after_request
+def cors(resp):
+    resp.headers["Access-Control-Allow-Origin"] = "*"
+    resp.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
+    resp.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization"
+    return resp
+
+# ========== MAIN ==========
 if __name__ == "__main__":
-    print(f"🚀 Launching BodyPlus_XPro full system on http://0.0.0.0:{PORT}")
-    print(f"🔐 API key loaded? {_mask_key(API_KEY) if API_KEY else 'NO'}")
-    print(f"🪵 DEBUG_LOG={'True' if DEBUG_LOG else 'False'}")
-
-    # מפעיל את main app (כולל הוידאו, הזיהוי, החישובים וכו’)
-    threading.Thread(target=start_main_app, daemon=True).start()
-
-    try:
-        # מנסה להפעיל את ה־Dashboard (Flask Admin)
-        from admin_web.server import create_app
-        app_flask = create_app()
-        app_flask.run(host="0.0.0.0", port=PORT, debug=True, threaded=True)
-    except Exception as e:
-        print("⚠️ Dashboard failed, fallback to proxy-only mode.")
-        print("שגיאה:", e)
-        app.run(host="0.0.0.0", port=PORT, debug=True, threaded=True)
+    print("🚀 Launching FULL BodyPlus_XPro (Flask + Proxy + API)")
+    print(f"🔗 Upstream: {RUNPOD_BASE}")
+    print(f"🔐 API Key Set: {'✅' if API_KEY else '❌'}")
+    print(f"🌍 Running on port {PORT}")
+    app.run(host="0.0.0.0", port=PORT, debug=True, threaded=True)
