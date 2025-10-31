@@ -377,7 +377,7 @@ canonical_keys:
     unit: text
     aliases: [rep.units]
 
-  # טמפו
+  # טמपो
   rep.timing_s:
     unit: s
     aliases: [rep.timing_s, rep_time_s, rep_duration_s]
@@ -522,6 +522,58 @@ canonical_keys:
     unit: ratio
     aliases: [weight_shift_ratio, weight_shift]  # לשימוש בטקסט (ממופה ליחס)
 
+  # =====================================================================
+  # 🔽🔽🔽 הוספות לבנץ' פרס (חדשים) — מסומנים TODO: לא נמדד עדיין 🔽🔽🔽
+  # =====================================================================
+
+  # Bench — Elbow Flare (זווית הזרוע מול הכתף)
+  bench.elbow_flare_left_deg:      # TODO: לא נמדד עדיין
+    unit: deg
+    aliases: [bench.elbow_flare_left_deg, elbow_flare_left_deg, shoulder_elbow_angle_left_deg]
+
+  bench.elbow_flare_right_deg:     # TODO: לא נמדד עדיין
+    unit: deg
+    aliases: [bench.elbow_flare_right_deg, elbow_flare_right_deg, shoulder_elbow_angle_right_deg]
+
+  bench.elbow_flare_avg_deg:       # TODO: לא נמדד עדיין
+    unit: deg
+    aliases: [bench.elbow_flare_avg_deg, elbow_flare_avg_deg, shoulder_elbow_angle_avg_deg]
+
+  # Bench — תנוחת בנץ' (שכיבה/מגעים)
+  bench.on_bench:                  # TODO: לא נמדד עדיין
+    unit: bool
+    aliases: [bench.on_bench, on_bench]
+
+  bench.butt_on_bench:             # TODO: לא נמדד עדיין
+    unit: bool
+    aliases: [bench.butt_on_bench, butt_on_bench, pelvis_on_bench]
+
+  bench.feet_on_floor:             # TODO: לא נמדד עדיין
+    unit: bool
+    aliases: [bench.feet_on_floor, feet_on_floor, both_feet_on_floor]
+
+  # Bench — מגע/מסלול המוט
+  bench.bar_touch_chest:           # TODO: לא נמדד עדיין
+    unit: bool
+    aliases: [bench.bar_touch_chest, bar_touched_chest]
+
+  bench.bar_y_rel_chest:           # TODO: לא נמדד עדיין (אם אין לך כבר press.hand_y_rel_chest)
+    unit: ratio
+    aliases: [bench.bar_y_rel_chest, bar_y_rel_chest]
+
+  bench.bar_bounce_detected:       # TODO: לא נמדד עדיין
+    unit: bool
+    aliases: [bench.bar_bounce_detected, bar_bounce]
+
+  # Bench — סט כתף (סקאפולה)
+  scap.retraction_deg:             # TODO: לא נמדד עדיין
+    unit: deg
+    aliases: [scap.retraction_deg, scap_retraction_deg]
+
+  scap.depression_deg:             # TODO: לא נמדד עדיין
+    unit: deg
+    aliases: [scap.depression_deg, scap_depression_deg]
+
 # =============================================================================
 # טולרנסים בין aliases של אותו מפתח קנוני
 # =============================================================================
@@ -538,7 +590,29 @@ tolerances:
   bool:    0
 
 # =============================================================================
-# 🛠️ רעיונות עתידיים (תיעוד בלבד)
+# 🛠️ שיפורים / מדידות עתיד (ולאיזה תרגילים זה קשור)
+# =============================================================================
+# • bench.elbow_flare_left_deg / right_deg / avg_deg  — Bench Press קלאסי; Push-Up (גרסה מתקדמת בהמשך).
+#   מטרה: לוודא שהמרפק בטווח בטוח מול הכתף (לא “בורח” גבוה מדי; <~20° = נטייה ל-Close Grip → וריאנט נפרד).
+#
+# • bench.on_bench / bench.butt_on_bench / bench.feet_on_floor  — Bench Press.
+#   מטרה: אכיפת תנוחת בנץ’ תקנית (שכיבה, ישבן על הספסל, רגליים על הקרקע).
+#
+# • bench.bar_touch_chest / bench.bar_y_rel_chest  — Bench Press.
+#   מטרה: אימות עומק הירידה/מגע מבוקר בחזה (ללא “הקפצה”).
+#
+# • bench.bar_bounce_detected  — Bench Press.
+#   מטרה: זיהוי “הקפצה מהחזה” לפי שינויי מהירות/האצה סביב נקודת המגע.
+#
+# • scap.retraction_deg / scap.depression_deg  — Bench Press (וגם חתירות/לחיצות בכלל).
+#   מטרה: “כתפיים אחורה ולמטה” לייצוב חגורת הכתפיים והגנה על הכתף.
+#
+# הערות:
+# - כל הסעיפים שמסומנים TODO “לא נמדד עדיין” — לא מורידים ציון עד מימוש בקינמטיקס.
+# - מיד כשנחשב אותם בצנרת kinematics → המפתחות כאן כבר מוכנים, והחיווט באיפיון/Scoring יופעל.
+#
+# =============================================================================
+# 🧠 רעיונות עתידיים (תיעוד כללי – נשמרו גם מהגרסה הקודמת)
 # =============================================================================
 # 1) ROM מפורק למפרקים נוספים: knee_rom_deg / elbow_rom_deg (deg)
 # 2) מדדי “turn quality” כמותיים: turn_sharpness (ratio), turn_dt_s (s)

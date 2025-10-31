@@ -1,22 +1,32 @@
 ﻿# ==========================
 # BodyPlus_XPro Requirements
+# יציב לענן (Linux) וגם מקומי (Windows)
+# NumPy נעול ל-1.x כדי למנוע בעיות תאימות
+# Python מומלץ: 3.11.x
 # ==========================
 
-# --- Core ---
-numpy==1.26.4
+# --- Core / Math ---
+numpy==1.26.4            # 🔒 אל תעלה ל-2.x
 pandas==2.2.2
 scipy==1.13.1
+
+# --- CV / Pose ---
 opencv-python-headless==4.10.0.84
 mediapipe==0.10.21
-torch==2.3.1+cpu
-ultralytics==8.3.20
 Pillow==10.4.0
+protobuf==4.25.3         # תאימות טובה ל-mediapipe
+
+# --- Torch / YOLO ---
+torch==2.3.1+cpu         # בענן/מקומי ללא GPU
+ultralytics==8.3.20
+# אם תריץ על GPU: החלף לשורה הבאה והסר את ה-+cpu
+# torch==2.3.1
 
 # --- Flask & Server ---
 Flask==3.0.3
 Flask-Cors==4.0.1
 Werkzeug==3.0.3
-gunicorn==21.2.0
+gunicorn==21.2.0         # ענן (Linux)
 gevent==24.2.1
 eventlet==0.36.1
 
@@ -25,15 +35,15 @@ PyYAML==6.0.2
 loguru==0.7.2
 tqdm==4.66.5
 psutil==5.9.8
+rich==13.7.1
 
 # --- Async / Requests ---
 requests==2.32.3
 aiohttp==3.10.5
 
-# --- Optional (Video Tools / FFMPEG / Cloud) ---
+# --- Video / FFMPEG helpers ---
 imageio==2.34.1
 imageio-ffmpeg==0.5.1
 
 # --- Local Dev / Utils ---
 python-dotenv==1.0.1
-rich==13.7.1
